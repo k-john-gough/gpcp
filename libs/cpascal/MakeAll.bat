@@ -8,6 +8,7 @@ gpcp /special GPTextFiles.cp
 gpcp /special ProgArgs.cp
 gpcp /special RTS.cp
 gpcp /special StdIn.cp
+gpcp /special WinMain.cp
 gpcp RealStr.cp
 gpcp StringLib.cp
 Browse /html /sort ASCII.cps
