@@ -614,7 +614,7 @@ public class RTS
 //  PROCEDURE intBitsToShortReal(l : INTEGER) : SHORTREAL;
 //  (** Convert an int into an ieee float with same bit pattern *)
 //
-  	public static double intBitsToShortReal(int l)
+  	public static float intBitsToShortReal(int l)
   	{
 	    byte[] tmp = System.BitConverter.GetBytes(l);
   	    return System.BitConverter.ToSingle(tmp,0);
