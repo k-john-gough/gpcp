@@ -190,9 +190,9 @@ MODULE CPascal;
       *  be called twice. Avoid an attempted sharing violation...
       *)
       IF Scnr.lst # NIL THEN 
-      TxtFil.CloseFile(Scnr.lst);
-      CSt.Message(RTS.getStr(sysX));
-      Scnr.lst := NIL;
+        TxtFil.CloseFile(Scnr.lst);
+        CSt.Message(RTS.getStr(sysX));
+        Scnr.lst := NIL;
       ELSE
         FixListing;
       END;

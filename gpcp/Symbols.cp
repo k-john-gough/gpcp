@@ -1305,7 +1305,8 @@ MODULE Symbols;
                                 IN s : ARRAY OF CHAR),NEW,EXTENSIBLE;
     VAR l,c : INTEGER;
   BEGIN
-    IF ty.idnt # NIL THEN l := ty.idnt.token.lin; c := ty.idnt.token.col;
+    IF (ty.idnt # NIL) & (ty.idnt.token # NIL) THEN 
+      l := ty.idnt.token.lin; c := ty.idnt.token.col;
     ELSE l := S.line; c := S.col;
     END;
     S.SemError.RepSt1(n,s,l,c);

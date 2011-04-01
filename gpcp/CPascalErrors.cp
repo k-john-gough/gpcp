@@ -506,6 +506,7 @@ MODULE CPascalErrors;
     | 233: str := "Literal constant too big, even for LONGINT";
     | 234: str := "Extension of LIMITED type must be limited";
     | 235: str := "LIMITED types can only be extended in the same module";
+    | 236: str := "Cannot resolve CLR name of this type";
 
     | 298: str := "ILASM failed to assemble IL file";
     | 299: str := "Compiler raised an internal exception";
@@ -617,6 +618,8 @@ MODULE CPascalErrors;
     | 205,
       207: msg := LitValue.strToCharOpen(
 		       "Binding scope of feature is record type <" + s1 + ">");
+    | 236: msg := LitValue.strToCharOpen(
+                       "Cannot resolve CLR name of type : " + s1);
     | 299: msg := LitValue.strToCharOpen("Exception: " + s1);
     | 308: msg := LitValue.strToCharOpen(
                        "Renaming static class to <" + s1 + ">");

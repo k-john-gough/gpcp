@@ -941,7 +941,8 @@ MODULE MsilUtil;
     elTp := arTp.elemTp;
     aLen := arTp.length;
     os.PushInt(aLen);
-    os.CodeTn(Asm.opc_newarr, elTp);
+   (* os.CodeTn(Asm.opc_newarr, elTp); *)
+    os.CodeT(Asm.opc_newarr, elTp);
    (*
     *   Do we need an initialization loop?
     *)
@@ -990,7 +991,8 @@ MODULE MsilUtil;
         vTp : Sy.Type;
   BEGIN
     ord := mapVecElTp(eTp);
-    os.CodeTn(Asm.opc_newarr, mapOrdRepT(ord));
+    (*os.CodeTn(Asm.opc_newarr, mapOrdRepT(ord)); *)
+    os.CodeT(Asm.opc_newarr, mapOrdRepT(ord));
     os.PutGetF(Asm.opc_stfld, vecArray(ord));
   END MkVecArr;
 
@@ -1054,7 +1056,8 @@ MODULE MsilUtil;
               os.MkFixedArray(elT);
             ELSE
               os.PushLocal(lAr[dim+1]);
-              os.CodeTn(Asm.opc_newarr, elT.elemTp);
+              (*os.CodeTn(Asm.opc_newarr, elT.elemTp); *)
+              os.CodeT(Asm.opc_newarr, elT.elemTp);
               InitLoop(os, dim+1, elT, lAr);
             END;
         END;
@@ -1081,10 +1084,12 @@ MODULE MsilUtil;
     IF (elTp IS Ty.Array) OR (elTp IS Ty.Record) THEN
       GetLengths(os, 0, arTp, lens);
       os.PushLocal(lens[0]);
-      os.CodeTn(Asm.opc_newarr, elTp);
+      (*os.CodeTn(Asm.opc_newarr, elTp); *)
+      os.CodeT(Asm.opc_newarr, elTp);
       InitLoop(os, 0, arTp, lens);
     ELSE
-      os.CodeTn(Asm.opc_newarr, elTp);
+      (*os.CodeTn(Asm.opc_newarr, elTp); *)
+      os.CodeT(Asm.opc_newarr, elTp);
     END; 
   END MkOpenArray;
 
@@ -1333,6 +1338,7 @@ MODULE MsilUtil;
       IF inS[0] # '[' THEN 
         RETURN mod.clsNm;
       ELSE
+        INCL(mod.xAttr, Sy.isFn); (* make sure this is marked foreign *)
         ln := LEN(inS);
         ix := 0;
         REPEAT
