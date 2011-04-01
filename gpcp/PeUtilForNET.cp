@@ -2437,11 +2437,33 @@ MODULE PeUtil;
 
 (* -------------------------------- *)
 
+  PROCEDURE (os : PeFile)RescueOpaque(tTy : Sy.Type),NEW;
+    VAR blk : Id.BlkId;
+        ext : BlkXtn;
+  BEGIN
+    blk := tTy.idnt.dfScp(Id.BlkId);
+    os.DoExtern(blk);
+    ext := blk.tgXtn(BlkXtn);
+    (* Set tgXtn to a ClassRef *)
+    tTy.tgXtn := getOrAddClass(ext.asmD, MKSTR(blk.xName^), MKSTR(Sy.getName.ChPtr(tTy.idnt)^));
+  RESCUE (any)
+    (* Just leave tgXtn = NIL *)
+  END RescueOpaque;
+
+(* -------------------------------- *)
+
   PROCEDURE (os : PeFile)typ(tTy : Sy.Type) : Api.Type,NEW;
     VAR xtn : ANYPTR;
   BEGIN (* returns Api.Type descriptor for this type *)
     IF tTy.tgXtn = NIL THEN Mu.MkTypeName(tTy, os) END;
+    IF (tTy IS TypeDesc.Opaque) & (tTy.tgXtn = NIL) THEN os.RescueOpaque(tTy(TypeDesc.Opaque)) END;
     xtn := tTy.tgXtn;
+    IF xtn = NIL THEN 
+      IF tTy.xName # NIL THEN tTy.TypeErrStr(236, tTy.xName); 
+      ELSE tTy.TypeError(236); 
+      END;
+      RTS.Throw("Opaque Type Error");
+    END;
     WITH xtn : Api.Type DO
         RETURN xtn;
     | xtn : RecXtn DO
