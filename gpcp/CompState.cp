@@ -127,6 +127,16 @@ MODULE CompState;
 (*				Utilities				*)
 (* ==================================================================== *)
 
+    PROCEDURE SetQuiet*(); 
+    BEGIN
+      CPascalErrors.nowarn := TRUE;
+    END SetQuiet;
+    
+    PROCEDURE RestoreQuiet*();
+    BEGIN
+      CPascalErrors.nowarn := ~warning;
+    END RestoreQuiet;
+
     PROCEDURE targetIsNET*() : BOOLEAN;
     BEGIN
       RETURN target = "net";

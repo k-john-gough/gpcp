@@ -145,25 +145,16 @@ BEGIN
     GPBinFiles.CloseFile(S.src);
     CPascal.FixListing();
     CPascal.Finalize();
-    Chuck("Parse error(s) in module <" + mod.name + ">");
+    Chuck("Parse error(s) in module <" + mod.name^ + ">");
   END;
 END Check;
 
 PROCEDURE DoImport(mod : MH.ModInfo; VAR mainImported : BOOLEAN);
 VAR
-  mName : FileNames.NameString;
+  mName : MH.ModName;
   aMod  : MH.ModInfo;
   last  : S.Token;
-  strng, impNm : POINTER TO ARRAY OF CHAR;
-  (* ----------------------------------------------------------- *)
-  PROCEDURE AssignOpen(src : LitValue.CharOpen; 
-                   OUT dst : FileNames.NameString);
-    VAR idx, max : INTEGER;
-  BEGIN
-    max := MIN(LEN(src), LEN(FileNames.NameString));
-    FOR idx := 0 TO max-1 DO dst[idx] := src[idx] END;
-  END AssignOpen;
-  (* ----------------------------------------------------------- *)
+  strng, impNm : MH.ModName;
 BEGIN
   Check(G.identSym,mod);
   last := token;
@@ -173,12 +164,13 @@ BEGIN
     token := S.get();			(* read past ident *)
   END;
   IF last.sym = G.identSym THEN
-    S.GetString(last.pos, last.len, mName);
+    mName := LitValue.subStrToCharOpen(last.pos, last.len);
   ELSIF last.sym = G.stringSym THEN
     strng := LitValue.subStrToCharOpen(last.pos+1, last.len-2);
     ForeignName.ParseModuleString(strng, impNm);
-    AssignOpen(impNm, mName);
+    mName := impNm;
   ELSE
+    mName := NIL;
     Chuck("Bad module name for alias import");
   END;
   IF (NameHash.enterSubStr(last.pos, last.len) = NameHash.mainBkt) OR 
@@ -198,7 +190,7 @@ VAR
   cpmainImported : BOOLEAN;
   hsh : INTEGER;
 BEGIN
-  CompState.InitCompState(mod.name + ".cp");
+  CompState.InitCompState(mod.name^ + ".cp");
   mod.importsLinked := TRUE;
   cpmainImported := FALSE;
   S.Reset;
@@ -213,8 +205,8 @@ BEGIN
   Check(G.MODULESym,mod); token := S.get();
   Check(G.identSym,mod);
   S.GetString(token.pos,token.len,mName);
-  IF (mName # mod.name) THEN 
-    Chuck("File " + mod.name + ".cp does not contain MODULE " + mName);
+  IF (mName # mod.name^) THEN 
+    Chuck("File " + mod.name^ + ".cp does not contain MODULE " + mName);
   END;
   token := S.get();
   IF token.sym = G.lbrackSym THEN
@@ -233,9 +225,9 @@ BEGIN
     END;
   END;
   IF (mod = graph) & ~cpmainImported THEN
-    Warn("WARNING: " + mod.name + " is not a base module.");
-    Warn("Modules that " + mod.name + " depends on will be checked for consistency");
-    Warn("Modules that depend on " + mod.name + " will not be checked or recompiled");
+    Warn("WARNING: " + mod.name^ + " is not a base module.");
+    Warn("Modules that " + mod.name^ + " depends on will be checked for consistency");
+    Warn("Modules that depend on " + mod.name^ + " will not be checked or recompiled");
   END;
 END LinkImports;
 
@@ -248,10 +240,10 @@ VAR
 BEGIN
   NEW(graph); 
   ReadModuleName(name);
-  graph := MH.GetModule(name);
-  S.src := GPBinFiles.findLocal(graph.name + ".cp");
+  graph := MH.GetModule(BOX(name$));
+  S.src := GPBinFiles.findLocal(graph.name^ + ".cp");
   IF S.src = NIL THEN
-    Chuck("Could not find base file <" + graph.name + ".cp>");
+    Chuck("Could not find base file <" + graph.name^ + ".cp>");
   ELSE
     GPBinFiles.CloseFile(S.src);
   END;
@@ -259,12 +251,12 @@ BEGIN
   nextIx := 0; 
   WHILE (nextIx < toDoList.tide) DO
     nextModule := toDoList.list[nextIx]; INC(nextIx);
-    S.src := GPBinFiles.findLocal(nextModule.name + ".cp");
+    S.src := GPBinFiles.findLocal(nextModule.name^ + ".cp");
     SF.OpenSymbolFile(nextModule.name, S.src = NIL);
     IF S.src = NIL THEN
       IF SF.file = NIL THEN 
-        Chuck("Cannot find source file <" + nextModule.name + 
-                  ".cp> or symbol file <" + nextModule.name + 
+        Chuck("Cannot find source file <" + nextModule.name^ + 
+                  ".cp> or symbol file <" + nextModule.name^ + 
                   ".cps> on CPSYM path.");
       ELSE 
         SF.ReadSymbolFile(nextModule,FALSE); 
@@ -313,7 +305,7 @@ BEGIN
   IF mod.isForeign THEN
     IF ~CompState.quiet THEN
       Console.WriteString(
-	  "#cpmake:  "+mod.name+" is foreign, compiling with -special.");
+	  "#cpmake:  " + mod.name^ + " is foreign, compiling with -special.");
       Console.WriteLn;
       Console.WriteString(
 	  "#cpmake:  Foreign implementation may need recompilation.");
@@ -321,10 +313,10 @@ BEGIN
     END;
     CPascal.DoOption("-special");
   ELSIF ~CompState.quiet THEN
-    Console.WriteString("#cpmake:  compiling " + mod.name);
+    Console.WriteString("#cpmake:  compiling " + mod.name^);
     Console.WriteLn;
   END;
-  CPascal.Compile(mod.name+".cp",retVal); 
+  CPascal.Compile(mod.name^ + ".cp",retVal); 
   mod.key := NewSymFileRW.GetLastKeyVal(); 
   INC(compCount);
 END CompileModule;
@@ -343,7 +335,7 @@ BEGIN
       retVal := 0;
       CompileModule(node,retVal);
       IF retVal # 0 THEN
-        Chuck("Compile errors in module <" + node.name + ">");
+        Chuck("Compile errors in module <" + node.name^ + ">");
       END;
     END;
     FOR ix := 0 TO node.importedBy.tide-1 DO

@@ -9,6 +9,7 @@
 MODULE Symbols;
 
   IMPORT
+        RTS,
         GPCPcopyright,
         GPText,
         Console,
@@ -47,7 +48,7 @@ MODULE Symbols;
     rMsk*  = { 8 .. 15};  noNew*  =  8; asgnd* =  9; noCpy* = 10;
                           spshl*  = 11; xCtor* = 12;
     fMsk*  = {16 .. 23};  isFn*   = 16; extFn* = 17; fnInf* = 18;
-    dMsk*  = {24 .. 31};  cMain*  = 24; wMain* = 25;
+    dMsk*  = {24 .. 31};  cMain*  = 24; wMain* = 25; sta*   = 26;
 
 (* ============================================================ *)
 
@@ -64,6 +65,7 @@ MODULE Symbols;
                 vMod-  : INTEGER;   (* visibility tag *)
                 dfScp* : Scope;     (* defining scope *)
                 tgXtn* : ANYPTR;    (* target stuff   *)
+                namStr- : RTS.NativeString;
               END;   (* For fields: record-decl scope *)
 
     IdSeq*  = RECORD
@@ -224,6 +226,16 @@ MODULE Symbols;
   PROCEDURE (t : Expr)Diagnose*(i : INTEGER),NEW,ABSTRACT;
   PROCEDURE (t : Stmt)Diagnose*(i : INTEGER),NEW,ABSTRACT;
   PROCEDURE (t : Type)name*() : L.CharOpen,NEW,ABSTRACT;
+  
+  PROCEDURE (t : Idnt)SetNameFromString*(nam : L.CharOpen),NEW;
+  BEGIN
+    t.namStr := MKSTR(nam^);
+  END SetNameFromString;
+
+  PROCEDURE (t : Idnt)SetNameFromHash*(hash : INTEGER),NEW;
+  BEGIN
+    t.namStr := MKSTR(NameHash.charOpenOfHash(hash)^);
+  END SetNameFromHash;
   
 (* ============================================================ *)
 (*             Base Class text-span method                      *)
@@ -1073,6 +1085,13 @@ MODULE Symbols;
   BEGIN
     RETURN NameHash.charOpenOfHash(id.hash);
   END ChPtr;
+
+  PROCEDURE (g : NameFetch)NtStr*(id : Idnt) : RTS.NativeString,NEW;
+  BEGIN
+    IF g.ChPtr(id) = NIL THEN RETURN NIL;
+	ELSE RETURN MKSTR(g.ChPtr(id)^);
+	END;
+  END NtStr;
 
 (* ============================================================ *)
 (*  Private methods of the symbol-table info-blocks             *)

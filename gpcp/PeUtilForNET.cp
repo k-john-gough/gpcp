@@ -858,7 +858,8 @@ MODULE PeUtil;
   PROCEDURE (os : PeFile)PushStr*(IN str : ARRAY OF CHAR);
   (* Use target quoting conventions for the literal string *)
   BEGIN
-    os.pePI.code.ldstr(MKSTR(str));
+    (* os.pePI.code.ldstr(MKSTR(str)); *)
+    os.pePI.code.ldstr(Sys.String.init(BOX(str), 0, LEN(str) - 1));
     os.Adjust(1);
   END PushStr;
 
@@ -1549,7 +1550,7 @@ MODULE PeUtil;
         *)
         NEW(rthA, 1);
         IF rtTpHdl = NIL THEN
-          rtTpHdl := getOrAddClass(corlib, "System", "RuntimeTypeHandle");
+          rtTpHdl := getOrAddValueClass(corlib, "System", "RuntimeTypeHandle");
         END;
         rthA[0] := rtTpHdl;
        (*
@@ -2458,9 +2459,9 @@ MODULE PeUtil;
     IF tTy.tgXtn = NIL THEN Mu.MkTypeName(tTy, os) END;
     IF (tTy IS TypeDesc.Opaque) & (tTy.tgXtn = NIL) THEN os.RescueOpaque(tTy(TypeDesc.Opaque)) END;
     xtn := tTy.tgXtn;
-    IF xtn = NIL THEN 
-      IF tTy.xName # NIL THEN tTy.TypeErrStr(236, tTy.xName); 
-      ELSE tTy.TypeError(236); 
+    IF xtn = NIL THEN
+      IF tTy.xName # NIL THEN tTy.TypeErrStr(236, tTy.xName);
+      ELSE tTy.TypeError(236);
       END;
       RTS.Throw("Opaque Type Error");
     END;

@@ -13,6 +13,7 @@ MODULE SymbolFile;
         Error,
         GPBinFiles,
         FileNames,
+        LitValue,
         CompState,
         MH := ModuleHandler;
 
@@ -105,7 +106,7 @@ MODULE SymbolFile;
     iAtt : INTEGER;
     lAtt : LONGINT;
     rAtt : REAL;
-    sAtt : FileNames.NameString;
+    sAtt : LitValue.CharOpen;
 
 (* ============================================================ *)
 (* ========     Various reading utility procedures      ======= *)
@@ -118,36 +119,46 @@ MODULE SymbolFile;
 
 (* ======================================= *)
 
-  PROCEDURE ReadUTF(OUT nam : ARRAY OF CHAR);
+  PROCEDURE readUTF() : LitValue.CharOpen; 
     CONST
-        bad = "Bad UTF-8 string";
+      bad = "Bad UTF-8 string";
     VAR num : INTEGER;
-        bNm : INTEGER;
-        idx : INTEGER;
-        chr : INTEGER;
+      bNm : INTEGER;
+      len : INTEGER;
+      idx : INTEGER;
+      chr : INTEGER;
+      buff : LitValue.CharOpen;
   BEGIN
     num := 0;
-    bNm := read() * 256 + read();
-    FOR idx := 0 TO bNm-1 DO
-      chr := read();
-      IF chr <= 07FH THEN
-        nam[num] := CHR(chr); INC(num);
-      ELSIF chr DIV 32 = 06H THEN
+   (* 
+    *  bNm is the length in bytes of the UTF8 representation 
+    *)
+    len := read() * 256 + read();  (* max length 65k *)
+   (* 
+    *  Worst case the number of chars will equal byte-number.
+    *)
+    NEW(buff, len + 1); 
+    idx := 0;
+    WHILE idx < len DO
+      chr := read(); INC(idx);
+      IF chr <= 07FH THEN		(* [0xxxxxxx] *)
+        buff[num] := CHR(chr); INC(num);
+      ELSIF chr DIV 32 = 06H THEN	(* [110xxxxx,10xxxxxx] *)
         bNm := chr MOD 32 * 64;
-        chr := read();
+        chr := read(); INC(idx);
         IF chr DIV 64 = 02H THEN
-          nam[num] := CHR(bNm + chr MOD 64); INC(num);
+          buff[num] := CHR(bNm + chr MOD 64); INC(num);
         ELSE
           RTS.Throw(bad);
         END;
-      ELSIF chr DIV 16 = 0EH THEN
+      ELSIF chr DIV 16 = 0EH THEN	(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         bNm := chr MOD 16 * 64;
-        chr := read();
+        chr := read(); INC(idx);
         IF chr DIV 64 = 02H THEN
           bNm := (bNm + chr MOD 64) * 64; 
-          chr := read();
+          chr := read(); INC(idx);
           IF chr DIV 64 = 02H THEN
-            nam[num] := CHR(bNm + chr MOD 64); INC(num);
+            buff[num] := CHR(bNm + chr MOD 64); INC(num);
           ELSE 
             RTS.Throw(bad);
           END;
@@ -158,8 +169,9 @@ MODULE SymbolFile;
         RTS.Throw(bad);
       END;
     END;
-    nam[num] := 0X;
-  END ReadUTF;
+    buff[num] := 0X;
+    RETURN LitValue.arrToCharOpen(buff, num);
+  END readUTF;
 
 (* ======================================= *)
 
@@ -229,9 +241,10 @@ MODULE SymbolFile;
     sSym := read();
     CASE sSym OF
     | namSy : 
-        iAtt := read(); ReadUTF(sAtt);
+        iAtt := read(); 
+        sAtt := readUTF();
     | strSy : 
-        ReadUTF(sAtt);
+        sAtt := readUTF();
     | retSy, fromS, tDefS, basSy :
         iAtt := readOrd();
     | bytSy :
@@ -413,9 +426,9 @@ MODULE SymbolFile;
     GetSym();
     CheckAndGet(modSy);
     Check(namSy);
-    IF mod.name # sAtt THEN 
-      SymError("Wrong name in symbol file. Expected <" + mod.name + 
-                ">, found <" + sAtt + ">"); 
+    IF mod.name^ # sAtt^ THEN 
+      SymError("Wrong name in symbol file. Expected <" + mod.name^ + 
+                ">, found <" + sAtt^ + ">"); 
       RETURN;
     END;
     GetSym();

@@ -1,4 +1,5 @@
 
+(* ============================================================ *)
 (*  JavaUtil is the module which writes java classs file        *)
 (*  structures  						*)
 (*  Copyright (c) John Gough 1999, 2000.			*)

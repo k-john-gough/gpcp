@@ -21,7 +21,7 @@ SYSTEM MODULE RTS;
 
   TYPE  CharOpen*       = POINTER TO ARRAY OF CHAR;
 
-  TYPE  NativeType*	= POINTER TO ABSTRACT RECORD END;
+  TYPE  NativeType*	   = POINTER TO ABSTRACT RECORD END;
         NativeObject*   = POINTER TO ABSTRACT RECORD END;  
         NativeString*   = POINTER TO RECORD END;
         NativeException*= POINTER TO EXTENSIBLE RECORD END;
@@ -101,6 +101,16 @@ SYSTEM MODULE RTS;
                         OUT r  : SHORTREAL; 
                         OUT ok : BOOLEAN);
   (** Parse array into a short REAL *)
+
+  (* ========================================================== *)
+  (* ============== Operations on Native Strings ============== *)
+  (* ========================================================== *)
+
+  PROCEDURE CharAtIndex*(str : NativeString; idx : INTEGER) : CHAR;
+  (* Get the character at zero-based index idx *)
+
+  PROCEDURE Length*(str : NativeString) : INTEGER;
+  (* Get the length of the native string *)
 
   (* ========================================================== *)
   (* ============== Conversions TO array of char ============== *)

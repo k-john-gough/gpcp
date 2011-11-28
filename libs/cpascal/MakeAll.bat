@@ -9,6 +9,7 @@ gpcp /special ProgArgs.cp
 gpcp /special RTS.cp
 gpcp /special StdIn.cp
 gpcp /special WinMain.cp
+gpcp /special STA.cp
 gpcp RealStr.cp
 gpcp StringLib.cp
 Browse /html /sort ASCII.cps
@@ -17,6 +18,7 @@ Browse /html /sort Error.cps
 Browse /html /sort GPFiles.cps
 Browse /html /sort GPBinFiles.cps
 Browse /html /sort GPTextFiles.cps
+Browse /html /sort ProgArgs.cps
 Browse /html /sort RTS.cps
 Browse /html /sort StdIn.cps
 Browse /html /sort RealStr.cps

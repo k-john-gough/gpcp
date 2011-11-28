@@ -575,7 +575,7 @@ MODULE TypeDesc;
     VAR ext : Record;
         i   : INTEGER;
   BEGIN
-    e := e.boundRecTp();  (* FIXME? kjg *)
+    e := e.boundRecTp(); 
 
     IF (e = NIL) OR (e.kind # recTp) THEN RETURN FALSE;
     ELSIF e = b THEN RETURN TRUE;               (* Trivially! *)
@@ -1639,12 +1639,6 @@ MODULE TypeDesc;
    (* ----------------------------------------- *)
   BEGIN (* resolve *)
     IF i.depth = initialMark THEN
-(*
- *    IF i.idnt # NIL THEN
- *      recId := i.idnt;
- *      nameS := Sy.getName.ChPtr(recId);
- *    END;
- *)
       i.depth := d;
       e145 := FALSE;
       e137 := FALSE;

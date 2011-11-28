@@ -76,6 +76,26 @@ public class RTS
 	}
 
 /* ------------------------------------------------------------ */
+//   PROCEDURE TypeName(typ : NativeType) : CharOpen
+//  (* Get the name of the argument type *)
+//
+    public static char[] TypeName(System.Type t) { 
+      return NativeStrings.mkArr(t.FullName);
+    }
+
+/* ------------------------------------------------------------ */
+//   PROCEDURE CharAtIndex(str : NativeString; idx : INTEGER) : CHAR;
+//  (* Get the character at zero-based index idx *)
+//
+    public static char CharAtIndex( string s, int i ) { return s[i]; }
+
+/* ------------------------------------------------------------ */
+//  PROCEDURE Length(str : NativeString) : INTEGER;
+//  (* Get the length of the native string *)
+//
+    public static int Length( string s ) { return s.Length; }
+
+/* ------------------------------------------------------------ */
 // PROCEDURE StrToByte(IN str : ARRAY OF CHAR;
 //                     OUT b  : BYTE;
 //                     OUT ok : BOOLEAN);
@@ -614,7 +634,7 @@ public class RTS
 //  PROCEDURE intBitsToShortReal(l : INTEGER) : SHORTREAL;
 //  (** Convert an int into an ieee float with same bit pattern *)
 //
-  	public static float intBitsToShortReal(int l)
+  	public static double intBitsToShortReal(int l)
   	{
 	    byte[] tmp = System.BitConverter.GetBytes(l);
   	    return System.BitConverter.ToSingle(tmp,0);
@@ -733,7 +753,7 @@ public class ProgArgs
 	// PROCEDURE ArgNumber*() : INTEGER
 	public static int ArgNumber()
 	{
-	    if (ProgArgs.argList == null)
+        if (ProgArgs.argList == null)
 		return 0;
 	    else
 		return argList.Length;
@@ -743,19 +763,19 @@ public class ProgArgs
 	// PROCEDURE GetArg*(num : INTEGER; OUT arg : ARRAY OF CHAR) 
 	public static void GetArg(int num, char[] arr)
 	{
-	    int i;
-	    if (argList == null) {
-		arr[0] = '\0';
+      int i;
+	    if (argList == null && num < argList.Length) {
+		    arr[0] = '\0';
 	    } else {
-		for (i = 0; 
-		     i < arr.Length && i < argList[num].Length;
-		     i++) {
 		    System.String str = argList[num];
-		    arr[i] = str[i];
-		}
-		if (i == arr.Length)
+		    for (i = 0; 
+		      i < arr.Length && i < argList[num].Length;
+		      i++) {
+		        arr[i] = str[i];
+		    }
+		    if (i == arr.Length)
 		    i--;
-		arr[i] = '\0';
+		    arr[i] = '\0';
 	    }
 	}
 

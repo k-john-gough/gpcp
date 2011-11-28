@@ -99,6 +99,7 @@ public class MsilAsm {
 	}
 	optNm = optNm + CP_rts.mkStr(opt) + ' ';
 	if (verbose) {
+	    System.Console.WriteLine("#gpcp: Calling " + asm.StartInfo.FileName);
 #if BETA2
 	    asm.StartInfo.CreateNoWindow = false;
 #endif

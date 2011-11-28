@@ -43,7 +43,7 @@ MODULE GPCPcopyright;
      (* VERSION    = "1.3.8 of 18 November 2007"; *)
      (* VERSION    = "1.3.9 of 15 January 2008"; *)
      (* VERSION    = "1.3.10 of 15 November 2010"; *)
-        VERSION    = "1.3.11 of 1 April 2011";
+        VERSION    = "1.3.12 of 17 November 2011"; 
 	verStr*    = " version " + VERSION;
 
   CONST	prefix     = "#gpcp: ";

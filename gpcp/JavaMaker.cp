@@ -8,6 +8,7 @@ MODULE JavaMaker;
 
   IMPORT 
         GPCPcopyright,
+        ASCII,
         Error,
         Console,
         L := LitValue,
@@ -20,7 +21,7 @@ MODULE JavaMaker;
         GPTextFiles,
         Jvm := JVMcodes,
         J := JavaUtil,
-        JasminAsm,
+        (* JasminAsm, jasmin is no longer used! *)
         ClassUtil,
         JsmnUtil,
         G  := Builtin,
@@ -246,11 +247,14 @@ MODULE JavaMaker;
   PROCEDURE (this : JavaAssembler)Assemble*();
     VAR ix : INTEGER;
   BEGIN
-    FOR ix := 0 TO asmList.tide-1 DO
-      IF CompState.verbose THEN
-        CompState.Message("Assembling " + asmList.a[ix]^);
+    IF asmList.tide > 0 THEN
+      CompState.Message("Jasmin Assmbler no longer supported");
+      CompState.Message("The following jasmin text files were created:");
+      FOR ix := 0 TO asmList.tide-1 DO
+        Console.Write(ASCII.HT); 
+        Console.WriteString(asmList.a[ix]^);
+        Console.WriteLn;
       END;
-      JasminAsm.Assemble(asmList.a[ix]);
     END;
   END Assemble;
 
@@ -491,6 +495,9 @@ MODULE JavaMaker;
   BEGIN
    (*
     *  Create the classFile structure, and open the output file.
+    *  The default for the JVM target is to write a class file
+    *  directly.  The -jasmin option writes a jasmin output file
+    *  but does not call the (now unavailable) assembler.
     *)
     IF CompState.doCode & ~CompState.doJsmn THEN
       WITH this : JavaModEmitter DO
@@ -2280,7 +2287,7 @@ MODULE JavaMaker;
 (*
  *      e.PushValue(argX, argX.type);
  *)
-        e.ValueCopy(argX, argX.type);
+        e.ValueCopy(argX, dstT);
         out.PutVecElement(dstT);
         out.LoadLocal(vRef, NIL);
         out.LoadLocal(tide, G.intTp);
@@ -2416,7 +2423,9 @@ MODULE JavaMaker;
     lhTyp := stat.lhsX.type;
     e.PushHandle(stat.lhsX, lhTyp);
     e.PushValue(stat.rhsX, lhTyp);
-    WITH lhTyp : Ty.Array DO 
+    WITH lhTyp : Ty.Vector DO
+        e.ScalarAssign(stat.lhsX);
+    | lhTyp : Ty.Array DO 
         IF stat.rhsX.kind = Xp.mkStr THEN
           e.outF.CallRTS(J.StrVal, 2, 0);
         ELSIF stat.rhsX.type = G.strTp THEN

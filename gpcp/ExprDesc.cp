@@ -322,6 +322,18 @@ MODULE ExprDesc;
 
 (* -------------------------------------------- *)
 
+  PROCEDURE mkStrLenLt*(str : L.CharOpen; len : INTEGER) : LeafX;
+    VAR l : LeafX;
+  BEGIN
+    NEW(l);
+    l.token := S.prevTok;
+    l.SetKind(strLt);
+    l.type := Builtin.strTp;
+    l.value := L.newStrLenVal(str, len); RETURN l;
+  END mkStrLenLt;
+
+(* -------------------------------------------- *)
+
   PROCEDURE tokToStrLt*(pos,len : INTEGER) : LeafX;
   (** Generate a LeafX for this string, stripping off the quote *
     * characters which surround it in the scanner buffer. *)
@@ -333,6 +345,20 @@ MODULE ExprDesc;
     l.type := Builtin.strTp;
     l.value := L.newBufVal(pos+1,len-2); RETURN l;
   END tokToStrLt;
+
+(* -------------------------------------------- *)
+
+  PROCEDURE translateStrLt*(pos,len : INTEGER) : LeafX;
+  (** Generate a LeafX for this string, stripping off the quote *
+    * characters which surround it in the scanner buffer. *)
+    VAR l : LeafX;
+  BEGIN
+    NEW(l);
+    l.token := S.prevTok;
+    l.SetKind(strLt);
+    l.type := Builtin.strTp;
+    l.value := L.escapedString(pos+2,len-3); RETURN l;
+  END translateStrLt;
 
 (* ============================================================ *)
 (*         UnaryX Constructor methods     *)
@@ -1278,6 +1304,7 @@ MODULE ExprDesc;
           funI : I.PrcId;
           funN : INTEGER;
           argN : INTEGER;
+          errN : INTEGER;
           arg0 : D.Expr;
           arg1 : D.Expr;
           argT : D.Type;
@@ -1395,8 +1422,19 @@ MODULE ExprDesc;
             argT := arg0.type;
             arg0.CheckWriteable();
             WITH argT : T.Vector DO
-              IF ~argT.elemTp.equalType(arg1.type) THEN 
-                D.RepTypesErrTok(230, argT.elemTp, arg1.type, arg1.token);
+              IF ~argT.elemTp.assignCompat(arg1) THEN
+                IF    arg1.type.isOpenArrType() THEN errN := 142;
+                ELSIF arg1.type.isExtnRecType() THEN errN := 143;
+                ELSIF (arg1.type.kind = T.prcTp) &
+                      (arg1.kind = qualId) &
+                      ~arg1.isProcVar() THEN errN := 165;
+                ELSIF argT.elemTp.isCharArrayType() &
+                      arg1.type.isStringType() THEN  errN :=  27;
+                ELSE             errN :=  83;
+                END;
+                IF errN # 83 THEN arg1.ExprError(errN);
+                ELSE D.RepTypesErrTok(83, argT.elemTp, arg1.type, arg1.token);
+                END;
               END;
             ELSE 
               arg0.ExprError(229);

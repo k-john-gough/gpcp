@@ -24,6 +24,7 @@ MODULE NameHash;
     entries-  : INTEGER;
     mainBkt*  : INTEGER;
     winMain*  : INTEGER;
+    staBkt*   : INTEGER;
 
 (* ============================================================ *)
   PROCEDURE^ enterStr*(IN str : ARRAY OF CHAR) : INTEGER;
@@ -56,6 +57,7 @@ MODULE NameHash;
     entries := 0;
     mainBkt := enterStr("CPmain");
     winMain := enterStr("WinMain");
+    staBkt  := enterStr("STA");
   END InitNameHash;
 
 (* ============================================================ *)

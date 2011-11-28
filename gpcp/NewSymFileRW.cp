@@ -2,7 +2,7 @@
 (* ==================================================================== *)
 (*									*)
 (*  SymFileRW:  Symbol-file reading and writing for GPCP.		*)
-(*	Copyright (c) John Gough 1999, 2000.				*)
+(*	Copyright (c) John Gough 1999 -- 2011.				*)
 (*									*)
 (* ==================================================================== *)
 
@@ -90,6 +90,12 @@ MODULE NewSymFileRW;
 // and the user of the class _must_ agree on the IR name of the class.
 // The same reasoning applies to procedure types, which must have equal
 // interface names in all modules.
+//
+// Notes on the fine print about UTFstring --- November 2011 clarification.
+// The character sequence in the symbol file is modified UTF-8, that is
+// it may represent CHR(0), U+0000, by the bytes 0xC0, 0x80. String
+// constants may thus contain embedded nulls. 
+// 
 // ======================================================================== *)
 
   CONST
@@ -110,6 +116,7 @@ MODULE NewSymFileRW;
         magic   = 0DEADD0D0H;
         syMag   = 0D0D0DEADH;
         dumped* = -1;
+        buffDefault = 1024;
 
 (* ============================================================ *)
 
@@ -121,6 +128,8 @@ MODULE NewSymFileRW;
         	    iNxt : INTEGER;
         	    oNxt : INTEGER;
         	    work : D.TypeSeq;
+                    (* Recycled scratch area *)
+                    buff : POINTER TO ARRAY OF UBYTE; 
         	  END;
 
   TYPE
@@ -133,8 +142,9 @@ MODULE NewSymFileRW;
         	    iAtt  : INTEGER;
         	    lAtt  : LONGINT;
         	    rAtt  : REAL;
-        	    sAtt  : FileNames.NameString;
                     rScp  : ImpResScope;
+        	    strLen : INTEGER;
+        	    strAtt : Lt.CharOpen;
                     oArray : D.IdSeq;
         	    sArray : D.ScpSeq;		(* These two sequences	*)
   		    tArray : D.TypeSeq;		(* must be private as   *)
@@ -173,6 +183,7 @@ MODULE NewSymFileRW;
     VAR new : SymFile;
   BEGIN
     NEW(new);
+    NEW(new.buff, buffDefault);
    (*
     *  Initialization: cSum starts at zero. Since impOrd of
     *  the module is zero, impOrd of the imports starts at 1.
@@ -197,81 +208,107 @@ MODULE NewSymFileRW;
     BF.WriteByte(f.file, chr);
   END Write;
 
-(* ======================================= *)
-
-  PROCEDURE (f : SymFile)WriteStrUTF(IN nam : ARRAY OF CHAR),NEW;
-    VAR buf : ARRAY 256 OF INTEGER;
-        num : INTEGER;
+ (* ======================================= *
+  *  This method writes a UTF-8 byte sequence that
+  *  represents the input string up to but not
+  *  including the terminating null character.
+  *)
+  PROCEDURE (f : SymFile)WriteNameUTF(IN nam : ARRAY OF CHAR),NEW;
+    VAR num : INTEGER;
         idx : INTEGER;
         chr : INTEGER;
   BEGIN
+    IF LEN(nam) * 3 > LEN(f.buff) THEN 
+      NEW(f.buff, LEN(nam) * 3);
+    END;
+
     num := 0;
     idx := 0;
-    chr := ORD(nam[idx]);
+    chr := ORD(nam[0]);
     WHILE chr # 0H DO
       IF    chr <= 7FH THEN 		(* [0xxxxxxx] *)
-        buf[num] := chr; INC(num);
+        f.buff[num] := USHORT(chr); INC(num);
       ELSIF chr <= 7FFH THEN 		(* [110xxxxx,10xxxxxx] *)
-        buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num  ] := 0C0H + chr; INC(num, 2);
+        f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num  ] := USHORT(0C0H + chr); INC(num, 2);
       ELSE 				(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
-        buf[num+2] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num  ] := 0E0H + chr; INC(num, 3);
+        f.buff[num+2] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num  ] := USHORT(0E0H + chr); INC(num, 3);
       END;
       INC(idx); chr := ORD(nam[idx]);
     END;
     f.Write(num DIV 256);
     f.Write(num MOD 256);
-    FOR idx := 0 TO num-1 DO f.Write(buf[idx]) END;
-  END WriteStrUTF;
+    FOR idx := 0 TO num-1 DO f.Write(f.buff[idx]) END;
+  END WriteNameUTF;
 
-(* ======================================= *)
 
-  PROCEDURE (f : SymFile)WriteOpenUTF(chOp : Lt.CharOpen),NEW;
-    VAR buf : ARRAY 256 OF INTEGER;
-        num : INTEGER;
+ (* ======================================= *
+  *  This method writes a UTF-8 byte sequence that
+  *  represents the input string up to but not
+  *  including the final null character. The 
+  *  string may include embedded null characters.
+  *  Thus if the last meaningfull character is null
+  *  there will be two nulls at the end.
+  *)
+  PROCEDURE (f : SymFile)WriteStringUTF(chOp : Lt.CharOpen),NEW;
+    VAR num : INTEGER;
+        len : INTEGER;
         idx : INTEGER;
         chr : INTEGER;
   BEGIN
+    len := LEN(chOp) - 1; (* Discard "terminating" null *)
+    IF len * 3 > LEN(f.buff) THEN 
+      NEW(f.buff, len * 3);
+    END;
+
     num := 0;
-    idx := 0;
-    chr := ORD(chOp[0]);
-    WHILE chr # 0H DO
-      IF    chr <= 7FH THEN 		(* [0xxxxxxx] *)
-        buf[num] := chr; INC(num);
-      ELSIF chr <= 7FFH THEN 		(* [110xxxxx,10xxxxxx] *)
-        buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num  ] := 0C0H + chr; INC(num, 2);
-      ELSE 				(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
-        buf[num+2] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
-        buf[num  ] := 0E0H + chr; INC(num, 3);
-      END;
-      INC(idx);
+    FOR idx := 0 TO len - 1 DO
       chr := ORD(chOp[idx]);
+      IF chr = 0 THEN         (* [11000000, 10000000] *)
+        f.buff[num+1] := 080H; 
+        f.buff[num  ] := 0C0H; INC(num, 2);
+      ELSIF chr <= 7FH THEN 		(* [0xxxxxxx] *)
+        f.buff[num  ] := USHORT(chr); INC(num);
+      ELSIF chr <= 7FFH THEN 		(* [110xxxxx,10xxxxxx] *)
+        f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num  ] := USHORT(0C0H + chr); INC(num, 2);
+      ELSE 				(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
+        f.buff[num+2] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
+        f.buff[num  ] := USHORT(0E0H + chr); INC(num, 3);
+      END;
     END;
     f.Write(num DIV 256);
     f.Write(num MOD 256);
-    FOR idx := 0 TO num-1 DO f.Write(buf[idx]) END;
-  END WriteOpenUTF;
+    FOR idx := 0 TO num-1 DO f.Write(f.buff[idx]) END;
+  END WriteStringUTF;
 
 (* ======================================= *)
 
-  PROCEDURE (f : SymFile)WriteString(IN nam : ARRAY OF CHAR),NEW;
+  PROCEDURE (f : SymFile)WriteStringForName(nam : Lt.CharOpen),NEW;
   BEGIN
     f.Write(strSy); 
-    f.WriteStrUTF(nam);
-  END WriteString;
+    f.WriteNameUTF(nam);
+  END WriteStringForName;
 
 (* ======================================= *)
 
-  PROCEDURE (f : SymFile)WriteName(idD : D.Idnt),NEW;
+  PROCEDURE (f : SymFile)WriteStringForLit(str : Lt.CharOpen),NEW;
+  BEGIN
+    f.Write(strSy); 
+    f.WriteStringUTF(str);
+  END WriteStringForLit;
+
+(* ======================================= *)
+
+  PROCEDURE (f : SymFile)WriteNameForId(idD : D.Idnt),NEW;
   BEGIN
     f.Write(namSy); 
     f.Write(idD.vMod); 
-    f.WriteOpenUTF(Nh.charOpenOfHash(idD.hash));
-  END WriteName;
+    f.WriteNameUTF(Nh.charOpenOfHash(idD.hash));
+  END WriteNameForId;
 
 (* ======================================= *)
 
@@ -434,7 +471,7 @@ MODULE NewSymFileRW;
       *   Emit Optional Parameter name 
       *)
       IF ~CSt.legacy & (parI.hash # 0) THEN
-        f.WriteString(Nh.charOpenOfHash(parI.hash));
+        f.WriteStringForName(Nh.charOpenOfHash(parI.hash));
       END;
     END;
     f.Write(endFm);
@@ -454,14 +491,14 @@ MODULE NewSymFileRW;
     conX := id.conExp(ExprDesc.LeafX);
     cVal := conX.value;
     f.Write(conSy);
-    f.WriteName(id);
+    f.WriteNameForId(id);
     CASE conX.kind OF
     | ExprDesc.tBool  : f.Write(truSy);
     | ExprDesc.fBool  : f.Write(falSy);
     | ExprDesc.numLt  : f.WriteNum(cVal.long());
     | ExprDesc.charLt : f.WriteChar(cVal.char());
     | ExprDesc.realLt : f.WriteReal(cVal.real());
-    | ExprDesc.strLt  : f.WriteString(cVal.chOpen());
+    | ExprDesc.strLt  : f.WriteStringForLit(cVal.chOpen());
     | ExprDesc.setLt  : 
         f.Write(setSy); 
         IF cVal # NIL THEN sVal := cVal.int() ELSE sVal := 0 END;
@@ -477,7 +514,7 @@ MODULE NewSymFileRW;
   *)
   BEGIN
     f.Write(typSy);
-    f.WriteName(id);
+    f.WriteNameForId(id);
     f.EmitTypeOrd(id.type);
   END EmitTypeId;
 
@@ -489,7 +526,7 @@ MODULE NewSymFileRW;
   *)
   BEGIN
     f.Write(varSy);
-    f.WriteName(id);
+    f.WriteNameForId(id);
     f.EmitTypeOrd(id.type);
   END EmitVariableId;
 
@@ -502,8 +539,8 @@ MODULE NewSymFileRW;
   BEGIN
     IF D.need IN id.xAttr THEN
       f.Write(impSy);
-      f.WriteName(id);
-      IF id.scopeNm # NIL THEN f.WriteString(id.scopeNm) END;
+      f.WriteNameForId(id);
+      IF id.scopeNm # NIL THEN f.WriteStringForName(id.scopeNm) END; 
       f.Write(keySy);
       f.Write4B(id.modKey);
       id.impOrd := f.iNxt; INC(f.iNxt);
@@ -518,8 +555,8 @@ MODULE NewSymFileRW;
   *)
   BEGIN
     f.Write(prcSy);
-    f.WriteName(id);
-    IF id.prcNm # NIL THEN f.WriteString(id.prcNm) END;
+    f.WriteNameForId(id);
+    IF id.prcNm # NIL THEN f.WriteStringForName(id.prcNm) END; 
     IF id.kind = Id.ctorP THEN f.Write(truSy) END;
     f.FormalType(id.type(Ty.Procedure));
   END EmitProcedureId;
@@ -533,12 +570,12 @@ MODULE NewSymFileRW;
   BEGIN
     IF id.kind = Id.fwdMth THEN id := id.resolve(Id.MthId) END;
     f.Write(mthSy);
-    f.WriteName(id);
+    f.WriteNameForId(id);
     f.Write(ORD(id.mthAtt));
     f.Write(id.rcvFrm.parMod);
     f.EmitTypeOrd(id.rcvFrm.type);
-    IF id.prcNm # NIL THEN f.WriteString(id.prcNm) END;
-    IF ~CSt.legacy & (id.rcvFrm.hash # 0) THEN f.WriteName(id.rcvFrm) END;
+    IF id.prcNm # NIL THEN f.WriteStringForName(id.prcNm) END; 
+    IF ~CSt.legacy & (id.rcvFrm.hash # 0) THEN f.WriteNameForId(id.rcvFrm) END;
     f.FormalType(id.type(Ty.Procedure));
   END EmitMethodId;
 
@@ -630,7 +667,7 @@ MODULE NewSymFileRW;
     IF mod # 0 THEN
       f.Write(fromS);
       f.WriteOrd(mod);
-      f.WriteName(idt);
+      f.WriteNameForId(idt);
     END;
   END EmitTypeHeader;
 
@@ -701,7 +738,7 @@ MODULE NewSymFileRW;
       FOR index := 0 TO t.fields.tide-1 DO
         field := t.fields.a[index];
         IF (field.vMod # D.prvMode) & (field.type # NIL) THEN
-          f.WriteName(field);
+          f.WriteNameForId(field);
           f.EmitTypeOrd(field.type);
         END;
       END;
@@ -863,9 +900,9 @@ MODULE NewSymFileRW;
       END;
       symfile.Write4B(RTS.loInt(marker));
       symfile.Write(modSy);
-      symfile.WriteName(m);
+      symfile.WriteNameForId(m);
       IF m.scopeNm # NIL THEN (* explicit name *)
-        symfile.WriteString(m.scopeNm);
+        symfile.WriteStringForName(m.scopeNm); 
         symfile.Write(falSy);
       END;
      (*
@@ -913,36 +950,50 @@ MODULE NewSymFileRW;
 
 (* ======================================= *)
 
-  PROCEDURE ReadUTF(f : BF.FILE; OUT nam : ARRAY OF CHAR);
+  PROCEDURE (rdr : SymFileReader)ReadUTF(), NEW;
     CONST
         bad = "Bad UTF-8 string";
     VAR num : INTEGER;
         bNm : INTEGER;
+        len : INTEGER;
         idx : INTEGER;
         chr : INTEGER;
+        fil : BF.FILE;
   BEGIN
     num := 0;
-    bNm := read(f) * 256 + read(f);
-    FOR idx := 0 TO bNm-1 DO
-      chr := read(f);
+    fil := rdr.file;
+   (* 
+    *  len is the length in bytes of the UTF8 representation 
+    *)
+    len := read(fil) * 256 + read(fil);  (* max length 65k *)
+   (* 
+    *  Worst case the number of chars will equal byte-number.
+    *)
+    IF LEN(rdr.strAtt) <= len THEN 
+      NEW(rdr.strAtt, len + 1);
+    END;
+
+    idx := 0;
+    WHILE idx < len DO
+      chr := read(fil); INC(idx);
       IF chr <= 07FH THEN		(* [0xxxxxxx] *)
-        nam[num] := CHR(chr); INC(num);
+        rdr.strAtt[num] := CHR(chr); INC(num);
       ELSIF chr DIV 32 = 06H THEN	(* [110xxxxx,10xxxxxx] *)
         bNm := chr MOD 32 * 64;
-        chr := read(f);
+        chr := read(fil); INC(idx);
         IF chr DIV 64 = 02H THEN
-          nam[num] := CHR(bNm + chr MOD 64); INC(num);
+          rdr.strAtt[num] := CHR(bNm + chr MOD 64); INC(num);
         ELSE
           RTS.Throw(bad);
         END;
       ELSIF chr DIV 16 = 0EH THEN	(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         bNm := chr MOD 16 * 64;
-        chr := read(f);
+        chr := read(fil); INC(idx);
         IF chr DIV 64 = 02H THEN
           bNm := (bNm + chr MOD 64) * 64; 
-          chr := read(f);
+          chr := read(fil); INC(idx);
           IF chr DIV 64 = 02H THEN
-            nam[num] := CHR(bNm + chr MOD 64); INC(num);
+            rdr.strAtt[num] := CHR(bNm + chr MOD 64); INC(num);
           ELSE 
             RTS.Throw(bad);
           END;
@@ -953,7 +1004,8 @@ MODULE NewSymFileRW;
         RTS.Throw(bad);
       END;
     END;
-    nam[num] := 0X;
+    rdr.strAtt[num] := 0X;
+    rdr.strLen := num;
   END ReadUTF;
 
 (* ======================================= *)
@@ -1019,6 +1071,7 @@ MODULE NewSymFileRW;
     D.InitIdSeq(new.oArray, 4);
     D.InitTypeSeq(new.tArray, 8);
     D.InitScpSeq(new.sArray, 8);
+    NEW(new.strAtt, buffDefault);
     RETURN new;
   END newSymFileReader;
 
@@ -1041,9 +1094,9 @@ MODULE NewSymFileRW;
     f.sSym := read(file);
     CASE f.sSym OF
     | namSy : 
-        f.iAtt := read(file); ReadUTF(file, f.sAtt);
+        f.iAtt := read(file); f.ReadUTF();
     | strSy : 
-        ReadUTF(file, f.sAtt);
+        f.ReadUTF();
     | retSy, fromS, tDefS, basSy :
         f.iAtt := readOrd(file);
     | bytSy :
@@ -1095,7 +1148,7 @@ MODULE NewSymFileRW;
     token := scope.token;
     IF token = NIL THEN token := S.prevTok END;
     filNm := Nh.charOpenOfHash(scope.hash);
-
+    
     f.impS := scope;
     D.AppendScope(f.sArray, scope);
     fileName := BOX(filNm^ + ".cps");
@@ -1209,9 +1262,6 @@ MODULE NewSymFileRW;
   BEGIN
     Ty.InsertInRec(id,rec,TRUE,oId,ok);
     IF oId # NIL THEN D.AppendIdnt(sfr.oArray,oId); END;
-(*
-    IF ~ok THEN Report(id,rec.idnt); END;
- *)
     IF ~ok THEN Report(id, rec.name()) END;
   END InsertInRec;
 
@@ -1227,7 +1277,7 @@ MODULE NewSymFileRW;
     | chrSy : expr := ExprDesc.mkCharLt(f.cAtt);
     | fltSy : expr := ExprDesc.mkRealLt(f.rAtt);
     | setSy : expr := ExprDesc.mkSetLt(BITS(f.iAtt));
-    | strSy : expr := ExprDesc.mkStrLt(f.sAtt);		(* implicit f.sAtt^ *)
+    | strSy : expr := ExprDesc.mkStrLenLt(f.strAtt, f.strLen);
     END;
     f.GetSym();						(* read past value  *)
     RETURN expr;
@@ -1287,7 +1337,7 @@ MODULE NewSymFileRW;
       parD.varOrd := indx; 
       parD.type := f.getTypeFromOrd();
      (* Skip over optional parameter name string *)
-      IF f.sSym = strSy THEN (* parD.hash := Nh.enterStr(f.sAtt); *)
+      IF f.sSym = strSy THEN (* parD.hash := Nh.enterStr(f.strAtt); *)
         f.GetSym;
       END;
       Id.AppendParam(rslt.formals, parD);
@@ -1435,11 +1485,23 @@ MODULE NewSymFileRW;
       INCL(rslt.xAttr, D.noCpy);
       f.GetSym();
     END;
-    IF f.impS.scopeNm # NIL THEN rslt.extrnNm := f.impS.scopeNm END;
+   (* 
+    *  Do not override extrnNm values set
+    *  by *Maker.Init for Native* types.
+    *)
+    IF (f.impS.scopeNm # NIL) & (rslt.extrnNm = NIL) THEN
+      rslt.extrnNm := f.impS.scopeNm; 
+    END;
 
     IF f.sSym = basSy THEN
-      rslt.baseTp := f.typeOf(f.iAtt);
-      IF f.iAtt # Ty.anyRec THEN INCL(rslt.xAttr, D.clsTp) END;
+     (* 
+      *  Do not override baseTp values set
+      *  by *Maker.Init for Native* types.
+      *)
+      IF rslt.baseTp = NIL THEN
+        rslt.baseTp := f.typeOf(f.iAtt);
+        IF f.iAtt # Ty.anyRec THEN INCL(rslt.xAttr, D.clsTp) END;
+      END;
       f.GetSym();
     END;
     IF f.sSym = iFcSy THEN
@@ -1454,7 +1516,7 @@ MODULE NewSymFileRW;
     WHILE f.sSym = namSy DO
       fldD := Id.newFldId();
       fldD.SetMode(f.iAtt);
-      fldD.hash := Nh.enterStr(f.sAtt);
+      fldD.hash := Nh.enterStr(f.strAtt);
       fldD.type := f.typeOf(readOrd(f.file));
       fldD.recTyp := rslt;
       f.GetSym();
@@ -1539,7 +1601,7 @@ MODULE NewSymFileRW;
     *)
     newI := Id.newTypId(NIL);
     newI.SetMode(f.iAtt);
-    newI.hash := Nh.enterStr(f.sAtt);
+    newI.hash := Nh.enterStr(f.strAtt);
     newI.type := f.getTypeFromOrd(); 
     newI.dfScp := f.impS;
     oldI := testInsert(newI, f.impS);
@@ -1566,7 +1628,7 @@ MODULE NewSymFileRW;
 
     INCL(impD.xAttr, D.weak);
     impD.SetMode(f.iAtt);
-    impD.hash := Nh.enterStr(f.sAtt);
+    impD.hash := Nh.enterStr(f.strAtt);
     f.ReadPast(namSy); 
     IF impD.hash = f.modS.hash THEN	(* Importing own imp indirectly	*)
         				(* Shouldn't this be an error?  *)
@@ -1578,7 +1640,7 @@ MODULE NewSymFileRW;
     ELSE				(* Importing some other module.	*)
       oldD := testInsert(impD, f.modS);
       IF f.sSym = strSy THEN 
-        impD.scopeNm := Lt.strToCharOpen(f.sAtt);
+        impD.scopeNm := Lt.arrToCharOpen(f.strAtt, f.strLen);
         f.GetSym();
       END;
       IF (oldD # impD) & (oldD.kind = Id.impId) THEN
@@ -1600,14 +1662,15 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)constant() : Id.ConId,NEW;
-  (* Constant   = conSy Name Literal.		*)
+  (* Constant = conSy Name Literal.		*)
+  (* Name     = namSy byte UTFstring.           *)
   (* Assert: f.sSym = namSy.			*)
     VAR newC : Id.ConId;
         anyI : D.Idnt;
   BEGIN
     newC := Id.newConId();
     newC.SetMode(f.iAtt);
-    newC.hash := Nh.enterStr(f.sAtt);
+    newC.hash := Nh.enterStr(f.strAtt);
     newC.dfScp := f.impS;
     f.ReadPast(namSy);
     newC.conExp := f.getLiteral();
@@ -1624,7 +1687,7 @@ MODULE NewSymFileRW;
   BEGIN
     newV := Id.newVarId();
     newV.SetMode(f.iAtt);
-    newV.hash := Nh.enterStr(f.sAtt);
+    newV.hash := Nh.enterStr(f.strAtt);
     newV.type := f.getTypeFromOrd();
     newV.dfScp := f.impS;
     RETURN newV;
@@ -1641,11 +1704,11 @@ MODULE NewSymFileRW;
     newP := Id.newPrcId();
     newP.setPrcKind(Id.conPrc);
     newP.SetMode(f.iAtt);
-    newP.hash := Nh.enterStr(f.sAtt);
+    newP.hash := Nh.enterStr(f.strAtt);
     newP.dfScp := f.impS;
     f.ReadPast(namSy);
     IF f.sSym = strSy THEN 
-      newP.prcNm := Lt.strToCharOpen(f.sAtt);
+      newP.prcNm := Lt.arrToCharOpen(f.strAtt, f.strLen);
      (* and leave scopeNm = NIL *)
       f.GetSym();
     END;
@@ -1671,8 +1734,9 @@ MODULE NewSymFileRW;
     newM := Id.newMthId();
     newM.SetMode(f.iAtt);
     newM.setPrcKind(Id.conMth);
-    newM.hash := Nh.enterStr(f.sAtt);
+    newM.hash := Nh.enterStr(f.strAtt);
     newM.dfScp := f.impS;
+    IF CSt.verbose THEN newM.SetNameFromHash(newM.hash) END;
     rcvD := Id.newParId();
     rcvD.varOrd := 0;
    (* byte1 is the method attributes  *)
@@ -1684,12 +1748,12 @@ MODULE NewSymFileRW;
     f.GetSym();
     rcvD.parMod := rFrm;
     IF f.sSym = strSy THEN 
-      newM.prcNm := Lt.strToCharOpen(f.sAtt);
+      newM.prcNm := Lt.arrToCharOpen(f.strAtt, f.strLen);
      (* and leave scopeNm = NIL *)
       f.GetSym();
     END;
    (* Skip over optional receiver name string *)
-    IF f.sSym = namSy THEN (* rcvD.hash := Nh.enterString(f.sAtt); *)
+    IF f.sSym = namSy THEN (* rcvD.hash := Nh.enterString(f.strAtt); *)
       f.GetSym();
     END;
    (* End skip over optional receiver name *)
@@ -1761,7 +1825,7 @@ MODULE NewSymFileRW;
         f.GetSym();
         tpIdnt := Id.newTypId(NIL);
         tpIdnt.SetMode(f.iAtt);
-        tpIdnt.hash := Nh.enterStr(f.sAtt);
+        tpIdnt.hash := Nh.enterStr(f.strAtt);
         tpIdnt.dfScp := impScp;
         tpIdnt := testInsert(tpIdnt, impScp)(Id.TypId);
         f.ReadPast(namSy);
@@ -1913,11 +1977,11 @@ MODULE NewSymFileRW;
     VAR oldS : INTEGER;
   BEGIN
     f.ReadPast(modSy);
-    IF f.sSym = namSy THEN (* do something with f.sAtt *)
-      IF nm # f.sAtt THEN
+    IF f.sSym = namSy THEN (* do something with f.strAtt *)
+      IF nm # f.strAtt^ THEN
         Error.WriteString("Wrong name in symbol file. Expected <");
         Error.WriteString(nm + ">, found <");
-        Error.WriteString(f.sAtt + ">"); 
+        Error.WriteString(f.strAtt^ + ">"); 
         Error.WriteLn;
         HALT(1);
       END;
@@ -1925,7 +1989,7 @@ MODULE NewSymFileRW;
     ELSE RTS.Throw("Bad symfile header");
     END;
     IF f.sSym = strSy THEN (* optional name *)
-      f.impS.scopeNm := Lt.strToCharOpen(f.sAtt);
+      f.impS.scopeNm := Lt.arrToCharOpen(f.strAtt, f.strLen);
       f.GetSym();
       IF f.sSym = falSy THEN 
         INCL(f.impS.xAttr, D.isFn);
@@ -2059,9 +2123,6 @@ MODULE NewSymFileRW;
         blkI : Id.BlkId;
         fScp : ImpResScope;
         rAll : ResolveAll;
-(*
- *  str : RTS.NativeString;
- *)
   BEGIN
    (*
     *  The list of scopes has been constructed by
@@ -2093,10 +2154,6 @@ MODULE NewSymFileRW;
     END;
     FOR indx := 0 TO fScp.work.tide-1 DO
       blkI := fScp.work.a[indx](Id.BlkId);
-(*
- *    str := MKSTR(Nh.charOpenOfHash(blkI.hash)^);
- *    blkI.symTb.Apply(Visitor.newResolver());
- *)
       NEW(rAll);
       blkI.symTb.Apply(rAll);
     END;

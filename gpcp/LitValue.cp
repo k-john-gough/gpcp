@@ -8,7 +8,8 @@
 
 MODULE LitValue;
 
-  IMPORT 
+  IMPORT
+    ASCII, 
 	GPCPcopyright,
 	Console,
 	GPText,
@@ -24,6 +25,8 @@ MODULE LitValue;
 		     a-    : POINTER TO ARRAY OF CharOpen;
 		   END;
 
+    CharVector*  = VECTOR OF CHAR;
+
 (* ============================================================ *)
 
   TYPE
@@ -33,10 +36,14 @@ MODULE LitValue;
 		  str : CharOpen;
 		END;
 
-(* ============================================================ *)
+(* ================================================================= *)
+(*                      FORWARD DECLARATIONS                         *)
+(* ================================================================= *)
   PROCEDURE^ strToCharOpen*(IN str : ARRAY OF CHAR) : CharOpen;
+  PROCEDURE^ arrToCharOpen*(str : CharOpen; len : INTEGER) : CharOpen;
   PROCEDURE^ subStrToCharOpen*(pos,len : INTEGER) : CharOpen;
-(* ============================================================ *)
+  PROCEDURE^ chrVecToCharOpen*(vec : CharVector) : CharOpen;
+(* ================================================================= *)
 
   PROCEDURE  newChrVal*(ch : CHAR) : Value;
     VAR val : Value;
@@ -71,6 +78,15 @@ MODULE LitValue;
     RETURN val;
   END newStrVal;
 
+  PROCEDURE  newStrLenVal*(str : CharOpen; len : INTEGER) : Value;
+    VAR val : Value;
+  BEGIN
+    NEW(val); 
+    val.ord := len;
+    val.str := arrToCharOpen(str, len);
+    RETURN val;
+  END newStrLenVal;
+
   PROCEDURE  newBufVal*(p,l : INTEGER) : Value;
     VAR val : Value;
   BEGIN
@@ -79,6 +95,55 @@ MODULE LitValue;
     val.str := subStrToCharOpen(p,l);
     RETURN val;
   END newBufVal;
+
+  PROCEDURE  escapedString*(pos,len : INTEGER) : Value;
+    VAR value  : Value;
+	    vector : CharVector;
+		count  : INTEGER;
+		theCh  : CHAR;
+		cdPnt  : INTEGER;
+    (* ----------------------- *)
+    PROCEDURE ReportBadHex(code, offset : INTEGER);
+      VAR tok : CPascalS.Token;
+    BEGIN
+      tok := CPascalS.prevTok;
+	  CPascalS.SemError.Report(code, tok.lin, tok.col + offset);
+    END ReportBadHex;
+    (* ----------------------- *)
+  BEGIN
+    count := 0;
+    NEW(value);
+	NEW(vector, len * 2);
+	WHILE count < len DO
+	  theCh :=  CPascalS.charAt(pos+count); INC(count);
+	  IF theCh = '\' THEN
+	    theCh := CPascalS.charAt(pos+count); INC(count);
+		CASE theCh OF
+		|  '0' : APPEND(vector, 0X);
+		|  '\' : APPEND(vector, '\');
+		|  'a' : APPEND(vector, ASCII.BEL);
+		|  'b' : APPEND(vector, ASCII.BS);
+		|  'f' : APPEND(vector, ASCII.FF);
+		|  'n' : APPEND(vector, ASCII.LF);
+		|  'r' : APPEND(vector, ASCII.CR);
+		|  't' : APPEND(vector, ASCII.HT);
+		|  'v' : APPEND(vector, ASCII.VT);
+		|  'u' : cdPnt := CPascalS.getHex(pos+count, 4);
+		         IF cdPnt < 0 THEN ReportBadHex(-cdPnt, count); cdPnt := 0 END;
+				 APPEND(vector, CHR(cdPnt)); INC(count, 4);
+		|  'x' : cdPnt := CPascalS.getHex(pos+count, 2);
+		         IF cdPnt < 0 THEN ReportBadHex(-cdPnt, count); cdPnt := 0 END;
+		         APPEND(vector, CHR(cdPnt)); INC(count, 2);
+		ELSE APPEND(vector, theCh);
+		END;
+      ELSE
+	    APPEND(vector, theCh);
+	  END;
+    END;
+    value.ord := LEN(vector);
+	value.str := chrVecToCharOpen(vector);
+    RETURN value;
+  END escapedString;
 
 (* ============================================================ *)
 
@@ -173,20 +238,37 @@ MODULE LitValue;
     seq.a[seq.tide] := elem; INC(seq.tide);
   END AppendCharOpen;
 
-(* -------------------------------------------- *)
-
+ (* -------------------------------------------- *
+  * This function trims the string asciiz style.
+  * -------------------------------------------- *)
   PROCEDURE strToCharOpen*(IN str : ARRAY OF CHAR) : CharOpen;
     VAR i : INTEGER;
         h : INTEGER;
         p : CharOpen;
   BEGIN
-    h := LEN(str$);
-    NEW(p,h+1);
+    h := LEN(str$); (* Length NOT including NUL *)
+    NEW(p,h+1);     (* Including space for NUL *)
     FOR i := 0 TO h DO
       p[i] := str[i];
     END;
     RETURN p;
   END strToCharOpen;
+
+ (* -------------------------------------------- *
+  * This function uses ALL of the characters 
+  * which may include embedded NUL characters.
+  * -------------------------------------------- *)
+  PROCEDURE arrToCharOpen*(str : CharOpen;
+                           len : INTEGER) : CharOpen;
+    VAR i : INTEGER;
+        p : CharOpen;
+  BEGIN
+    NEW(p,len+1);
+    FOR i := 0 TO len DO
+      p[i] := str[i];
+    END;
+    RETURN p;
+  END arrToCharOpen;
 
 (* -------------------------------------------- *)
 
@@ -214,6 +296,21 @@ MODULE LitValue;
     END;
     RETURN LEN(op);
   END posOf;
+
+(* -------------------------------------------- *)
+
+  PROCEDURE chrVecToCharOpen(vec : CharVector) : CharOpen;
+    VAR i, len : INTEGER;
+	    cOpen  : CharOpen;
+  BEGIN
+    len := LEN(vec);
+    NEW(cOpen,len + 1);
+	FOR i := 0 TO len -1 DO
+	  cOpen[i] := vec[i];
+    END;
+	cOpen[len] := 0X;
+	RETURN cOpen;
+  END chrVecToCharOpen;
 
 (* -------------------------------------------- *)
 

@@ -9,6 +9,7 @@
 MODULE ModuleHandler;
 
 IMPORT  GPCPcopyright,
+        LitValue,
 	FileNames;
 
 CONST
@@ -16,7 +17,7 @@ CONST
 
 TYPE
 
-  ModName* = FileNames.NameString;
+  ModName* = LitValue.CharOpen;
 
   ModInfo* = POINTER TO ModInfoRec;
 
@@ -138,10 +139,10 @@ BEGIN
   found := FALSE; 
   WHILE (node # NIL) & (~found) DO
     parent := node;
-    IF node.module.name = modName THEN
+    IF node.module.name^ = modName^ THEN
       found := TRUE;
       mod := node.module;
-    ELSIF modName < node.module.name THEN
+    ELSIF modName^ < node.module.name^ THEN
       node := node.left;
     ELSE
       node := node.right;
@@ -152,7 +153,7 @@ BEGIN
     NEW(node);
     mod := NewModInfo(modName);
     node.module := mod; 
-    IF modName < parent.module.name THEN
+    IF modName^ < parent.module.name^ THEN
       parent.left := node;
     ELSE
       parent.right := node;
