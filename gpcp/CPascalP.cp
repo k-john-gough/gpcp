@@ -34,7 +34,7 @@ MODULE CPascalP;
 (* ==================================================================== *)
 
 CONST
-  maxT       = 82;
+  maxT       = 85;
   minErrDist =  2;  (* minimal distance (good tokens) between two errors *)
   setsize    = 32;
   noError    = -1;
@@ -341,6 +341,8 @@ VAR
     ident.dfScp := ident;
     ident.hash  := idHsh;
 
+	IF G.verbose THEN ident.SetNameFromHash(idHsh) END;
+
     IF ident.hash = Bi.sysBkt THEN
       dummy := CompState.thisMod.symTb.enter(Bi.sysBkt, CompState.sysMod);
       IF G.verbose THEN G.Message("imports unsafe SYSTEM module") END;
@@ -362,6 +364,7 @@ VAR
       *  there are already references to it in the structure.
       *)
       clash.token := ident.token;   (* to help error reports  *)
+	  IF G.verbose THEN clash.SetNameFromHash(clash.hash) END;
       ident := clash(Id.BlkId);
       IF ~ident.isWeak() & 
          (ident.hash # Bi.sysBkt) THEN SemError(170) END; (* imported twice  *)
@@ -377,6 +380,9 @@ VAR
       modScope.main := TRUE;      (* the import is "CPmain" *)
       INCL(modScope.xAttr, Sy.wMain); (* Windows Main *)
       IF G.verbose THEN G.Message("contains WinMain entry point") END;
+    ELSIF ident.hash = NameHash.staBkt THEN
+      INCL(modScope.xAttr, Sy.sta);
+      IF G.verbose THEN G.Message("sets Single Thread Apartment") END;
     END;
 
     IF Sy.weak IN ident.xAttr THEN
@@ -391,11 +397,26 @@ VAR
         alias.dfScp  := ident;    (* AFTER clash resolved. *)
         Sy.AppendScope(impSeq, alias);
       END;
-
+      
       EXCL(ident.xAttr, Sy.weak); (* ==> directly imported *)
       INCL(ident.xAttr, Sy.need); (* ==> needed in symfile *)
     END;
   END Import;
+  
+  PROCEDURE ImportThreading(modScope : Id.BlkId; VAR impSeq : Sy.ScpSeq);
+    VAR hash : INTEGER;
+        idnt : Id.BlkId;
+  BEGIN
+    hash := NameHash.enterStr("mscorlib_System_Threading");
+    idnt := Id.newImpId();
+    idnt.dfScp := idnt;
+    idnt.hash := hash;
+    IF ~Sy.refused(idnt, modScope) THEN
+      EXCL(idnt.xAttr, Sy.weak);
+      INCL(idnt.xAttr, Sy.need);
+      Sy.AppendScope(impSeq, idnt);
+    END;
+  END ImportThreading;
 
 (* ==================================================================== *)
 
@@ -410,6 +431,21 @@ VAR
       Import(modScope, G.impSeq);
     END;
     Expect(T.semicolonSym);
+	(*
+	 * Now some STA-specific tests.
+	 *)
+	IF Sy.sta IN modScope.xAttr THEN
+      IF Sy.trgtNET THEN
+        ImportThreading(modScope, G.impSeq);
+       ELSE
+         SemError(238);
+      END;
+      IF ~modScope.main THEN 
+        SemError(319); 
+        EXCL(modScope.xAttr, Sy.sta);
+      END;	  
+    END;
+    
     G.import1 := RTS.GetMillis();
 IF G.legacy THEN
     OldSymFileRW.WalkImports(G.impSeq, modScope);
@@ -1329,6 +1365,9 @@ END;
     | T.stringSym :
         Get;
         xSyn := Xp.tokToStrLt(token.pos, token.len);
+    | T.bangStrSym :
+        Get;
+        xSyn := Xp.translateStrLt(token.pos, token.len);
     | T.NILSym :
         Get;
         xSyn := Xp.mkNilX();
@@ -3320,6 +3359,7 @@ END;
     IF iSyn IS Sy.Scope THEN iSyn(Sy.Scope).ovfChk := G.ovfCheck END;
     iSyn.token := nextT;
     iSyn.hash  := NameHash.enterSubStr(nextT.pos, nextT.len);
+    IF G.verbose THEN iSyn.SetNameFromHash(iSyn.hash) END;
     iSyn.dfScp := inhScp;
     IF nextT.dlr & ~G.special THEN SemErrorT(186, nextT) END;
     Expect(T.identSym);
@@ -3391,6 +3431,30 @@ END;
     G.parseS := RTS.GetMillis();
     Module;
   END Parse;
+  
+(* ==================================================================== *)
+
+  PROCEDURE parseTextAsStatement*(text : ARRAY OF LitValue.CharOpen; encScp : Sy.Scope) : Sy.Stmt;
+    VAR result : Sy.Stmt;
+  BEGIN
+    G.SetQuiet;
+    NEW(nextT);
+    S.NewReadBuffer(text); Get;
+    result := statementSequence(NIL, encScp);
+    S.RestoreFileBuffer();
+    G.RestoreQuiet;
+    RETURN result;
+  END parseTextAsStatement;
+
+  PROCEDURE ParseDeclarationText*(text : ARRAY OF LitValue.CharOpen; encScp : Sy.Scope);
+  BEGIN
+    G.SetQuiet;
+    NEW(nextT);
+    S.NewReadBuffer(text); Get;
+    DeclarationSequence(encScp);
+    S.RestoreFileBuffer();
+    G.RestoreQuiet;
+  END ParseDeclarationText;
 
 (* ==================================================================== *)
 
@@ -3422,7 +3486,7 @@ BEGIN
   symSet[ 3, 0] := {T.identSym, T.integerSym, T.realSym, T.CharConstantSym,
                     T.stringSym, T.minusSym, T.lparenSym, T.plusSym};
   symSet[ 3, 1] := {T.NILSym-32, T.tildeSym-32, T.lbraceSym-32};
-  symSet[ 3, 2] := {};
+  symSet[ 3, 2] := {T.bangStrSym-64};
   (* ------------------------------------------------------------ *)
 
   (* lookahead of optional statement *)

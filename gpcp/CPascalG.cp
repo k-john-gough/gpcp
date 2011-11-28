@@ -22,5 +22,6 @@ CONST
   IMPORTSym* = 72; MODULESym* = 73;  CLOSESym* = 74;  
   INTERFACESym* = 75;  RESCUESym* = 76; 
   STATICSym* = 77; ENUMSym* = 78; DIV0Sym* = 79; REM0Sym* = 80;
-  EVENTSym* = 81; VECTORSym* = 82; NOSYM* = 83; idVariant* = 84; 
+  EVENTSym* = 81; VECTORSym* = 82; NOSYM* = 83; idVariant* = 84;
+  bangStrSym* = 85; 
 END CPascalG.

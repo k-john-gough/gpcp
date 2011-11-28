@@ -613,7 +613,8 @@ MODULE ClsToType;
           FOR indx := 0 TO (LEN(byts) DIV 2)-1 DO
             chrs[indx] := CHR(byts[indx*2] + byts[indx*2 + 1] * 256);
           END;
-          RETURN Xp.mkStrLt(chrs);
+          (* RETURN Xp.mkStrLt(chrs); *)
+          RETURN Xp.mkStrLenLt(chrs, LEN(chrs) - 1); (* CHECK THIS! *)
       END;
     END conExp;
    (* ------------------------------------ *)

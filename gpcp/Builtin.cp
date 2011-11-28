@@ -159,9 +159,6 @@ MODULE Builtin;
     rec.extrnNm := blk.scopeNm;
     rec.recAtt  := att;
     INCL(rec.xAttr, Symbols.clsTp);		(* new 04.jun.01 *)
-(*
- *  INCL(rec.xAttr, Symbols.noNew);		(* new 04.aug.01 *)
- *)
     tId.SetMode(Symbols.pubMode);
     tId.dfScp := blk;
     tId.hash  := NameHash.enterStr(nam);
@@ -303,6 +300,7 @@ MODULE Builtin;
     hash := NameHash.enterStr(str);
     var.hash := hash;
     var.dfScp := NIL;
+    var.SetNameFromString(BOX(str$));
     ASSERT(CompState.thisMod.symTb.enter(hash, var));
   END BindName;
 

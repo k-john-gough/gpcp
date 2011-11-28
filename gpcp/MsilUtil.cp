@@ -316,7 +316,7 @@ MODULE MsilUtil;
   PROCEDURE (os : MsilFile)MainHead*(xAtt : SET),NEW,ABSTRACT;
 
   PROCEDURE (os : MsilFile)MainTail*(),NEW,ABSTRACT;
-
+  
 (* ------------------------------------------------------------ *)
 
   PROCEDURE (os : MsilFile)ClinitHead*(),NEW,ABSTRACT;

@@ -22,7 +22,9 @@ MODULE MsilMaker;
         GPTextFiles,
         PeUtil,
         IlasmUtil,
+        Nh  := NameHash,
         Scn := CPascalS,
+        Psr := CPascalP,
         CSt := CompState,
         Asm := IlasmCodes,
         Mu  := MsilUtil,
@@ -194,6 +196,34 @@ MODULE MsilMaker;
     INCL(blk.xAttr, Sy.rtsMd);
     CSt.prgArg := blk;
   END Init;
+
+(* ============================================================ *)
+
+   PROCEDURE (this : MsilEmitter)mkThreadAssign() : Sy.Stmt,NEW; 
+     VAR stmt : Sy.Stmt;
+         text : ARRAY 3 OF Lv.CharOpen;
+   BEGIN
+     text[0] := BOX("__thread__ := mscorlib_System_Threading.Thread.init(__wrapper__);");
+     text[1] := BOX("__thread__.set_ApartmentState(mscorlib_System_Threading.ApartmentState.STA);");
+     text[2] := BOX("__thread__.Start(); END");
+     stmt := Psr.parseTextAsStatement(text, CSt.thisMod);
+     stmt.StmtAttr(CSt.thisMod);
+     RETURN stmt;
+   END mkThreadAssign;
+   
+(* ============================================================ *)
+
+   PROCEDURE (this : MsilEmitter)AddStaMembers(),NEW; 
+     VAR text : ARRAY 3 OF Lv.CharOpen;
+         proc : Sy.Idnt;
+   BEGIN
+     text[0] := BOX("VAR __thread__ : mscorlib_System_Threading.Thread;");
+     text[1] := BOX("PROCEDURE __wrapper__(); BEGIN END __wrapper__;");
+     text[2] := BOX("END");
+     Psr.ParseDeclarationText(text, CSt.thisMod);
+     proc := Sy.bindLocal(Nh.enterStr("__wrapper__"), CSt.thisMod);
+     proc(Id.PrcId).body := CSt.thisMod.modBody;
+   END AddStaMembers;
 
 (* ============================================================ *)
 
@@ -543,8 +573,16 @@ MODULE MsilMaker;
         recT  : Sy.Type;
         varId : Sy.Idnt;
         cfLive : BOOLEAN; (* Control Flow is (still) live *)
+        threadDummy : Sy.Stmt;
+        threadField : Sy.Idnt;
   BEGIN
     out.MkBodyClass(mod);
+
+    threadDummy := NIL; (* to avoid warning *)
+    IF Sy.sta IN this.mod.xAttr THEN
+      this.AddStaMembers();
+      threadDummy := this.mkThreadAssign(); 
+    END;
 
     out.OpenBrace(2);
     FOR index := 0 TO this.mod.procs.tide-1 DO
@@ -574,24 +612,29 @@ MODULE MsilMaker;
     *  No constructor for the module "class",
     *  there are never any instances created.
     *)
-    out.MkNewProcInfo(this.mod);
     asmExe := this.mod.main;    (* Boolean flag for assembler *)
     IF asmExe THEN
      (*
       *   Emit '<clinit>' with variable initialization
       *)
       out.Blank();
+      out.MkNewProcInfo(this.mod);
       out.ClinitHead();
       out.InitVars(this.mod);
       out.Code(Asm.opc_ret);
       out.ClinitTail();
       out.Blank();
      (*
-      *   Emit module body as 'CPmain()'
+      *   Emit module body as 'CPmain() or WinMain'
       *)
       out.MkNewProcInfo(this.mod);
       out.MainHead(this.mod.xAttr);
-      this.EmitStat(this.mod.modBody, cfLive);
+      IF Sy.sta IN this.mod.xAttr THEN
+        out.Comment("Real entry point for STA");
+        this.EmitStat(threadDummy, cfLive);
+      ELSE
+        this.EmitStat(this.mod.modBody, cfLive);
+      END;
       IF cfLive THEN
         out.Comment("Continuing directly to CLOSE");
         this.EmitStat(this.mod.modClose, cfLive);
@@ -604,6 +647,7 @@ MODULE MsilMaker;
      (*
       *   Emit single <clinit> incorporating module body
       *)
+      out.MkNewProcInfo(this.mod);
       out.ClinitHead();
       out.InitVars(this.mod);
       this.EmitStat(this.mod.modBody, cfLive);
@@ -701,6 +745,9 @@ MODULE MsilMaker;
       out.Comment("WinMain entry");
     ELSIF Sy.cMain IN this.mod.xAttr THEN
       out.Comment("CPmain entry");
+    END;
+    IF Sy.sta IN this.mod.xAttr THEN
+      out.Comment("Single Thread Apartment");
     END;
 
     IF LEN(this.mod.xName$) # 0 THEN
@@ -2553,9 +2600,11 @@ MODULE MsilMaker;
         out.GetField(Mu.vecArrFld(vecT, out));
         out.PushLocal(cTmp);
         IF Mu.isRefSurrogate(argX.type) THEN 
-          e.ValueCopy(argX, argX.type);
+          (* e.ValueCopy(argX, argX.type); *)
+          e.ValueCopy(argX, vecT.elemTp);
         ELSE
-          e.PushValue(argX, argX.type);
+          (* e.PushValue(argX, argX.type); *)
+          e.PushValue(argX, vecT.elemTp);
         END;
         e.EraseAndAssign(argX.type, vecT);
        (*
@@ -2710,7 +2759,10 @@ MODULE MsilMaker;
     *  This is a value assign in CP.
     *)
     lhTyp := stat.lhsX.type;
-
+   (* 
+    *  Test if the erased type of the vector element
+    *  has to be reconstructed by a type assertion 
+    *)
     erasd := (stat.lhsX.kind = Xp.index) & 
              (stat.lhsX(Xp.BinaryX).lKid.type IS Ty.Vector);
 

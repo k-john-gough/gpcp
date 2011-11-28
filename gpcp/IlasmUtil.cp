@@ -39,7 +39,6 @@ MODULE IlasmUtil;
         winString   = "public static void '.WinMain'($S[]) il managed";
         subSysStr   = "  .subsystem 0x00000002";
         copyHead    = "public void __copy__(";
-        valueType* = "[mscorlib]System.ValueType";
 
    CONST
         putArgStr   = "$S[] [RTS]ProgArgs::argList";
@@ -85,12 +84,12 @@ MODULE IlasmUtil;
         cmma,                           (* ","      *)
         brsz,                           (* "{} etc" *)
         vFld,                           (* "v$"     *)
-        inVd : Lv.CharOpen;       (* "in.v "  *)
+        inVd : Lv.CharOpen;             (* "in.v "  *)
 
   VAR   evtAdd, evtRem : Lv.CharOpen;
         pVarSuffix     : Lv.CharOpen;
         xhrMk          : Lv.CharOpen;
-
+  
   VAR   boxedObj       : Lv.CharOpen;
 
 (* ============================================================ *)
@@ -141,16 +140,6 @@ MODULE IlasmUtil;
   PROCEDURE^ (os : IlasmFile)CodeLb*(code : INTEGER; i2 : Mu.Label);
   PROCEDURE^ (os : IlasmFile)DefLabC*(l : Mu.Label; IN c : ARRAY OF CHAR);
 
-(* ------------------------------------------------------------ *)
-(*
-  PROCEDURE (os : IlasmFile)newProcInfo*(proc : Sy.Scope) : Mu.ProcInfo;
-    VAR p : Mu.ProcInfo;
-  BEGIN
-    NEW(p);
-    Mu.InitProcInfo(p, proc);
-    RETURN p;
-  END newProcInfo;
- *)
 (* ============================================================ *)
 
   PROCEDURE (os : IlasmFile)MkNewProcInfo*(proc : Sy.Scope);
@@ -302,6 +291,24 @@ MODULE IlasmUtil;
 
 (* ============================================================ *)
 
+  PROCEDURE (os : IlasmFile)WriteHex(int : INTEGER),NEW;
+    VAR ord : INTEGER;
+  BEGIN
+    IF int <= 9 THEN ord := ORD('0') + int ELSE ord := (ORD('A')-10)+int END;
+    os.CatChar(CHR(ord));
+  END WriteHex;
+
+(* ============================================================ *)
+
+  PROCEDURE (os : IlasmFile)WriteHexByte(int : INTEGER),NEW;
+  BEGIN
+    os.WriteHex(int DIV 16);
+    os.WriteHex(int MOD 16);
+    os.CatChar(' ');
+  END WriteHexByte;
+
+(* ============================================================ *)
+
   PROCEDURE (os : IlasmFile)Tstring(IN str : ARRAY OF CHAR),NEW;
    (* TAB, then string *)
   BEGIN
@@ -333,38 +340,69 @@ MODULE IlasmUtil;
   END Tlong;
 
 (* ============================================================ *)
-
+  
   PROCEDURE (os : IlasmFile)QuoteStr(IN str : ARRAY OF CHAR),NEW;
-    VAR idx : INTEGER;
-        chr : CHAR;
-        ord : INTEGER;
-  BEGIN
-    idx := 0;
-    chr := str[0];
-    os.CatChar('"');
-    WHILE chr # 0X DO
-      CASE chr OF
-      | "\",'"' : os.CatChar("\");
-                  os.CatChar(chr);
-      | 9X      : os.CatChar("\");
-                  os.CatChar("t");
-      | 0AX     : os.CatChar("\");
-                  os.CatChar("n");
-      ELSE
-        IF chr > 07EX THEN
-          ord := ORD(chr);
-          os.CatChar('\');
-          os.CatChar(CHR(ord DIV 64 + ORD('0')));
-          os.CatChar(CHR(ord MOD 64 DIV 8 + ORD('0')));
-          os.CatChar(CHR(ord MOD 8 + ORD('0')));
+   (* ------------------------ *)
+    PROCEDURE EmitQuotedString(os : IlasmFile; IN str : ARRAY OF CHAR);
+      VAR chr : CHAR;
+          idx : INTEGER;
+          ord : INTEGER;
+    BEGIN
+      os.CatChar('"');
+      FOR idx := 0 TO LEN(str) - 2 DO
+        chr := str[idx];
+        CASE chr OF
+        | "\",'"' : os.CatChar("\");
+                    os.CatChar(chr);
+        | 9X      : os.CatChar("\");
+                    os.CatChar("t");
+        | 0AX     : os.CatChar("\");
+                    os.CatChar("n");
         ELSE
-          os.CatChar(chr);
-        END
+          IF chr > 07EX THEN
+            ord := ORD(chr);
+            os.CatChar('\');
+            os.CatChar(CHR(ord DIV 64 + ORD('0')));
+            os.CatChar(CHR(ord MOD 64 DIV 8 + ORD('0')));
+            os.CatChar(CHR(ord MOD 8 + ORD('0')));
+          ELSE
+            os.CatChar(chr);
+          END
+        END;
       END;
-      INC(idx);
-      chr := str[idx];
+      os.CatChar('"');
+    END EmitQuotedString;
+   (* ------------------------ *)
+    PROCEDURE EmitByteArray(os : IlasmFile; IN str : ARRAY OF CHAR);
+      VAR idx : INTEGER;
+          ord : INTEGER;
+    BEGIN
+      os.CatStr("bytearray (");
+      FOR idx := 0 TO LEN(str) - 2 DO
+        ord := ORD(str[idx]);
+        os.WriteHexByte(ord MOD 256);
+        os.WriteHexByte(ord DIV 256);
+      END;
+      os.CatStr(")");
+    END EmitByteArray;
+   (* ------------------------ *)
+    PROCEDURE NotASCIIZ(IN str : ARRAY OF CHAR) : BOOLEAN;
+      VAR idx : INTEGER;
+          ord : INTEGER;
+    BEGIN
+      FOR idx := 0 TO LEN(str) - 2 DO
+        ord := ORD(str[idx]);
+        IF (ord = 0) OR (ord > 0FFH) THEN RETURN TRUE END;
+      END;
+      RETURN FALSE;
+    END NotASCIIZ;
+   (* ------------------------ *)
+  BEGIN
+    IF NotASCIIZ(str) THEN
+      EmitByteArray(os, str);
+    ELSE
+      EmitQuotedString(os, str);
     END;
-    os.CatChar('"');
   END QuoteStr;
 
 (* ============================================================ *)
@@ -1469,7 +1507,9 @@ MODULE IlasmUtil;
     os.CatEOL();
     os.OpenBrace(4);
     os.Directive(Asm.dot_entrypoint);
-    IF Cs.debug THEN os.LineSpan(Scn.mkSpanT(Cs.thisMod.begTok)) END;
+    IF Cs.debug & ~(Sy.sta IN xAtt) THEN 
+      os.LineSpan(Scn.mkSpanT(Cs.thisMod.begTok));
+    END;
    (*
     *  Save the command-line arguments to the RTS.
     *)
@@ -1954,7 +1994,6 @@ BEGIN
   xhrMk := Lv.strToCharOpen("class [RTS]XHR"); 
   boxedObj := Lv.strToCharOpen("Boxed_"); 
   pVarSuffix := Lv.strToCharOpen(".ctor($O, native int) ");
-
 END IlasmUtil.
 (* ============================================================ *)
 (* ============================================================ *)

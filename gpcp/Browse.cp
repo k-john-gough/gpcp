@@ -6,14 +6,15 @@ MODULE Browse;
         Error,
         CPmain,
         GPFiles,
-	GPBinFiles,
+        GPBinFiles,
+        LitValue,
         ProgArgs,
-	Symbols,
+        Symbols,
         IdDesc,
         GPText,
         GPTextFiles,
         GPCPcopyright,
-	FileNames;
+        FileNames;
 
 (* ========================================================================= *
 // Collected syntax ---
@@ -75,6 +76,12 @@ MODULE Browse;
 // and the user of the class _must_ agree on the IR name of the class.
 // The same reasoning applies to procedure types, which must have equal
 // interface names in all modules.
+//
+// Notes on the fine print about UTFstring --- November 2011 clarification.
+// The character sequence in the symbol file is modified UTF-8, that is
+// it may represent CHR(0), U+0000, by the bytes 0xC0, 0x80. String
+// constants may thus contain embedded nulls. 
+// 
 // ======================================================================== *)
 
   CONST
@@ -103,9 +110,13 @@ MODULE Browse;
 (* ============================================================ *)
 
   TYPE
+    CharOpen = POINTER TO ARRAY OF CHAR;
 
+(* ============================================================ *)
+
+  TYPE
     Desc = POINTER TO ABSTRACT RECORD
-             name : FileNames.NameString;
+             name   : CharOpen;
              access : INTEGER;
            END;
 
@@ -114,37 +125,37 @@ MODULE Browse;
                  tide : INTEGER;
                END;
 
-    LitValue = POINTER TO ABSTRACT RECORD
+    AbsValue = POINTER TO ABSTRACT RECORD
                END;
 
-    NumValue = POINTER TO RECORD (LitValue)
+    NumValue = POINTER TO RECORD (AbsValue)
                  numVal : LONGINT;
                END;
 
-    SetValue = POINTER TO RECORD (LitValue)
+    SetValue = POINTER TO RECORD (AbsValue)
                  setVal : SET;
                END;
 
-    StrValue = POINTER TO RECORD (LitValue)
-                 strVal : FileNames.NameString;
+    StrValue = POINTER TO RECORD (AbsValue)
+                 strVal : CharOpen;
                END;
 
-    FltValue = POINTER TO RECORD (LitValue)
+    FltValue = POINTER TO RECORD (AbsValue)
                  fltVal : REAL;
                END;
 
-    BoolValue = POINTER TO RECORD (LitValue)
+    BoolValue = POINTER TO RECORD (AbsValue)
                   boolVal : BOOLEAN;
                 END;
 
-    ChrValue = POINTER TO RECORD (LitValue)
+    ChrValue = POINTER TO RECORD (AbsValue)
                  chrVal : CHAR;
                END;
 
     Type = POINTER TO ABSTRACT RECORD
              declarer : Desc;             
              importedFrom : Module;
-             importedName : FileNames.NameString;
+             importedName : CharOpen;
            END;
 
     TypeList = POINTER TO ARRAY OF Type;
@@ -153,7 +164,7 @@ MODULE Browse;
             END;
 
     Basic = POINTER TO EXTENSIBLE RECORD (Type)
-              name : FileNames.NameString;
+              name : CharOpen;
             END;
 
     Enum = POINTER TO EXTENSIBLE RECORD (Type)
@@ -202,7 +213,7 @@ MODULE Browse;
               END;
 
     Proc = POINTER TO EXTENSIBLE RECORD (Type)
-             fName         : FileNames.NameString;
+             fName         : CharOpen;
              retType       : Type;
              retTypeNum    : INTEGER;
              noModes       : BOOLEAN;
@@ -225,7 +236,7 @@ MODULE Browse;
                  END;
                  
     ConstDesc = POINTER TO RECORD  (Desc)
-                  val : LitValue;
+                  val : AbsValue;
                 END;
 
     TypeDesc = POINTER TO EXTENSIBLE RECORD (Desc)
@@ -249,9 +260,9 @@ MODULE Browse;
               END;
 
     Module = POINTER TO RECORD
-               name      : FileNames.NameString;
-               symName   : FileNames.NameString;
-               fName     : FileNames.NameString;
+               name      : CharOpen;
+               symName   : CharOpen;
+               fName     : CharOpen;
                pathName  : GPFiles.FileNameArray;
                imports   : ModList;
                consts    : DescList;
@@ -281,23 +292,17 @@ MODULE Browse;
                     
 (* ============================================================ *)
 
-  TYPE
-
-    CharOpen = POINTER TO ARRAY OF CHAR;
-
-(* ============================================================ *)
-
   VAR
     args, argNo  : INTEGER;
-    fileName, modName  : FileNames.NameString;
-    printFNames, doAll, verbatim, hexCon, alpha : BOOLEAN;
+    fileName, modName  : CharOpen;
+    printFNames, doAll, verbatim, verbose, hexCon, alpha : BOOLEAN;
     file  : GPBinFiles.FILE;
     sSym  : INTEGER;
     cAtt  : CHAR;
     iAtt  : INTEGER;
     lAtt  : LONGINT;
     rAtt  : REAL;
-    sAtt  : FileNames.NameString;
+    sAtt  : CharOpen;
     typeList : TypeList;
     accArray : ARRAY 4 OF CHAR;
     outExt  : ARRAY 6 OF CHAR;
@@ -352,7 +357,7 @@ MODULE Browse;
 (* ============================================================ *)
 (* ============================================================ *)
 
-  PROCEDURE GetModule(name : FileNames.NameString) : Module;
+  PROCEDURE GetModule(name : CharOpen) : Module;
   VAR
     i : INTEGER;
     tmp : POINTER TO ARRAY OF Module;
@@ -360,7 +365,7 @@ MODULE Browse;
   BEGIN
     ASSERT(modList.list # NIL);
     FOR i := 0 TO modList.tide-1 DO
-      IF modList.list[i].name = name THEN RETURN modList.list[i] END;
+      IF modList.list[i].name^ = name^ THEN RETURN modList.list[i] END;
     END;
     IF modList.tide >= LEN(modList.list) THEN
       tmp := modList.list;
@@ -373,7 +378,7 @@ MODULE Browse;
     mod.systemMod := FALSE;
     mod.progArg := FALSE;
     mod.name := name;
-    mod.symName := name + symExt;
+    mod.symName := BOX(name^ + symExt);
     modList.list[modList.tide] := mod;
     INC(modList.tide);
     RETURN mod;
@@ -465,94 +470,60 @@ MODULE Browse;
 
 (* ======================================= *)
 
-  PROCEDURE ReadUTF(OUT nam : ARRAY OF CHAR);
+  PROCEDURE readUTF() : CharOpen; 
     CONST
-	bad = "Bad UTF-8 string";
+      bad = "Bad UTF-8 string";
     VAR num : INTEGER;
-	bNm : INTEGER;
-	idx : INTEGER;
-	chr : INTEGER;
+      bNm : INTEGER;
+      len : INTEGER;
+      idx : INTEGER;
+      chr : INTEGER;
+      buff : CharOpen;
   BEGIN
     num := 0;
-    bNm := read() * 256 + read();
-    FOR idx := 0 TO bNm-1 DO
-      chr := read();
+   (* 
+    *  bNm is the length in bytes of the UTF8 representation 
+    *)
+    len := read() * 256 + read();  (* max length 65k *)
+   (* 
+    *  Worst case the number of chars will equal byte-number.
+    *)
+    NEW(buff, len + 1); 
+    idx := 0;
+    WHILE idx < len DO
+      chr := read(); INC(idx);
       IF chr <= 07FH THEN		(* [0xxxxxxx] *)
-	nam[num] := CHR(chr); INC(num);
+        buff[num] := CHR(chr); INC(num);
       ELSIF chr DIV 32 = 06H THEN	(* [110xxxxx,10xxxxxx] *)
-	bNm := chr MOD 32 * 64;
-	chr := read();
-	IF chr DIV 64 = 02H THEN
-	  nam[num] := CHR(bNm + chr MOD 64); INC(num);
-	ELSE
-	  RTS.Throw(bad);
-	END;
+        bNm := chr MOD 32 * 64;
+        chr := read(); INC(idx);
+        IF chr DIV 64 = 02H THEN
+          buff[num] := CHR(bNm + chr MOD 64); INC(num);
+        ELSE
+          RTS.Throw(bad);
+        END;
       ELSIF chr DIV 16 = 0EH THEN	(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
-	bNm := chr MOD 16 * 64;
-	chr := read();
-	IF chr DIV 64 = 02H THEN
-	  bNm := (bNm + chr MOD 64) * 64; 
-	  chr := read();
-	  IF chr DIV 64 = 02H THEN
-	    nam[num] := CHR(bNm + chr MOD 64); INC(num);
-	  ELSE 
-	    RTS.Throw(bad);
-	  END;
-	ELSE
-	  RTS.Throw(bad);
-	END;
+        bNm := chr MOD 16 * 64;
+        chr := read(); INC(idx);
+        IF chr DIV 64 = 02H THEN
+          bNm := (bNm + chr MOD 64) * 64; 
+          chr := read(); INC(idx);
+          IF chr DIV 64 = 02H THEN
+            buff[num] := CHR(bNm + chr MOD 64); INC(num);
+          ELSE 
+            RTS.Throw(bad);
+          END;
+        ELSE
+          RTS.Throw(bad);
+        END;
       ELSE
-	RTS.Throw(bad);
+        RTS.Throw(bad);
       END;
     END;
-    nam[num] := 0X;
-  END ReadUTF;
+    buff[num] := 0X;
+    RETURN LitValue.arrToCharOpen(buff, num);
+  END readUTF;
 
-(* ======================================= *)
-(*
- * PROCEDURE ReadUTF(OUT nam : ARRAY OF CHAR);
- *   CONST
- *	bad = "Bad UTF-8 string";
- *   VAR num : INTEGER;
- *	bNm : INTEGER;
- *	idx : INTEGER;
- *	chr : INTEGER;
- * BEGIN
- *   num := 0;
- *   bNm := read() * 256 + read();
- *   FOR idx := 0 TO bNm-1 DO
- *     chr := read();
- *     IF chr <= 07FH THEN
- *	nam[num] := CHR(chr); INC(num);
- *     ELSIF chr DIV 32 = 06H THEN
- *	bNm := chr MOD 32 * 64;
- *	chr := read();
- *	IF chr DIV 64 = 02H THEN
- *	  nam[num] := CHR(bNm + chr DIV 64); INC(num);
- *	ELSE
- *	  RTS.Throw(bad);
- *	END;
- *     ELSIF chr DIV 16 = 0EH THEN
- *	bNm := chr MOD 16 * 64;
- *	chr := read();
- *	IF chr DIV 64 = 02H THEN
- *	  bNm := bNm + chr DIV 64; 
- *	  chr := read();
- *	  IF chr DIV 64 = 02H THEN
- *	    nam[num] := CHR(bNm + chr DIV 64); INC(num);
- *	  ELSE 
- *	    RTS.Throw(bad);
- *	  END;
- *	ELSE
- *	  RTS.Throw(bad);
- *	END;
- *     ELSE
- *	RTS.Throw(bad);
- *     END;
- *   END;
- *   nam[num] := 0X;
- * END ReadUTF;
- *)
 (* ======================================= *)
 
   PROCEDURE readChar() : CHAR;
@@ -613,9 +584,10 @@ MODULE Browse;
     sSym := read();
     CASE sSym OF
     | namSy : 
-	iAtt := read(); ReadUTF(sAtt);
+	iAtt := read(); 
+        sAtt := readUTF();
     | strSy : 
-	ReadUTF(sAtt);
+        sAtt := readUTF();
     | retSy, fromS, tDefS, basSy :
 	iAtt := readOrd();
     | bytSy :
@@ -649,7 +621,7 @@ MODULE Browse;
 
 (* ============================================ *)
 
-  PROCEDURE GetLiteral(VAR lit : LitValue);
+  PROCEDURE GetLiteral(VAR lit : AbsValue);
   VAR
     b : BoolValue;
     n : NumValue;
@@ -696,7 +668,7 @@ MODULE Browse;
       par.typeNum := readOrd();
       GetSym();
       IF sSym = strSy THEN
-        par.opNm := BOX(sAtt);
+        par.opNm := sAtt;
         GetSym();
       END;
       AddPar(p.pars,par);
@@ -824,9 +796,6 @@ MODULE Browse;
   BEGIN
     NEW(rec);
     rec.recAtt := read();
-(*
-    IF rec.recAtt >=8 THEN rec.recAtt := rec.recAtt - 8; END;
-*)
     rec.isAnonRec := FALSE;
     GetSym();				(* Get past recSy rAtt	*)
     IF (sSym = falSy) OR (sSym = truSy) THEN
@@ -883,10 +852,10 @@ MODULE Browse;
         mth.fName := sAtt;
         GetSym(); 
       ELSE
-        mth.fName[0] := 0X;
+        mth.fName := NIL;
       END;
       IF sSym = namSy THEN 
-        mth.recName := BOX(sAtt);
+        mth.recName := sAtt;
         GetSym(); 
       END;
       GetFormalType(mth);
@@ -933,7 +902,7 @@ MODULE Browse;
         namedType : Named;
         f : VarDesc;
         rec : Record;
-        impName : FileNames.NameString;
+        impName : CharOpen;
         i,j : INTEGER;
   BEGIN
     GetSym();
@@ -943,7 +912,7 @@ MODULE Browse;
       ASSERT(typOrd # 0);
       ReadPast(tDefS);
       modOrd := -1;
-      impName := "";
+      impName := BOX("");
      (*
       *  The fromS symbol appears if the type is imported.
       *)
@@ -1023,9 +992,6 @@ MODULE Browse;
         ch0 := typ.declarer.name[0];
         IF (ch0 = "@") OR (ch0 = "$") THEN typ.declarer := NIL END;
       END;
-(*
-      IF (typ IS Record) & (typ.declarer = NIL) THEN (* anon record *)
- *)
       IF typ IS Record THEN 
 	r := typ(Record);
 	FOR j := 0 TO r.intrFaces.tide - 1 DO
@@ -1033,32 +999,14 @@ MODULE Browse;
 	  r.intrFaces.list[j](TypeDesc).type := typeList[k];
 	END;
 	IF typ.declarer = NIL THEN (* anon record *)
-(*
-          Console.WriteString("Type ");
-          Console.WriteInt(i,1);
-          Console.WriteString(" is an AnonRecord ");
-          Console.WriteLn;
- *)
           typ(Record).isAnonRec := TRUE;
 	END;
       ELSIF (typ IS Pointer) & (typ(Pointer).baseType IS Record) THEN
         IF (typ.declarer = NIL) & (typ.importedFrom = NIL) THEN 
-(*
-        Console.WriteString("Type ");
-        Console.WriteInt(i,1);
-        Console.WriteString(" is an AnonPointer ");
-        Console.WriteLn;
- *)
           typ(Pointer).isAnonPointer := TRUE; 
         END;
         r := typ(Pointer).baseType(Record);
         IF (r.declarer = NIL) THEN  (* anon record *)
-(*
-        Console.WriteString("Type ");
-        Console.WriteInt(i,1);
-        Console.WriteString(" is an Pointer to anon record - fixing");
-        Console.WriteLn;
- *)
           r.isAnonRec := TRUE;
           r.ptrType := typ(Pointer);
         END;
@@ -1150,14 +1098,14 @@ MODULE Browse;
     GetSym();
     NEW(procDesc.pType);
     IF sSym = strSy THEN 
-      IF sAtt = "<init>" THEN
-        procDesc.pType.fName := "< init >";  
+      IF sAtt^ = "<init>" THEN
+        procDesc.pType.fName := BOX("< init >");  
       ELSE
         procDesc.pType.fName := sAtt;
       END;
       GetSym(); 
     ELSE
-      procDesc.pType.fName[0] := 0X;
+      procDesc.pType.fName := NIL;
     END;
     IF sSym = truSy THEN
       procDesc.pType.isConstructor := TRUE;
@@ -1192,11 +1140,11 @@ MODULE Browse;
     AddMod(mod.imports,mod);
     ReadPast(modSy);
     IF sSym = namSy THEN (* do something with f.sAtt *)
-      IF mod.name # sAtt THEN
+      IF mod.name^ # sAtt^ THEN
         Error.WriteString("Wrong name in symbol file. Expected <");
-        Error.WriteString(mod.name + ">, found <");
-        Error.WriteString(sAtt + ">"); 
-	Error.WriteLn;
+        Error.WriteString(mod.name^ + ">, found <");
+        Error.WriteString(sAtt^ + ">"); 
+	    Error.WriteLn;
         HALT(1);
       END;
       GetSym();
@@ -1206,11 +1154,11 @@ MODULE Browse;
       mod.fName := sAtt;
       GetSym();
       IF (sSym = falSy) OR (sSym = truSy) THEN 
-	GetSym();
+        GetSym();
       ELSE RTS.Throw("Bad explicit name");
       END; 
     ELSE
-      mod.fName[0] := 0X;
+      mod.fName := NIL;
     END; 
    (*
     *  Optional strong name info.
@@ -1262,23 +1210,23 @@ MODULE Browse;
 
 (* ============================================================ *)
 
-  PROCEDURE GetSymAndModNames*(VAR symName : FileNames.NameString;
-                               OUT modName : FileNames.NameString);
+  PROCEDURE GetSymAndModNames(VAR symName : CharOpen;
+                              OUT modName : CharOpen);
   VAR i,j : INTEGER;
       ok : BOOLEAN; 
   BEGIN
-    modName := symName;
+    modName := BOX(symName^);
     i := 0;
     WHILE ((i < LEN(symName)) & (symName[i] # '.') & 
            (symName[i] # 0X)) DO INC(i); END;
     IF (i >= LEN(symName)) OR (symName[i] # '.') THEN 
-      symName := symName + symExt;
+      symName := BOX(symName^ + symExt);
     ELSE
       modName[i] := 0X;
     END;
   END GetSymAndModNames;
 
-  PROCEDURE Parse*();
+  PROCEDURE Parse();
   VAR 
     marker,modIx,i   : INTEGER;
     mod : Module;
@@ -1292,9 +1240,9 @@ MODULE Browse;
       IF file = NIL THEN
         file := GPBinFiles.findOnPath("CPSYM", mod.symName);
         IF (file = NIL) OR (mod.progArg) THEN
-          Error.WriteString("File <" + mod.symName + "> not found"); 
+          Error.WriteString("File <" + mod.symName^ + "> not found"); 
           Error.WriteLn;
-	  HALT(1);
+          HALT(1);
         END;
         mod.pathName := GPBinFiles.getFullPathName(file);
         i := 0;
@@ -1307,12 +1255,15 @@ MODULE Browse;
         ELSIF marker = RTS.loInt(syMag) THEN
           mod.systemMod := TRUE;
         ELSE
-          Error.WriteString("File <"+fileName+"> is not a valid symbol file"); 
+          Error.WriteString("File <" + fileName^ + "> is not a valid symbol file"); 
           Error.WriteLn;
           RETURN;
         END;
         mod.print := TRUE;
         GetSym();
+        IF verbose THEN
+          Error.WriteString("Reading " + mod.name^); Error.WriteLn;
+        END;
         SymFile(mod);
         GPBinFiles.CloseFile(file);
       END;
@@ -1384,9 +1335,9 @@ BEGIN
 END Indent;
 
 PROCEDURE (o : Output) WriteImportedTypeName(impMod : Module;
-                                        tName : ARRAY OF CHAR),NEW,EXTENSIBLE;
+                                             tName : ARRAY OF CHAR),NEW,EXTENSIBLE;
 BEGIN
-  Console.WriteString(impMod.name + "." + tName);
+  Console.WriteString(impMod.name^ + "." + tName);
 END WriteImportedTypeName;
 
 PROCEDURE (o : Output) WriteTypeName(tName : ARRAY OF CHAR),NEW,EXTENSIBLE;
@@ -1455,9 +1406,9 @@ BEGIN
 END Indent;
 
 PROCEDURE (f : FileOutput) WriteImportedTypeName(impMod : Module;
-                                              tName : ARRAY OF CHAR),EXTENSIBLE;
+                                                 tName : ARRAY OF CHAR),EXTENSIBLE;
 BEGIN
-  GPText.WriteString(f.file,impMod.name + "." + tName);
+  GPText.WriteString(f.file,impMod.name^ + "." + tName);
 END WriteImportedTypeName;
 
 PROCEDURE (f : FileOutput) WriteTypeName(tName : ARRAY OF CHAR),EXTENSIBLE;
@@ -1560,7 +1511,7 @@ BEGIN
   GPText.WriteString(h.file,'.html#type-');;
   GPText.WriteString(h.file,tName);
   GPText.WriteString(h.file,'">');
-  GPText.WriteString(h.file,impMod.name + "." + tName);
+  GPText.WriteString(h.file,impMod.name^ + "." + tName);
   GPText.WriteString(h.file,'</a>');
 END WriteImportedTypeName;
 
@@ -1607,23 +1558,68 @@ END MethAnchor;
 (*				Format Helpers				*)
 (* ==================================================================== *)
 
-  PROCEDURE qStrOf(str : FileNames.NameString) : CharOpen;
+  PROCEDURE qStrOf(str : CharOpen) : CharOpen;
     VAR len : INTEGER;
-	res : CharOpen;
 	idx : INTEGER;
-	dQt : BOOLEAN;
+	ord : INTEGER;
+        rslt : LitValue.CharVector;
+    (* -------------------------------------- *)
+    PROCEDURE hexDigit(d : INTEGER) : CHAR;
+    BEGIN
+      IF d < 10 THEN RETURN CHR(d + ORD('0')) 
+      ELSE RETURN CHR(d-10 + ORD('a'));
+      END;
+    END hexDigit;
+    (* -------------------------------------- *)
+    PROCEDURE AppendHex2D(r : LitValue.CharVector; o : INTEGER);
+    BEGIN
+      APPEND(r, '\');
+      APPEND(r, 'x');
+      APPEND(r, hexDigit(o DIV 16 MOD 16));
+      APPEND(r, hexDigit(o        MOD 16));
+    END AppendHex2D;
+    (* -------------------------------------- *)
+    PROCEDURE AppendUnicode(r : LitValue.CharVector; o : INTEGER);
+    BEGIN
+      APPEND(r, '\');
+      APPEND(r, 'u');
+      APPEND(r, hexDigit(o DIV 1000H MOD 16));
+      APPEND(r, hexDigit(o DIV  100H MOD 16));
+      APPEND(r, hexDigit(o DIV   10H MOD 16));
+      APPEND(r, hexDigit(o           MOD 16));
+    END AppendUnicode;
+    (* -------------------------------------- *)
   BEGIN
-    dQt := FALSE;
-    len := LEN(str$);
-    FOR idx := 0 TO len-1 DO
-      IF str[idx] = '"' THEN dQt := TRUE END;
+   (*
+    *  Translate the string into ANSI-C like
+    *  for human, rather than machine consumption.
+    *)
+    NEW(rslt, LEN(str) * 2);
+    APPEND(rslt, '"');
+    FOR idx := 0 TO LEN(str) - 2 DO
+      ord := ORD(str[idx]);
+      CASE ord OF
+      |  0 : APPEND(rslt, '\');
+             APPEND(rslt, '0');
+      |  9 : APPEND(rslt, '\');
+             APPEND(rslt, 't');
+      | 10 : APPEND(rslt, '\');
+             APPEND(rslt, 'n');
+      | 12 : APPEND(rslt, '\');
+             APPEND(rslt, 'r');
+      | ORD('"') :
+             APPEND(rslt, '/');
+             APPEND(rslt, '"');
+      ELSE
+        IF ord > 0FFH THEN AppendUnicode(rslt, ord);
+        ELSIF (ord > 07EH) OR (ord < ORD(' ')) THEN AppendHex2D(rslt, ord);
+        ELSE APPEND(rslt, CHR(ord));
+        END;
+      END;
     END;
-    NEW(res, len+3);
-    IF dQt THEN res[0] := "'" ELSE res[0] := '"' END;
-    FOR idx := 1 TO len DO res[idx] := str[idx-1] END;
-    IF dQt THEN res[len+1] := "'" ELSE res[len+1] := '"' END;
-    res[len+2] := 0X;
-    RETURN res;
+    APPEND(rslt, '"');
+    APPEND(rslt, 0X);
+    RETURN LitValue.chrVecToCharOpen(rslt);
   END qStrOf;
 
   PROCEDURE hexOf(ch : CHAR) : CharOpen;
@@ -1709,7 +1705,7 @@ END MethAnchor;
     RETURN i; 
   END Length;
 
-  PROCEDURE (v : LitValue) Print(),NEW,EMPTY;
+  PROCEDURE (v : AbsValue) Print(),NEW,EMPTY;
 
   PROCEDURE (n : NumValue) Print();
   BEGIN
@@ -2052,8 +2048,8 @@ END MethAnchor;
     output.WriteKeyword("PROCEDURE ");
     output.WriteIdent(p.declarer.name);
     output.Write(accArray[p.declarer.access]);
-    IF printFNames & (p.fName[0] # 0X) THEN
-      output.WriteString('["' + p.fName + '"]');
+    IF printFNames & (p.fName # NIL) THEN
+      output.WriteString('["' + p.fName^ + '"]');
       INC(indent,Length(p.fName)+4);
     END; 
     PrintFormals(p,indent+11+Length(p.declarer.name));
@@ -2088,8 +2084,8 @@ END MethAnchor;
     output.WriteString(") ");
     output.WriteIdent(m.declarer.name);
     output.Write(accArray[m.declarer.access]);
-    IF printFNames & (m.fName[0] # 0X) THEN
-      output.WriteString('["' + m.fName + '"]');
+    IF printFNames & (m.fName # NIL) THEN
+      output.WriteString('["' + m.fName^ + '"]');
       INC(indent,Length(m.fName)+4);
     END; 
     PrintFormals(m, indent + 15 + 
@@ -2224,11 +2220,11 @@ END MethAnchor;
     (* --------------------------- *)
     PROCEDURE WriteOptionalExtras(impMod : Module);
     BEGIN
-      IF impMod.fName[0] # 0X THEN
+      IF impMod.fName # NIL THEN
         IF printFNames THEN
-          output.WriteString(' (* "' + impMod.fName + '" *)');
+          output.WriteString(' (* "' + impMod.fName^ + '" *)');
         ELSE
-          output.WriteString(' := "' + impMod.fName + '"');
+          output.WriteString(' := "' + impMod.fName^ + '"');
         END; 
       END; 
     END WriteOptionalExtras;
@@ -2242,7 +2238,7 @@ END MethAnchor;
     output.WriteStart(mod);
     IF mod.systemMod THEN
       heading := "SYSTEM ";
-    ELSIF mod.fName[0] # 0X THEN
+    ELSIF mod.fName # NIL THEN
       heading := "FOREIGN ";
     ELSE
       heading := "";
@@ -2250,8 +2246,8 @@ END MethAnchor;
     heading := heading + "MODULE ";
     output.WriteKeyword(heading);
     output.WriteIdent(mod.name);
-    IF printFNames & (mod.fName[0] # 0X) THEN 
-      output.WriteString(' ["' + mod.fName + '"]'); 
+    IF printFNames & (mod.fName # NIL) THEN 
+      output.WriteString(' ["' + mod.fName^ + '"]'); 
     END;
     output.Write(';'); 
    (*
@@ -2344,21 +2340,21 @@ END MethAnchor;
   BEGIN
     NEW(typeList,50);
     typeList[0] := NIL;
-    NEW(t); t.name := "BOOLEAN"; typeList[1] := t;
-    NEW(t); t.name := "SHORTCHAR"; typeList[2] := t;
-    NEW(t); t.name := "CHAR"; typeList[3] := t;
-    NEW(t); t.name := "BYTE"; typeList[4] := t;
-    NEW(t); t.name := "SHORTINT"; typeList[5] := t;
-    NEW(t); t.name := "INTEGER"; typeList[6] := t;
-    NEW(t); t.name := "LONGINT"; typeList[7] := t;
-    NEW(t); t.name := "SHORTREAL"; typeList[8] := t;
-    NEW(t); t.name := "REAL"; typeList[9] := t;
-    NEW(t); t.name := "SET"; typeList[10] := t;
-    NEW(t); t.name := "ANYREC"; typeList[11] := t;
-    NEW(t); t.name := "ANYPTR"; typeList[12] := t;
-    NEW(t); t.name := "ARRAY OF CHAR"; typeList[13] := t;
-    NEW(t); t.name := "ARRAY OF SHORTCHAR"; typeList[14] := t;
-    NEW(t); t.name := "UBYTE"; typeList[15] := t;
+    NEW(t); t.name := BOX("BOOLEAN"); typeList[1] := t;
+    NEW(t); t.name := BOX("SHORTCHAR"); typeList[2] := t;
+    NEW(t); t.name := BOX("CHAR"); typeList[3] := t;
+    NEW(t); t.name := BOX("BYTE"); typeList[4] := t;
+    NEW(t); t.name := BOX("SHORTINT"); typeList[5] := t;
+    NEW(t); t.name := BOX("INTEGER"); typeList[6] := t;
+    NEW(t); t.name := BOX("LONGINT"); typeList[7] := t;
+    NEW(t); t.name := BOX("SHORTREAL"); typeList[8] := t;
+    NEW(t); t.name := BOX("REAL"); typeList[9] := t;
+    NEW(t); t.name := BOX("SET"); typeList[10] := t;
+    NEW(t); t.name := BOX("ANYREC"); typeList[11] := t;
+    NEW(t); t.name := BOX("ANYPTR"); typeList[12] := t;
+    NEW(t); t.name := BOX("ARRAY OF CHAR"); typeList[13] := t;
+    NEW(t); t.name := BOX("ARRAY OF SHORTCHAR"); typeList[14] := t;
+    NEW(t); t.name := BOX("UBYTE"); typeList[15] := t;
 (*
  *  NEW(t); t.name := "SPECIAL"; typeList[16] := t;
  *)
@@ -2467,8 +2463,14 @@ BEGIN
       ELSE
         BadOption(option);
       END;
-    ELSIF option = "-verbatim" THEN
-      verbatim := TRUE;
+    ELSIF option[1] = 'v' THEN
+      IF option = "-verbatim" THEN
+        verbatim := TRUE;
+      ELSIF option = "-verbose" THEN
+        verbose := TRUE;
+      ELSE
+        BadOption(option);
+      END;
     ELSIF option = "-all" THEN
       doAll := TRUE;
     ELSIF option = "-hex" THEN
@@ -2503,7 +2505,7 @@ BEGIN
       output.thisMod := modList.list[i];
       IF output IS FileOutput THEN
         output(FileOutput).file := 
-            GPTextFiles.createFile(modList.list[i].name + outExt);
+            GPTextFiles.createFile(modList.list[i].name^ + outExt);
       END;
       PrintModule(modList.list[i]); 
       IF output IS FileOutput THEN
@@ -2517,6 +2519,8 @@ RESCUE (x)
 END Print;
 
 BEGIN
+  NEW(fileName, 256);
+  NEW(modName, 256);
   InitTypes();
   InitAccArray();
   modList.tide := 0;

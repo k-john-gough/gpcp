@@ -507,6 +507,8 @@ MODULE CPascalErrors;
     | 234: str := "Extension of LIMITED type must be limited";
     | 235: str := "LIMITED types can only be extended in the same module";
     | 236: str := "Cannot resolve CLR name of this type";
+    | 237: str := "Invalid hex escape sequence in this string";
+    | 238: str := "STA is illegal unless target is NET";
 
     | 298: str := "ILASM failed to assemble IL file";
     | 299: str := "Compiler raised an internal exception";
@@ -532,6 +534,7 @@ MODULE CPascalErrors;
     | 316: str := "This pointer type may still have its default NIL value";
     | 317: str := "Empty CASE statement will trap if control reaches here";
     | 318: str := "Empty WITH statement will trap if control reaches here";
+    | 319: str := "STA has no effect without CPmain or WinMain";
     (* ==================== END WARNINGS ====================== *)
     ELSE
       str := "Semantic error: " + LitValue.intToCharOpen(num)^;	
@@ -542,12 +545,12 @@ MODULE CPascalErrors;
       msg[idx] := str[idx];
     END;
     msg[len] := 0X;
-    IF num < 300 THEN 
+    IF num < 300 THEN
       INC(Scnr.errors); 
       StoreError(num,lin,col,msg); 
-    ELSE 
+    ELSIF ~nowarn THEN 
       INC(Scnr.warnings); 
-      IF ~nowarn THEN StoreError(num,lin,col,msg); END; 
+      StoreError(num,lin,col,msg);
     END;
 
     IF prompt THEN

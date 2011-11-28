@@ -312,21 +312,14 @@ MODULE ClassUtil;
     i : INTEGER;
     str1 : L.CharOpen;
   BEGIN
-    IF utf.val = str2 THEN RETURN TRUE; END;
+    IF utf.val = str2 THEN RETURN TRUE END;
     str1 := utf.val;
-    IF str1[0] # str2[0] THEN RETURN FALSE; END;
-    i := 1;
-    WHILE (i < LEN(str1)) & (i < LEN(str2)) &
-          (str1[i] = str2[i]) & (str1[i] # 0X) DO 
-      INC(i); 
-    END; 
-    IF (i = LEN(str1)) THEN
-      RETURN (i = LEN(str2)) OR (str2[i] = 0X);
-    ELSIF (i = LEN(str2)) THEN
-      RETURN (str1[i] = 0X);
-    ELSE
-      RETURN ((str1[i] = 0X) & (str2[i] = 0X));
+    IF (str1[0] # str2[0]) OR 
+       (LEN(str1) # LEN(str2)) THEN RETURN FALSE END;
+    FOR i := 1 TO LEN(str1) - 1 DO
+      IF str1[i] # str2[i] THEN RETURN FALSE END;
     END;
+    RETURN TRUE;
   END Equal;
 
   PROCEDURE AddUTF(VAR cp : ConstantPool; str : L.CharOpen) : INTEGER;
@@ -336,7 +329,7 @@ MODULE ClassUtil;
   BEGIN
     FOR i := 1 TO cp.tide-1 DO
       IF (cp.pool[i] # NIL) & (cp.pool[i] IS UTF8) & 
-         (Equal(cp.pool[i](UTF8),str)) THEN
+         Equal(cp.pool[i](UTF8), str) THEN
         RETURN i;
       END;
     END; 
@@ -581,7 +574,7 @@ MODULE ClassUtil;
       VAR ps : L.CharOpen;
           ch : CHAR;
     BEGIN
-      ps := BOX(CSt.binDir);
+      ps := BOX(CSt.binDir$);
       ch := ps[LEN(ps) - 2];
       IF (ch # "/") & (ch # "\") THEN
         ps := BOX(ps^ + genSep + fn);
@@ -595,7 +588,7 @@ MODULE ClassUtil;
     IF CSt.binDir # "" THEN
       ptr := GetFullPath(fileName);
     ELSE
-      ptr := BOX(fileName);
+      ptr := BOX(fileName$);
     END;
     Warp(ptr);
 (*
@@ -606,7 +599,7 @@ MODULE ClassUtil;
  *
  *  f.file := GPBinFiles.createPath(fileName);
  *)
-    srcFileName := BOX(CSt.srcNam); 
+    srcFileName := BOX(CSt.srcNam$); 
     NEW(fil);
     fil.file := GPBinFiles.createPath(ptr);
 
@@ -2117,14 +2110,19 @@ MODULE ClassUtil;
     END Expand;
    (* ================================= *)
   BEGIN
-    NEW(buf, 256);
+    NEW(buf, 128);
     num := 0;
     idx := 0;
-    chr := ORD(u.val[0]);
-    WHILE chr # 0H DO
-      IF num > LEN(buf)-3 THEN Expand(buf) END;
+    FOR idx := 0 TO LEN(u.val) - 2 DO
+      chr := ORD(u.val[idx]);
+      IF num > LEN(buf) - 3 THEN Expand(buf) END;
       IF chr <= 7FH THEN
-        buf[num] := chr; INC(num);
+        IF chr = 0H THEN (* Modified UTF8! *)
+          buf[num] := 0C0H; INC(num);
+          buf[num] := 080H; INC(num);
+        ELSE
+          buf[num] := chr;  INC(num);
+        END;
       ELSIF chr <= 7FFH THEN
         buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
         buf[num  ] := 0C0H + chr; INC(num, 2);
@@ -2133,8 +2131,6 @@ MODULE ClassUtil;
         buf[num+1] := 080H + chr MOD 64; chr := chr DIV 64;
         buf[num  ] := 0E0H + chr; INC(num, 3);
       END;
-      INC(idx);
-      chr := ORD(u.val[idx]);
     END;
     F.WriteByte(file,Jvm.const_utf8);
     u2(file,num);

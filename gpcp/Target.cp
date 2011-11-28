@@ -26,7 +26,7 @@ MODULE Target;
 (* ============================================================ *)
 
   PROCEDURE Select*(mod : IdDesc.BlkId; 
-		 IN str : ARRAY OF CHAR);
+                 IN str : ARRAY OF CHAR);
   BEGIN
     IF str = "jvm" THEN
       maker := JavaMaker.newJavaEmitter(mod);
