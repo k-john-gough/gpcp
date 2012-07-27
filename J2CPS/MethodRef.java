@@ -15,6 +15,7 @@ public class MethodRef extends Reference {
     return (classRef.GetName() + "." + name + type);
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("<MethodReference> " + classIndex + " " + nameAndTypeIndex + " " +

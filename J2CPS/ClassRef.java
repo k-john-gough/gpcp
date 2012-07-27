@@ -5,8 +5,6 @@
 /*************************************************************************/
 package J2CPS;
 
-import java.io.*;
-
 public class ClassRef {
 
   ConstantPool cp;  /* the constant pool containing this class ref */
@@ -41,11 +39,11 @@ public class ClassRef {
     if (name == null) { this.name = (String) this.cp.Get(nameIndex); }
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("<ClassReference> " + nameIndex + " " + name);
   }
-
 }
 
 

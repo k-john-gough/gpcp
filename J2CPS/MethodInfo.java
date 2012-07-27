@@ -5,8 +5,8 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-// import java.util.*;
+import java.io.DataInputStream;
+import java.io.IOException;
 
 public class MethodInfo extends MemberInfo {
 
@@ -42,7 +42,10 @@ public class MethodInfo extends MemberInfo {
     if (ClassDesc.verbose) { 
       System.out.println("Method has " + parTypes.length + " parameters");
     }
-    AddImport(thisClass);
+    //AddImport(thisClass);
+    for (int i=0; i < parTypes.length; i++)
+        thisClass.TryImport(parTypes[i]);
+    thisClass.TryImport(retType);
   }
 
   public MethodInfo(ClassDesc thisClass,String name,String jName,int acc) {
@@ -54,19 +57,13 @@ public class MethodInfo extends MemberInfo {
     }
   }
 
-  public void AddImport(ClassDesc thisClass) {
-    for (int i=0; i < parTypes.length; i++) {
-      if (parTypes[i] instanceof ClassDesc) { 
-        thisClass.AddImport((ClassDesc)parTypes[i]);
-      }
-    }
-    if (retType instanceof ClassDesc) { 
-      thisClass.AddImport((ClassDesc)retType); 
-    } else if (retType instanceof PtrDesc) {
-      ((PtrDesc)retType).AddImport(thisClass); 
-    }
-  }
+//  public void AddImport(ClassDesc thisClass) {
+//    for (int i=0; i < parTypes.length; i++)
+//        thisClass.TryImport(parTypes[i]);
+//    thisClass.TryImport(retType);
+//  }
 
+    @Override
   public String toString() {
     return ConstantPool.GetAccessString(accessFlags) + " " + name + " " + 
            signature;

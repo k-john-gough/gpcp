@@ -10,6 +10,7 @@ public class FieldRef extends Reference {
     return (classRef.GetName() + "." + name);
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("<FieldReference> " + classIndex + " " + nameAndTypeIndex + " " +

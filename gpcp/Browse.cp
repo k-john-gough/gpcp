@@ -579,29 +579,91 @@ MODULE Browse;
 (* ========		Symbol File Reader		======= *)
 (* ============================================================ *)
 
+  PROCEDURE DiagnoseSymbol();
+    VAR arg : ARRAY 24 OF CHAR;
+  BEGIN
+    CASE sSym OF
+    | ORD('H') : Console.WriteString("MODULE "); RETURN;
+    | ORD('0') : Console.WriteString("FALSE");
+    | ORD('1') : Console.WriteString("TRUE");
+    | ORD('I') : Console.WriteString("IMPORT "); RETURN;
+    | ORD('C') : Console.WriteString("CONST");
+    | ORD('T') : Console.WriteString("TYPE "); RETURN;
+    | ORD('P') : Console.WriteString("PROCEDURE "); RETURN;
+    | ORD('M') : Console.WriteString("MethodSymbol");
+    | ORD('V') : Console.WriteString("VAR "); RETURN;
+    | ORD('p') : Console.WriteString("ParamSymbol");
+    | ORD('&') : Console.WriteString("StartSymbol");
+    | ORD('!') : Console.WriteString("CloseSymbol");
+    | ORD('{') : Console.WriteString("StartRecord");
+    | ORD('}') : Console.WriteString("EndRecord");
+    | ORD('(') : Console.WriteString("StartFormals");
+    | ORD('@') : Console.WriteString("FROM "); RETURN;
+    | ORD(')') : Console.WriteString("EndFormals");
+    | ORD('[') : Console.WriteString("StartArray");
+    | ORD(']') : Console.WriteString("EndArray");
+    | ORD('%') : Console.WriteString("ProcType");
+    | ORD('^') : Console.WriteString("POINTER");
+    | ORD('e') : Console.WriteString("EnumType");
+    | ORD('~') : Console.WriteString("InterfaceType");
+    | ORD('v') : Console.WriteString("EventType");
+    | ORD('*') : Console.WriteString("VectorType");
+    | ORD('\') : Console.WriteString("BYTE "); Console.WriteInt(iAtt,1);
+    | ORD('c') : Console.WriteString("CHAR "); Console.Write(cAtt);
+    | ORD('S') : Console.WriteString("SetSymbol 0x"); Console.WriteHex(iAtt,1);
+    | ORD('K') : Console.WriteString("KeySymbol 0x"); Console.WriteHex(iAtt,1);
+    | ORD('t') : Console.WriteString("TypeDef t#"); Console.WriteInt(iAtt,1);
+    | ORD('+') : Console.WriteString("BaseType t#"); Console.WriteInt(iAtt,1);
+    | ORD('R') : Console.WriteString("RETURN t#"); Console.WriteInt(iAtt,1);
+    | ORD('#') :
+	    RTS.LongToStr(lAtt, arg); 
+	    Console.WriteString("Number "); 
+		Console.WriteString(arg$);
+    | ORD('$') : 
+        Console.WriteString("NameSymbol #");
+        Console.WriteInt(iAtt,1); 
+        Console.Write(' ');
+        Console.WriteString(sAtt);
+    | ORD('s') : 
+        Console.WriteString("String '");
+        Console.WriteString(sAtt);
+        Console.Write("'");
+    | ORD('r') : 
+        RTS.RealToStrInvar(rAtt, arg);
+        Console.WriteString("Real "); 
+        Console.WriteString(arg$);
+    ELSE 
+	    Console.WriteString("Bad Symbol ");
+		Console.WriteInt(sSym, 1);
+	    Console.WriteString(" in File");
+    END;
+    Console.WriteLn;
+  END DiagnoseSymbol;
+
   PROCEDURE GetSym();
   BEGIN
     sSym := read();
     CASE sSym OF
     | namSy : 
-	iAtt := read(); 
+        iAtt := read(); 
         sAtt := readUTF();
     | strSy : 
         sAtt := readUTF();
     | retSy, fromS, tDefS, basSy :
-	iAtt := readOrd();
+        iAtt := readOrd();
     | bytSy :
-	iAtt := read();
+        iAtt := read();
     | keySy, setSy :
-	iAtt := readInt();
+        iAtt := readInt();
     | numSy :
-	lAtt := readLong();
+        lAtt := readLong();
     | fltSy :
-	rAtt := readReal();
+        rAtt := readReal();
     | chrSy :
-	cAtt := readChar();
+        cAtt := readChar();
     ELSE (* nothing to do *)
     END;
+    (* DiagnoseSymbol(); *)
   END GetSym;
 
 (* ======================================= *)
@@ -650,8 +712,8 @@ MODULE Browse;
   //	-- optional phrase is return type for proper procedures
   *)
     VAR 
- 	par : Par;
-	byte : INTEGER;
+         par : Par;
+        byte : INTEGER;
   BEGIN
     p.noModes := TRUE;
     IF sSym = retSy THEN 
@@ -917,10 +979,10 @@ MODULE Browse;
       *  The fromS symbol appears if the type is imported.
       *)
       IF sSym = fromS THEN
-	modOrd := iAtt;
-	GetSym();
+        modOrd := iAtt;
+        GetSym();
         impName := sAtt;
-	ReadPast(namSy);
+        ReadPast(namSy);
       END;
      (* Get type info. *)
       CASE sSym OF 
@@ -932,7 +994,7 @@ MODULE Browse;
       | pTpSy : typ := procedureType();
       | eTpSy : typ := enumType();
       ELSE 
-	NEW(namedType);
+        NEW(namedType);
 	typ := namedType;
       END;
       IF typ # NIL THEN
@@ -993,14 +1055,14 @@ MODULE Browse;
         IF (ch0 = "@") OR (ch0 = "$") THEN typ.declarer := NIL END;
       END;
       IF typ IS Record THEN 
-	r := typ(Record);
-	FOR j := 0 TO r.intrFaces.tide - 1 DO
-	  k := r.intrFaces.list[j](TypeDesc).typeNum;
-	  r.intrFaces.list[j](TypeDesc).type := typeList[k];
-	END;
-	IF typ.declarer = NIL THEN (* anon record *)
+        r := typ(Record);
+        FOR j := 0 TO r.intrFaces.tide - 1 DO
+          k := r.intrFaces.list[j](TypeDesc).typeNum;
+          r.intrFaces.list[j](TypeDesc).type := typeList[k];
+        END;
+        IF typ.declarer = NIL THEN (* anon record *)
           typ(Record).isAnonRec := TRUE;
-	END;
+        END;
       ELSIF (typ IS Pointer) & (typ(Pointer).baseType IS Record) THEN
         IF (typ.declarer = NIL) & (typ.importedFrom = NIL) THEN 
           typ(Pointer).isAnonPointer := TRUE; 

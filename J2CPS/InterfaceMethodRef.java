@@ -15,6 +15,7 @@ public class InterfaceMethodRef extends Reference {
     return (classRef.GetName() + "." + name + type);
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("<InterfaceMethReference>  Class " + classIndex + 

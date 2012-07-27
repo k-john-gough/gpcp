@@ -5,7 +5,7 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.util.*;
+import java.util.HashMap;
 
 public class CPWords {
 

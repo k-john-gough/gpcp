@@ -5,7 +5,8 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.IOException;
 
 /* The constant pool from the ClassFile */
 
@@ -47,7 +48,7 @@ public class ConstantPool {
     /* read in the constant pool */ 
     pool = new Object[count];
     for (int i = 1; i < count; i++) {
-      Object c = ReadConstant(stream, i);
+      Object c = ReadConstant(stream);
       pool[i] = c;
       /* note that Long and Double constant occupies two entries */
       if (c instanceof Long || c instanceof Double) { i++; }
@@ -68,12 +69,12 @@ public class ConstantPool {
     pool = null;
   }
 
-  private Object ReadConstant(DataInputStream stream, int index) 
+  private Object ReadConstant(DataInputStream stream) 
                                                             throws IOException {
     int tag = stream.readUnsignedByte();
     switch (tag) {
     case CONSTANT_Utf8:
-      return new String(stream.readUTF());
+      return stream.readUTF();
     case CONSTANT_Integer: 
       return new Integer(stream.readInt());
     case CONSTANT_Float: 
@@ -137,7 +138,7 @@ public class ConstantPool {
 
   /** Constructs a string from a set of access flags */
   public static String GetAccessString(int flags) {
-    StringBuffer result = new StringBuffer();
+    StringBuilder result = new StringBuilder();
     if ((flags & ACC_PUBLIC) != 0) result.append("public ");
     if ((flags & ACC_PRIVATE) != 0) result.append("private ");
     if ((flags & ACC_PROTECTED) != 0) result.append("protected ");
@@ -206,5 +207,4 @@ public class ConstantPool {
   public static boolean isTransient(int flags) {
     return (flags & ACC_TRANSIENT) != 0;
   }
-
 }

@@ -21,7 +21,7 @@ SYSTEM MODULE RTS;
 
   TYPE  CharOpen*       = POINTER TO ARRAY OF CHAR;
 
-  TYPE  NativeType*	   = POINTER TO ABSTRACT RECORD END;
+  TYPE  NativeType*	= POINTER TO ABSTRACT RECORD END;
         NativeObject*   = POINTER TO ABSTRACT RECORD END;  
         NativeString*   = POINTER TO RECORD END;
         NativeException*= POINTER TO EXTENSIBLE RECORD END;

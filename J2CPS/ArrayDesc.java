@@ -5,7 +5,8 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 public class ArrayDesc extends TypeDesc {
   
@@ -82,17 +83,17 @@ public class ArrayDesc extends TypeDesc {
     if (numArrayTypes == arrayTypes.length) {
       ArrayDesc[] temp = arrayTypes;
       arrayTypes = new ArrayDesc[numArrayTypes * 2];
-      for (int i=0; i < numArrayTypes; i++) {
-        arrayTypes[i] = temp[i];
-      } 
+      System.arraycopy(temp, 0, arrayTypes, 0, numArrayTypes);
     }
     return arrayTypes[numArrayTypes-1];
   }
 
-  public String getTypeMneumonic() {
-    return 'a' + elemType.getTypeMneumonic();
+  @Override
+  public String getTypeMnemonic() {
+    return 'a' + elemType.getTypeMnemonic();
   }
 
+  @Override
   public void writeType(DataOutputStream out, PackageDesc thisPack) 
                                                           throws IOException {
     // Array = TypeHeader arrSy TypeOrd (Byte | Number | ) endAr.

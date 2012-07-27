@@ -35,6 +35,7 @@ public class Reference {
     this.type = nAndt.GetType();
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("Class " + classIndex + "  NameAndType " + nameAndTypeIndex);
