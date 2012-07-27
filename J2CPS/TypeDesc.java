@@ -5,8 +5,9 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-import java.util.*;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class TypeDesc {
 
@@ -58,7 +59,7 @@ public class TypeDesc {
     typeOrd = ix;
   }
 
-  public String getTypeMneumonic() {
+  public String getTypeMnemonic() {
     return typeStrArr[typeOrd];
   }
 
@@ -136,7 +137,7 @@ public class TypeDesc {
     return typeArr; 
   }
 
-  public static final void InitTypes() {
+  public static void InitTypes() {
     for (int i=0; i < specT; i++) {
       basicTypes[i] = new TypeDesc(i);
       basicTypes[i].name = "BasicType" + i;
@@ -149,6 +150,5 @@ public class TypeDesc {
     System.err.println("TRYING TO WRITE A TYPEDESC! with ord " + typeOrd);
     System.exit(1);
   }
-
 }
 

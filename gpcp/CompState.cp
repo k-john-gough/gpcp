@@ -101,7 +101,8 @@ MODULE CompState;
     hashSize-  : INTEGER;
 
     thisMod-   : IdDesc.BlkId;           (* Desc. of compiling module.  *)
-    sysMod-    : IdDesc.BlkId;           (* Desc. of compiling module.  *)
+    sysMod-    : IdDesc.BlkId;           (* Desc. of SYSTEM module.     *)
+    sysLib-    : IdDesc.BlkId;           (* mscorlib OR java.lang BlkId *)
 
     impSeq*    : Symbols.ScpSeq;
 
@@ -126,6 +127,11 @@ MODULE CompState;
 (* ==================================================================== *)
 (*				Utilities				*)
 (* ==================================================================== *)
+
+    PROCEDURE SetSysLib*(lib : IdDesc.BlkId);
+	BEGIN
+	  sysLib := lib;
+	END SetSysLib;
 
     PROCEDURE SetQuiet*(); 
     BEGIN

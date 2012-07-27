@@ -5,8 +5,8 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-import java.util.*;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 public class PtrDesc extends TypeDesc {
 
@@ -15,7 +15,9 @@ public class PtrDesc extends TypeDesc {
   public PtrDesc(TypeDesc baseType) {
     typeOrd = TypeDesc.arrPtr;
     boundType = baseType;
-    if (boundType != null) { setName(); }
+    if (boundType != null) { 
+        name = "POINTER TO " + boundType.name; 
+    }
   }
 
   public PtrDesc(int inNum, int baseNum) {
@@ -41,6 +43,7 @@ public class PtrDesc extends TypeDesc {
     name = "POINTER TO " + boundType.name;
   }
 
+    @Override
   public void writeType(DataOutputStream out, PackageDesc thisPack) 
                                                            throws IOException {
     out.writeByte(SymbolFile.ptrSy);

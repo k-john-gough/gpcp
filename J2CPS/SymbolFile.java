@@ -6,7 +6,7 @@
 package J2CPS;
 
 import java.io.*;
-import java.util.*;
+import java.util.ArrayList;
 
 class SymbolFile {
  
@@ -324,25 +324,18 @@ class SymbolFile {
     switch (sSym) {
       case namSy : acc = in.readByte();         // fall through 
       case strSy : name = in.readUTF(); break;
-
       case arrSy :
       case ptrSy :
       case retSy : 
       case fromS : 
       case tDefS : 
       case basSy : tOrd = readOrd(); break;
-
       case bytSy : iVal = in.readByte(); break;
-
       case keySy : 
       case setSy : iVal = in.readInt(); break;
-
       case numSy : lVal = in.readLong(); break;
-
       case fltSy : dVal = in.readDouble(); break;
-
       case chrSy : cVal = in.readChar(); break;
-
       case modSy : 
       case impSy : 
       case conSy : 
@@ -364,7 +357,6 @@ class SymbolFile {
       case iFcSy :
       case evtSy :
       case pTpSy : break;
-  
       default:  char ch = (char) sSym;
                 System.out.println("Bad symbol file format." +ch+"  "+sSym);
                 System.exit(1);
@@ -887,8 +879,6 @@ class SymbolFile {
       }
     }
   }
-
-
 }
 
 

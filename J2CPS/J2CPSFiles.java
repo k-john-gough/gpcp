@@ -191,7 +191,6 @@ public class J2CPSFiles implements FilenameFilter {
     return new DataOutputStream(new FileOutputStream(
                                 new File(dirName,fileName + symExt)));
   }
-
 }
 
 

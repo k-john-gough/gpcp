@@ -5,14 +5,13 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.util.*;
-import java.io.*;
+import java.io.IOException;
 
 public class J2CPS {
 
   /**
    * Main program. Takes a package name as a parameter, produces the 
-   * component pascal symbol file.
+   * Component Pascal symbol file.
    */
   public static void main(String args[]) { 
     int argLen = args.length;
@@ -61,7 +60,7 @@ public class J2CPS {
       }
     }
     try {
-      PackageDesc thisPackage = new PackageDesc(filename, anonPack);
+      PackageDesc thisPackage = PackageDesc.MakeNewPackageDesc(filename, anonPack);
       PackageDesc.ReadPackages();
       PackageDesc.WriteSymbolFiles();
     }
@@ -70,9 +69,7 @@ public class J2CPS {
 	System.err.println("Aborting...");
 	System.exit(1);
     }
-  } 
-
-
+  }
 }
 
 

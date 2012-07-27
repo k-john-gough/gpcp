@@ -5,8 +5,9 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-import java.util.*;
+import java.io.DataInputStream;
+import java.io.IOException;
+
 
 public class FieldInfo extends MemberInfo {
   
@@ -19,7 +20,7 @@ public class FieldInfo extends MemberInfo {
     
     super(cp,stream,thisClass);
     type = TypeDesc.GetType(signature,0);
-    if (type instanceof ClassDesc) { thisClass.AddImport((ClassDesc)type); }
+    thisClass.TryImport(type);
   }
 
   public FieldInfo(ClassDesc cl,int acc,String nam,TypeDesc typ,Object cVal) {
@@ -28,9 +29,10 @@ public class FieldInfo extends MemberInfo {
     constVal = cVal;
   }
 
-  public void AddImport(ClassDesc thisClass) {
-    if (type instanceof ClassDesc) { thisClass.AddImport((ClassDesc)type); }
-  }
+//  @Override
+//  public void AddImport(ClassDesc thisClass) {
+//    if (type instanceof ClassDesc) { thisClass.AddImport((ClassDesc)type); }
+//  }
 
   public void GetConstValueAttribute (ConstantPool cp, DataInputStream stream) 
                                                             throws IOException {
@@ -52,6 +54,7 @@ public class FieldInfo extends MemberInfo {
              ConstantPool.isProtected(accessFlags)));
   }
 
+  @Override
   public String toString() {
     if (constVal == null) {
       return ConstantPool.GetAccessString(accessFlags) + " " + 

@@ -22,7 +22,8 @@ MODULE TypeDesc;
         Sy  := Symbols,
         Lv  := LitValue,
         S   := CPascalS,
-        H   := DiagHelper;
+        H   := DiagHelper,
+		RTS;
 
 (* ============================================================ *)
 
@@ -575,7 +576,7 @@ MODULE TypeDesc;
     VAR ext : Record;
         i   : INTEGER;
   BEGIN
-    e := e.boundRecTp(); 
+    IF e # NIL THEN e := e.boundRecTp() END;
 
     IF (e = NIL) OR (e.kind # recTp) THEN RETURN FALSE;
     ELSIF e = b THEN RETURN TRUE;               (* Trivially! *)
@@ -1613,6 +1614,7 @@ MODULE TypeDesc;
         intTp : Sy.Type;
         recId : Sy.Idnt;
         dBlk  : Id.BlkId;
+		ntvNm : RTS.NativeString;
         e137,e145 : BOOLEAN;
    (* ----------------------------------------- *)
     PROCEDURE refInNET(t : Sy.Type) : BOOLEAN;
@@ -1639,6 +1641,14 @@ MODULE TypeDesc;
    (* ----------------------------------------- *)
   BEGIN (* resolve *)
     IF i.depth = initialMark THEN
+
+	  IF CSt.verbose THEN
+  	    IF i.idnt # NIL THEN
+	      ntvNm := Sy.getName.NtStr(i.idnt);
+        ELSIF (i.bindTp # NIL) & (i.bindTp.idnt # NIL) THEN
+	      ntvNm := Sy.getName.NtStr(i.bindTp.idnt);
+        END;
+      END;
       i.depth := d;
       e145 := FALSE;
       e137 := FALSE;

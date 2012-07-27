@@ -5,8 +5,6 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-
 public class StringRef {
 
   ConstantPool cp;  /* the constant pool containing this string ref */
@@ -27,6 +25,7 @@ public class StringRef {
     this.str = (String) this.cp.Get(strIndex);
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return ("<StringRef>  " + this.strIndex + " " + str);

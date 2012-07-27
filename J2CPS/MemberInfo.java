@@ -5,8 +5,8 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-import java.util.*;
+import java.io.DataInputStream;
+import java.io.IOException;
 
 public class MemberInfo {
 
@@ -79,9 +79,7 @@ public class MemberInfo {
     return ConstantPool.isFinal(accessFlags); 
   }
 
-  public void AddImport(ClassDesc thisClass) {
-  }
-
+    @Override
   public String toString() { return ""; };
 
   

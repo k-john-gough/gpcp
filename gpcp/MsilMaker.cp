@@ -135,6 +135,7 @@ MODULE MsilMaker;
     *  Create import descriptor for [mscorlib]System
     *)
     Builtin.MkDummyImport("mscorlib_System", "[mscorlib]System", blk);
+	CSt.SetSysLib(blk);
    (*
     *  Create various classes.
     *)

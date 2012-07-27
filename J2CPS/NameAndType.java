@@ -34,6 +34,7 @@ public class NameAndType {
     if (this.type == null) { this.type = (String) this.cp.Get(typeIndex); }
   }
 
+    @Override
   public String toString() {
     this.Resolve();
     return "<NameAndType> " + nameIndex + " " + this.name + 

@@ -5,8 +5,11 @@
 /**********************************************************************/
 package J2CPS;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class PackageDesc {
 
@@ -26,17 +29,23 @@ public class PackageDesc {
   public int impNum = -1;
   public boolean anonPackage = false;
 
-  public PackageDesc(String pName, boolean anon) {
+  public static PackageDesc MakeNewPackageDesc(String pName, boolean anon) {
+      PackageDesc desc = new PackageDesc(pName, anon);
+      if (!anon)
+          packageList.put(desc.name, desc);
+      toDo.add(desc);
+      return desc;
+  }
+  
+  private PackageDesc(String pName, boolean anon) {
     if (anon) {
       name = pName;
       cpName = pName;
       javaName = pName;
       anonPackage = true;
     } else {
-      MakeName(pName);
-      packageList.put(name,this); 
+      MakeName(pName); 
     }
-    boolean ok = toDo.add(this); 
   }
 
   private void MakeName(String pName) {
@@ -54,7 +63,7 @@ public class PackageDesc {
   public static PackageDesc getPackage(String packName) {
     packName = packName.replace(jSepCh,qSepCh); 
     PackageDesc pack = (PackageDesc)packageList.get(packName);
-    if (pack == null) { pack = new PackageDesc(packName,false); }
+    if (pack == null) { pack = PackageDesc.MakeNewPackageDesc(packName,false); }
     return pack;
   }
 
@@ -62,7 +71,7 @@ public class PackageDesc {
     className = className.replace(jSepCh,qSepCh); 
     String pName = className.substring(0,className.lastIndexOf(qSepCh));
     PackageDesc pack = (PackageDesc)packageList.get(pName);
-    if (pack == null) { pack = new PackageDesc(pName,false); }
+    if (pack == null) { pack = PackageDesc.MakeNewPackageDesc(pName,false); }
     return pack;
   }
 
@@ -172,7 +181,4 @@ public class PackageDesc {
       SymbolFile.WriteSymbolFile(nextPack);
     }
   }
-
-
-
 }

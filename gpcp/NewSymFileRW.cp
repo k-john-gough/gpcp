@@ -1486,9 +1486,9 @@ MODULE NewSymFileRW;
       f.GetSym();
     END;
    (* 
-    *  Do not override extrnNm values set
-    *  by *Maker.Init for Native* types.
-    *)
+	*  Do not override extrnNm values set
+	*  by *Maker.Init for Native* types.
+	*)
     IF (f.impS.scopeNm # NIL) & (rslt.extrnNm = NIL) THEN
       rslt.extrnNm := f.impS.scopeNm; 
     END;
@@ -1498,10 +1498,10 @@ MODULE NewSymFileRW;
       *  Do not override baseTp values set
       *  by *Maker.Init for Native* types.
       *)
-      IF rslt.baseTp = NIL THEN
+	  IF rslt.baseTp = NIL THEN
         rslt.baseTp := f.typeOf(f.iAtt);
         IF f.iAtt # Ty.anyRec THEN INCL(rslt.xAttr, D.clsTp) END;
-      END;
+	  END;
       f.GetSym();
     END;
     IF f.sSym = iFcSy THEN
@@ -2124,6 +2124,7 @@ MODULE NewSymFileRW;
         fScp : ImpResScope;
         rAll : ResolveAll;
   BEGIN
+    D.AppendScope(imps, CSt.sysLib);
    (*
     *  The list of scopes has been constructed by
     *  the parser, while reading the import list.

@@ -6,7 +6,9 @@
 package J2CPS;
 
 import java.io.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 
 public class ClassDesc extends TypeDesc  {
 
@@ -48,21 +50,36 @@ public class ClassDesc extends TypeDesc  {
     typeOrd = TypeDesc.classT;
   }
 
-  public ClassDesc(String thisName, PackageDesc pack) {
+    public static ClassDesc GetClassDesc(String name, PackageDesc pack) {
+    if (name.indexOf(jSepCh) != -1) { name = name.replace(jSepCh,qSepCh); }
+    ClassDesc aClass = (ClassDesc)classList.get(name);
+    if (aClass == null) 
+        aClass = ClassDesc.MakeNewClassDesc(name,pack); 
+    return aClass;
+  }
+
+  public static ClassDesc MakeNewClassDesc(String name, PackageDesc pack) {
+      ClassDesc desc = new ClassDesc(name, pack);
+      desc.MakeJavaName();
+      classList.put(desc.qualName, desc);
+      return desc;
+  }
+  
+  private ClassDesc(String thisName, PackageDesc pack) {
     typeOrd = TypeDesc.classT;
     qualName = thisName;
-    MakeJavaName();
-    classList.put(qualName,this);
-    if (pack == null) {
-      packageDesc = PackageDesc.getClassPackage(qualName);
-    } else { packageDesc = pack; }
+    if (pack == null)
+        packageDesc = PackageDesc.getClassPackage(qualName);
+    else 
+        packageDesc = pack; 
   }
 
   public ClassDesc(int inNum) {
     inBaseTypeNum = inNum; 
   }
 
-  public String getTypeMneumonic() {
+    @Override
+  public String getTypeMnemonic() {
     if (javaName.equals(jlString)) {
       return "S";
     } else if (javaName.equals(jlObject)) {
@@ -84,19 +101,19 @@ public class ClassDesc extends TypeDesc  {
     }
     /* read and check the minor and major version numbers  */
     int minorVersion = stream.readUnsignedShort();
-   /* if (minorVersion > MINOR_VERSION) {
-	System.out.println("Unsupported Java minor version " +
-				String.valueOf(minorVersion));
-	System.exit(0);
-    }
-*/
+//   /* if (minorVersion > MINOR_VERSION) {
+//	System.out.println("Unsupported Java minor version " +
+//				String.valueOf(minorVersion));
+//	System.exit(0);
+//    }
+//*/
     int majorVersion = stream.readUnsignedShort();
- /*   if (majorVersion != MAJOR_VERSION) {
-      System.out.println("Unsupported Java major version " + 
-			 String.valueOf(majorVersion));
-      System.exit(0);
-    }
-*/
+// /*   if (majorVersion != MAJOR_VERSION) {
+//      System.out.println("Unsupported Java major version " + 
+//			 String.valueOf(majorVersion));
+//      System.exit(0);
+//    }
+//*/
     cp = new ConstantPool(stream);
     access = stream.readUnsignedShort(); 
     ClassRef thisClass = (ClassRef) cp.Get(stream.readUnsignedShort());
@@ -114,10 +131,10 @@ public class ClassDesc extends TypeDesc  {
       } 
       classList.remove(qualName);
       qualName = clName;
-      MakeJavaName();
+      this.MakeJavaName();
       classList.put(qualName,this);
     }
-    isInterface = cp.isInterface(access);
+    isInterface = ConstantPool.isInterface(access);
     int superIx = stream.readUnsignedShort();
     if (superIx > 0) {
       tmp = (ClassRef) cp.Get(superIx);
@@ -152,6 +169,16 @@ public class ClassDesc extends TypeDesc  {
     cp = null;
     return true;
   }
+  
+  public void TryImport(TypeDesc type){
+      if (type instanceof ClassDesc)
+          this.AddImport((ClassDesc)type);
+      else if (type instanceof ArrayDesc)
+          this.TryImport(((ArrayDesc)type).elemType);
+      else if (type instanceof PtrDesc)
+          ((PtrDesc)type).AddImport(this);
+      
+  }
 
   public void AddImport(ClassDesc aClass) {
    if ((aClass != this) && (aClass.packageDesc != this.packageDesc) &&
@@ -159,14 +186,6 @@ public class ClassDesc extends TypeDesc  {
       imports.add(aClass.packageDesc);
     }
   }
-
-/*
- *public boolean ReadClassFile(File cFile) throws IOException {
- *  DataInputStream in = new DataInputStream(new FileInputStream(cFile));
- *  if (verbose) { System.out.println("Reading Class File <"+qualName+">"); }
- *  return ReadClassFileDetails(in);
- *}
- */
 
   public boolean ReadClassFile(File cFile) throws IOException {
     boolean result;
@@ -176,13 +195,6 @@ public class ClassDesc extends TypeDesc  {
     // close the file or run out of file handles!
     in.close();
     return result;
-  }
-
-  public static ClassDesc GetClassDesc(String name, PackageDesc pack) {
-    if (name.indexOf(jSepCh) != -1) { name = name.replace(jSepCh,qSepCh); }
-    ClassDesc aClass = (ClassDesc)classList.get(name);
-    if (aClass == null) { aClass = new ClassDesc(name,pack); }
-    return aClass;
   }
 
   public void PrintClassFile() {
@@ -255,7 +267,7 @@ public class ClassDesc extends TypeDesc  {
     if (overloadedNames) { return; }
     if (meth.parTypes.length > 0) { meth.userName += "_"; }
     for (int i=0; i < meth.parTypes.length; i++) {
-      String next = meth.parTypes[i].getTypeMneumonic();
+      String next = meth.parTypes[i].getTypeMnemonic();
       if (next.endsWith("o")) { needHash = true; }
       meth.userName += next;
     }
@@ -411,6 +423,7 @@ public class ClassDesc extends TypeDesc  {
     }
   }
 
+    @Override
   public void writeType(DataOutputStream out,PackageDesc thisPack) 
                                                            throws IOException {
     if (objName == null)  { this.MakeJavaName(); }

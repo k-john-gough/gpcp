@@ -207,6 +207,7 @@ MODULE JavaMaker;
     *  Create import descriptor for java.lang
     *)
     Builtin.MkDummyImport("java_lang", "java.lang", blk);
+	CompState.SetSysLib(blk);
    (*
     *  Create various classes.
     *)

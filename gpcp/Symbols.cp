@@ -57,7 +57,7 @@ MODULE Symbols;
 (* ============================================================ *)
 
   TYPE
-    Idnt*   = POINTER TO ABSTRACT RECORD
+    Idnt*   = POINTER TO ABSTRACT RECORD (RTS.NativeObject)
                 kind-  : INTEGER;   (* tag for unions *)
                 token* : S.Token;   (* scanner token  *)
                 type*  : Type;      (* typ-desc | NIL *)
@@ -236,7 +236,36 @@ MODULE Symbols;
   BEGIN
     t.namStr := MKSTR(NameHash.charOpenOfHash(hash)^);
   END SetNameFromHash;
-  
+
+(* ============================================================ *)
+(*  This diagnostic method is placed here to use when GPCP-CLR  *)
+(*  itself is being debugged. If ToString is present then       *)
+(*  > gpcp /target=jvm Symbol.cp fails with error 105 :-        *)
+(*  "This method is not a redefinition, you must use NEW"       *)
+(* ============================================================ *
+  PROCEDURE (t : Idnt)ToString*() : RTS.NativeString;
+  BEGIN
+    IF t.namStr # NIL THEN RETURN t.namStr;
+	ELSE RETURN MKSTR(NameHash.charOpenOfHash(t.hash)^);
+	END;
+  END ToString;
+ * ============================================================ *)  
+(* ============================================================ *)
+(*  This diagnostic method is placed here to use when GPCP-JVM  *)
+(*  itself is being debugged. If toString is present then       *)
+(*  > gpcp /target=net Symbol.cp fails with error 105 :-        *)
+(*  "This method is not a redefinition, you must use NEW"       *)
+(* ============================================================ *
+  PROCEDURE (t : Idnt)toString*() : RTS.NativeString;
+  BEGIN
+    IF t.namStr # NIL THEN RETURN t.namStr;
+	ELSE RETURN MKSTR(NameHash.charOpenOfHash(t.hash)^);
+	END;
+  END toString;
+ * ============================================================ *) 
+(* ============================================================ *)
+
+ 
 (* ============================================================ *)
 (*             Base Class text-span method                      *)
 (* ============================================================ *)
