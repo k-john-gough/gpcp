@@ -14,7 +14,7 @@ MODULE Builtin;
 	CompState,
 	Symbols,
 	IdDesc,
-        LitValue,
+    LitValue,
 	Typ := TypeDesc;
 
 (* ============================================================ *)
@@ -164,6 +164,43 @@ MODULE Builtin;
     tId.hash  := NameHash.enterStr(nam);
     jnk := blk.symTb.enter(tId.hash, tId);
   END MkDummyClass;
+
+(* ------------------------------------------------------------	*)
+
+  PROCEDURE MkDummyMethodAndInsert*(IN namStr : ARRAY OF CHAR;
+                                       prcTyp : TypeDesc.Procedure;
+                                       hostTp : Symbols.Type;
+                                       scope  : IdDesc.BlkId;
+									   access : INTEGER;
+									   rcvFrm : INTEGER;
+                                       mthAtt : SET);
+    VAR mthD : IdDesc.MthId;
+	    recT : TypeDesc.Record;
+	    rcvD : IdDesc.ParId;
+		oldD : IdDesc.OvlId;
+        junk : BOOLEAN;
+  BEGIN
+    recT := hostTp.boundRecTp()(TypeDesc.Record);
+    prcTyp.receiver := hostTp;
+
+    mthD := IdDesc.newMthId();
+	mthD.SetMode(access);
+	mthD.setPrcKind(IdDesc.conMth);
+    mthD.hash := NameHash.enterStr(namStr);
+    mthD.dfScp := scope;
+	mthD.type := prcTyp;
+	mthD.bndType := hostTp;
+	mthD.mthAtt := mthAtt;
+
+    rcvD := IdDesc.newParId();
+    rcvD.varOrd := 0;
+	rcvD.parMod := rcvFrm;
+	rcvD.type := hostTp;
+
+	mthD.rcvFrm := rcvD;
+	TypeDesc.InsertInRec(mthD, recT, TRUE, oldD, junk);
+	Symbols.AppendIdnt(recT.methods, mthD);
+  END MkDummyMethodAndInsert;
 
 (* ------------------------------------------------------------	*)
 

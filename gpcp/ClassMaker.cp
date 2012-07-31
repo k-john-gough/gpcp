@@ -28,6 +28,7 @@ MODULE ClassMaker;
 (* ============================================================ *)
 
   PROCEDURE (maker : ClassEmitter)Init*(),NEW,EMPTY;
+  PROCEDURE (maker : ClassEmitter)ObjectFeatures*(),NEW,EMPTY;
   PROCEDURE (maker : ClassEmitter)Emit*(),NEW,ABSTRACT;
   PROCEDURE (asmbl : Assembler)Assemble*(),NEW,EMPTY;
 

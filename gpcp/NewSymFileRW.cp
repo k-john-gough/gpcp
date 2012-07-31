@@ -2124,7 +2124,6 @@ MODULE NewSymFileRW;
         fScp : ImpResScope;
         rAll : ResolveAll;
   BEGIN
-    D.AppendScope(imps, CSt.sysLib);
    (*
     *  The list of scopes has been constructed by
     *  the parser, while reading the import list.
@@ -2153,6 +2152,15 @@ MODULE NewSymFileRW;
       END;
       INC(indx);
     END;
+   (*
+	* If sysLib has NOT been explicitly imported, then
+	* insert dummy definitions for the native object methods
+	* so that user code may explictly extend RTS.NativeObject
+	* and override these methods.
+	*)
+	IF ~(D.fixd IN CSt.sysLib.xAttr) THEN 
+	  CSt.ImportObjectFeatures();
+	END;
     FOR indx := 0 TO fScp.work.tide-1 DO
       blkI := fScp.work.a[indx](Id.BlkId);
       NEW(rAll);

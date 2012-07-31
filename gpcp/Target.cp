@@ -45,6 +45,7 @@ MODULE Target;
     ELSE
       CompState.Message("Unknown emitter name <" + str + ">");
     END;
+	CompState.SetEmitter(maker);
   END Select;
 
 (* ============================================================ *)
