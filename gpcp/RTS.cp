@@ -20,9 +20,10 @@ SYSTEM MODULE RTS;
       dblPosInfinity-   : REAL;
 
   TYPE  CharOpen*       = POINTER TO ARRAY OF CHAR;
+        CharVector*     = VECTOR OF CHAR;
 
-  TYPE  NativeType*	= POINTER TO ABSTRACT RECORD END;
-        NativeObject*   = POINTER TO ABSTRACT RECORD END;  
+  TYPE  NativeType*     = POINTER TO ABSTRACT RECORD END;
+        NativeObject*   = POINTER TO EXTENSIBLE RECORD END;  
         NativeString*   = POINTER TO RECORD END;
         NativeException*= POINTER TO EXTENSIBLE RECORD END;
 
@@ -101,6 +102,12 @@ SYSTEM MODULE RTS;
                         OUT r  : SHORTREAL; 
                         OUT ok : BOOLEAN);
   (** Parse array into a short REAL *)
+
+  (* ========================================================== *)
+  (* ==============  Operations on Native Types  ============== *)
+  (* ========================================================== *)
+
+  PROCEDURE TypeName*(typ : NativeType) : CharOpen;
 
   (* ========================================================== *)
   (* ============== Operations on Native Strings ============== *)

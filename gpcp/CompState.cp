@@ -22,6 +22,7 @@ MODULE CompState;
         CPascalS,
         NameHash,
         FileNames,
+		ClassMaker,
         CPascalErrors;
 
   CONST	prefix     = "#gpcp: ";
@@ -68,6 +69,7 @@ MODULE CompState;
     lstNam-   : FileNames.NameString;    (* name of the listing file    *)
 
     target-   : ARRAY 4 OF CHAR;
+	emitter-  : ClassMaker.ClassEmitter;
 
     cpSymX-,                             (* User supplied CPSYM name    *)
     binDir-,                             (* PE-file directory .NET only *)
@@ -132,6 +134,16 @@ MODULE CompState;
 	BEGIN
 	  sysLib := lib;
 	END SetSysLib;
+
+    PROCEDURE SetEmitter*(maker : ClassMaker.ClassEmitter);
+	BEGIN
+	  emitter := maker;
+	END SetEmitter;
+
+	PROCEDURE ImportObjectFeatures*();
+	BEGIN
+	  emitter.ObjectFeatures();
+	END ImportObjectFeatures;
 
     PROCEDURE SetQuiet*(); 
     BEGIN

@@ -200,6 +200,38 @@ MODULE MsilMaker;
 
 (* ============================================================ *)
 
+  PROCEDURE (this : MsilEmitter)ObjectFeatures*();
+    VAR prcSig : Ty.Procedure; 
+        thePar : Id.ParId;
+  BEGIN
+	NEW(prcSig);
+    prcSig.retType := CSt.strId.type;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("ToString", prcSig, CSt.ntvObj, CSt.sysLib, Sy.pubMode, Sy.var, Id.extns);
+
+	NEW(prcSig);
+    prcSig.retType := Bi.intTp;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("GetHashCode", prcSig, CSt.ntvObj, CSt.sysLib, Sy.pubMode, Sy.var, Id.extns);
+
+	NEW(prcSig);
+    prcSig.retType := CSt.ntvObj;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("MemberwiseClone", prcSig, CSt.ntvObj, CSt.sysLib, Sy.protect, Sy.var, Id.extns);
+
+	NEW(prcSig);
+	NEW(thePar);
+    prcSig.retType := Bi.boolTp;
+    Id.InitParSeq(prcSig.formals, 2);
+	thePar.parMod := Sy.val;
+	thePar.type := CSt.ntvObj;
+	thePar.varOrd := 1;
+	Id.AppendParam(prcSig.formals, thePar);
+    Builtin.MkDummyMethodAndInsert("Equals", prcSig, CSt.ntvObj, CSt.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
+  END ObjectFeatures;
+
+(* ============================================================ *)
+
    PROCEDURE (this : MsilEmitter)mkThreadAssign() : Sy.Stmt,NEW; 
      VAR stmt : Sy.Stmt;
          text : ARRAY 3 OF Lv.CharOpen;

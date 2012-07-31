@@ -1,6 +1,6 @@
 (* ============================================================ *)
 (*  JavaMaker is the concrete class for emitting java           *)
-(*  class files.						*)
+(*  class files.                                                *)
 (*  Diane Corney - September,2000.                              *)
 (* ============================================================ *)
 
@@ -20,12 +20,12 @@ MODULE JavaMaker;
         GPBinFiles,
         GPTextFiles,
         Jvm := JVMcodes,
-        J := JavaUtil,
+        Ju  := JavaUtil,
         (* JasminAsm, jasmin is no longer used! *)
         ClassUtil,
         JsmnUtil,
-        G  := Builtin,
-        D  := Symbols,
+        Bi := Builtin,
+        Sy := Symbols,
         Id := IdDesc,
         Ty := TypeDesc,
         Xp := ExprDesc,
@@ -52,7 +52,7 @@ MODULE JavaMaker;
          (* --------------------------- *
           * mod* : Id.BlkId; 		*
           * --------------------------- *)
-            outF  : J.JavaFile;
+            outF  : Ju.JavaFile;
           END;
 
 (* ------------------------------------ *)
@@ -73,7 +73,7 @@ MODULE JavaMaker;
           RECORD (JavaEmitter)
          (* --------------------------- *
           * mod* : Id.BlkId; 		*
-          * outF : J.JavaFile; 		*
+          * outF : Ju.JavaFile; 		*
           * --------------------------- *)
             recT : Ty.Record;
           END;
@@ -90,7 +90,7 @@ MODULE JavaMaker;
 
   VAR
         asmList : LitValue.CharOpenSeq;
-        currentLoopLabel : J.Label;
+        currentLoopLabel : Ju.Label;
 
 (* ============================================================ *)
 
@@ -115,7 +115,7 @@ MODULE JavaMaker;
         modEmit : JavaModEmitter;
         modName : LitValue.CharOpen;
   BEGIN
-    modName := D.getName.ChPtr(mod);
+    modName := Sy.getName.ChPtr(mod);
    (*
     *  Allocate a new worklist object.
     *)
@@ -179,8 +179,8 @@ MODULE JavaMaker;
    (*
     *  First construct the base class-name string in the BlkId.
     *)
-    J.Init();
-    J.MkBlkName(this.mod);
+    Ju.Init();
+    Ju.MkBlkName(this.mod);
 
     ix := 0;
     WHILE ix < this.tide DO
@@ -206,38 +206,38 @@ MODULE JavaMaker;
    (*
     *  Create import descriptor for java.lang
     *)
-    Builtin.MkDummyImport("java_lang", "java.lang", blk);
+    Bi.MkDummyImport("java_lang", "java.lang", blk);
 	CompState.SetSysLib(blk);
    (*
     *  Create various classes.
     *)
-    Builtin.MkDummyClass("Object", blk, Ty.isAbs, obj);
+    Bi.MkDummyClass("Object", blk, Ty.isAbs, obj);
     CompState.ntvObj := obj.type;
-    Builtin.MkDummyClass("String", blk, Ty.noAtt, str);
+    Bi.MkDummyClass("String", blk, Ty.noAtt, str);
     CompState.ntvStr := str.type;
-    Builtin.MkDummyClass("Exception", blk, Ty.extns, exc);
+    Bi.MkDummyClass("Exception", blk, Ty.extns, exc);
     CompState.ntvExc := exc.type;
-    Builtin.MkDummyClass("Class", blk, Ty.noAtt, cls);
+    Bi.MkDummyClass("Class", blk, Ty.noAtt, cls);
     CompState.ntvTyp := cls.type;
    (*
     *  Create import descriptor for CP.RTS
     *)
-    Builtin.MkDummyImport("RTS", "", blk);
-    Builtin.MkDummyAlias("NativeType", blk, cls.type, CompState.clsId);
-    Builtin.MkDummyAlias("NativeObject", blk, obj.type, CompState.objId);
-    Builtin.MkDummyAlias("NativeString", blk, str.type, CompState.strId);
-    Builtin.MkDummyAlias("NativeException", blk, exc.type, CompState.excId);
+    Bi.MkDummyImport("RTS", "", blk);
+    Bi.MkDummyAlias("NativeType", blk, cls.type, CompState.clsId);
+    Bi.MkDummyAlias("NativeObject", blk, obj.type, CompState.objId);
+    Bi.MkDummyAlias("NativeString", blk, str.type, CompState.strId);
+    Bi.MkDummyAlias("NativeException", blk, exc.type, CompState.excId);
 
-    Builtin.MkDummyVar("dblPosInfinity",blk,Builtin.realTp,CompState.dblInf);
-    Builtin.MkDummyVar("dblNegInfinity",blk,Builtin.realTp,CompState.dblNInf);
-    Builtin.MkDummyVar("fltPosInfinity",blk,Builtin.sReaTp,CompState.fltInf);
-    Builtin.MkDummyVar("fltNegInfinity",blk,Builtin.sReaTp,CompState.fltNInf);
-    INCL(blk.xAttr, D.need);
+    Bi.MkDummyVar("dblPosInfinity",blk,Bi.realTp,CompState.dblInf);
+    Bi.MkDummyVar("dblNegInfinity",blk,Bi.realTp,CompState.dblNInf);
+    Bi.MkDummyVar("fltPosInfinity",blk,Bi.sReaTp,CompState.fltInf);
+    Bi.MkDummyVar("fltNegInfinity",blk,Bi.sReaTp,CompState.fltNInf);
+    INCL(blk.xAttr, Sy.need);
    (*
     *  Uplevel addressing stuff.
     *)
-    Builtin.MkDummyImport("$CPJrts$", "CP.CPJrts", blk);
-    Builtin.MkDummyClass("XHR", blk, Ty.isAbs, xhr);
+    Bi.MkDummyImport("$CPJrts$", "CP.CPJrts", blk);
+    Bi.MkDummyClass("XHR", blk, Ty.isAbs, xhr);
     CompState.rtsXHR := xhr.type;
     CompState.xhrId.recTyp := CompState.rtsXHR;
     CompState.xhrId.type   := CompState.rtsXHR;
@@ -245,6 +245,37 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
+  PROCEDURE (this : JavaWorkList)ObjectFeatures*();
+    VAR prcSig : Ty.Procedure; 
+        thePar : Id.ParId;
+  BEGIN
+	NEW(prcSig);
+    prcSig.retType := CompState.strId.type;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("toString", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, Id.extns);
+
+	NEW(prcSig);
+    prcSig.retType := Bi.intTp;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("hashCode", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, Id.extns);
+
+	NEW(prcSig);
+    prcSig.retType := CompState.ntvObj;
+    Id.InitParSeq(prcSig.formals, 2);
+    Bi.MkDummyMethodAndInsert("clone", prcSig, CompState.ntvObj, CompState.sysLib, Sy.protect, Sy.var, Id.extns);
+
+	NEW(prcSig);
+	NEW(thePar);
+    prcSig.retType := Bi.boolTp;
+    Id.InitParSeq(prcSig.formals, 2);
+	thePar.parMod := Sy.val;
+	thePar.type := CompState.ntvObj;
+	thePar.varOrd := 1;
+	Id.AppendParam(prcSig.formals, thePar);
+    Bi.MkDummyMethodAndInsert("equals", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
+  END ObjectFeatures;
+
+(* ============================================================ *)
   PROCEDURE (this : JavaAssembler)Assemble*();
     VAR ix : INTEGER;
   BEGIN
@@ -261,25 +292,25 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (t : JavaEmitter)EmitBody(f : J.JavaFile),NEW,ABSTRACT;
+  PROCEDURE (t : JavaEmitter)EmitBody(f : Ju.JavaFile),NEW,ABSTRACT;
   PROCEDURE^ (e : JavaEmitter)EmitProc(proc : Id.Procs),NEW;
-  PROCEDURE^ (e : JavaEmitter)EmitStat(stat : D.Stmt; OUT ok : BOOLEAN),NEW;
+  PROCEDURE^ (e : JavaEmitter)EmitStat(stat : Sy.Stmt; OUT ok : BOOLEAN),NEW;
   PROCEDURE^ (e : JavaEmitter)PushCall(callX : Xp.CallX),NEW;
-  PROCEDURE^ (e : JavaEmitter)PushValue(exp : D.Expr; typ : D.Type),NEW;
-  PROCEDURE^ (e : JavaEmitter)FallFalse(exp : D.Expr; tLb : J.Label),NEW;
-  PROCEDURE^ (e : JavaEmitter)ValueCopy(act : D.Expr; fmT : D.Type),NEW;
-  PROCEDURE^ (e : JavaEmitter)PushArg(act : D.Expr;
+  PROCEDURE^ (e : JavaEmitter)PushValue(exp : Sy.Expr; typ : Sy.Type),NEW;
+  PROCEDURE^ (e : JavaEmitter)FallFalse(exp : Sy.Expr; tLb : Ju.Label),NEW;
+  PROCEDURE^ (e : JavaEmitter)ValueCopy(act : Sy.Expr; fmT : Sy.Type),NEW;
+  PROCEDURE^ (e : JavaEmitter)PushArg(act : Sy.Expr;
         			      frm : Id.ParId;
-        			  VAR seq : D.ExprSeq),NEW;
+        			  VAR seq : Sy.ExprSeq),NEW;
 
 (* ============================================================ *)
 
   PROCEDURE (t : JavaRecEmitter)CopyProc(),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         junk : INTEGER;
         indx : INTEGER;
-        idnt : D.Idnt;
-        fTyp : D.Type;
+        idnt : Sy.Idnt;
+        fTyp : Sy.Type;
         
   BEGIN
    (*
@@ -325,25 +356,25 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (this : JavaRecEmitter)EmitBody(out : J.JavaFile);
+  PROCEDURE (this : JavaRecEmitter)EmitBody(out : Ju.JavaFile);
   (** Create the assembler for a class file for this record. *)
     VAR index  : INTEGER;
         parIx  : INTEGER;
-        clsId  : D.Idnt;
-        ident  : D.Idnt;
+        clsId  : Sy.Idnt;
+        ident  : Sy.Idnt;
         ctorD  : Id.PrcId;
         sCtor  : Id.PrcId;
         sCtTy  : Ty.Procedure;
-        baseT  : D.Type;
+        baseT  : Sy.Type;
         field  : Id.FldId;
         method : Id.MthId;
         record : Ty.Record;
-        impRec : D.Idnt;
+        impRec : Sy.Idnt;
         attr   : INTEGER;
         form   : Id.ParId;
-        expr   : D.Expr;
+        expr   : Sy.Expr;
         live   : BOOLEAN;
-        retn   : D.Type;
+        retn   : Sy.Type;
   BEGIN
     record := this.recT;
     out.StartRecClass(record); 
@@ -358,8 +389,8 @@ MODULE JavaMaker;
    (*
     *  Emit the no-arg constructor
     *)
-    IF ~(D.noNew IN record.xAttr) &
-       ~(D.xCtor IN record.xAttr) THEN
+    IF ~(Sy.noNew IN record.xAttr) &
+       ~(Sy.xCtor IN record.xAttr) THEN
       out.RecMakeInit(record, NIL);
       out.CallSuperCtor(record, NIL);
       out.VoidTail();
@@ -378,7 +409,7 @@ MODULE JavaMaker;
         sCtor := ctorD.basCll.sprCtor(Id.PrcId);
         IF sCtor # NIL THEN
           sCtTy := sCtor.type(Ty.Procedure);
-          IF sCtTy.xName = NIL THEN J.MkCallAttr(sCtor, sCtTy) END;
+          IF sCtTy.xName = NIL THEN Ju.MkCallAttr(sCtor, sCtTy) END;
           FOR parIx := 0 TO ctorD.basCll.actuals.tide-1 DO
             form := sCtTy.formals.a[parIx];
             expr := ctorD.basCll.actuals.a[parIx];
@@ -400,7 +431,7 @@ MODULE JavaMaker;
       END;
       out.EndProc();
     END;
-    IF ~(D.noCpy IN record.xAttr) THEN this.CopyProc() END;
+    IF ~(Sy.noCpy IN record.xAttr) THEN this.CopyProc() END;
    (*
     *  Emit all the (non-forward) methods ...
     *)
@@ -415,12 +446,12 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (this : JavaModEmitter)EmitBody(out : J.JavaFile);
+  PROCEDURE (this : JavaModEmitter)EmitBody(out : Ju.JavaFile);
   (** Create the assembler for a class file for this module. *)
     VAR index : INTEGER;
         objIx : INTEGER;
         proc  : Id.Procs;
-        recT  : D.Type;
+        recT  : Sy.Type;
         varId : Id.VarId;
         returned : BOOLEAN;
   BEGIN
@@ -432,8 +463,8 @@ MODULE JavaMaker;
       proc := this.mod.procs.a[index];
       IF (proc.kind = Id.conPrc) OR 
          (proc.kind = Id.conMth) THEN
-        J.MkProcName(proc);
-        J.RenumberLocals(proc);
+        Ju.MkProcName(proc);
+        Ju.RenumberLocals(proc);
       END;
     END;
    (* 
@@ -482,7 +513,7 @@ MODULE JavaMaker;
     *)
     FOR index := 0 TO this.mod.expRecs.tide-1 DO
       recT := this.mod.expRecs.a[index];
-      IF recT.xName = NIL THEN J.MkRecName(recT(Ty.Record)) END;
+      IF recT.xName = NIL THEN Ju.MkRecName(recT(Ty.Record)) END;
     END;
   END EmitBody;
 
@@ -511,7 +542,7 @@ MODULE JavaMaker;
       this.outF := cf;
     ELSE
       WITH this : JavaModEmitter DO
-          D.getName.Of(this.mod, fileName);
+          Sy.getName.Of(this.mod, fileName);
       | this : JavaRecEmitter DO
           FileNames.StripUpToLast("/", this.recT.xName, fileName);
       END;
@@ -541,9 +572,9 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)EmitProc(proc : Id.Procs),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         live : BOOLEAN;
-        retn : D.Type;
+        retn : Sy.Type;
         indx : INTEGER;
         nest : Id.Procs;
         procName : FileNames.NameString;
@@ -595,19 +626,19 @@ MODULE JavaMaker;
 (*		    Expression Handling Methods			*)
 (* ============================================================ *)
 
-  PROCEDURE longValue(lit : D.Expr) : LONGINT;
+  PROCEDURE longValue(lit : Sy.Expr) : LONGINT;
   BEGIN
     RETURN lit(Xp.LeafX).value.long();
   END longValue;
 
-  PROCEDURE intValue(lit : D.Expr) : INTEGER;
+  PROCEDURE intValue(lit : Sy.Expr) : INTEGER;
   BEGIN
     RETURN lit(Xp.LeafX).value.int();
   END intValue;
 
-  PROCEDURE isStrExp(exp : D.Expr) : BOOLEAN;
+  PROCEDURE isStrExp(exp : Sy.Expr) : BOOLEAN;
   BEGIN
-    RETURN (exp.type = G.strTp) & 
+    RETURN (exp.type = Bi.strTp) & 
            (exp.kind # Xp.mkStr) OR 
             exp.type.isNativeStr();
   END isStrExp;
@@ -615,7 +646,7 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)UbyteClear(),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
   BEGIN
     out  := e.outF;
     out.PushInt(255);
@@ -624,7 +655,7 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)newLeaf(rd : INTEGER; tp : D.Type) : Xp.IdLeaf,NEW;
+  PROCEDURE (e : JavaEmitter)newLeaf(rd : INTEGER; tp : Sy.Type) : Xp.IdLeaf,NEW;
     VAR id : Id.LocId;
   BEGIN
     id := Id.newLocId();
@@ -651,11 +682,11 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)DoCmp(cmpE : INTEGER;
-                                   tLab : J.Label;
-                                   type : D.Type),NEW;
+                                   tLab : Ju.Label;
+                                   type : Sy.Type),NEW;
    (**  Compare two TOS elems and jump to tLab if true. *)
    (* ------------------------------------------------- *)
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         code : INTEGER;
         tNum : INTEGER;
    (* ------------------------------------------------- *)
@@ -677,7 +708,7 @@ MODULE JavaMaker;
     WITH type : Ty.Base DO
       tNum := type.tpOrd;
       CASE tNum OF
-      | Ty.strN, Ty.sStrN : out.CallRTS(J.StrCmp,2,1);
+      | Ty.strN, Ty.sStrN : out.CallRTS(Ju.StrCmp,2,1);
       | Ty.realN : out.Code(Jvm.opc_dcmpl);
       | Ty.sReaN : out.Code(Jvm.opc_fcmpl);
       | Ty.lIntN : out.Code(Jvm.opc_lcmp);
@@ -697,7 +728,7 @@ MODULE JavaMaker;
           END;
       END;
     ELSE  (* This must be a reference or string comparison *)
-      IF type.isCharArrayType() THEN out.CallRTS(J.StrCmp,2,1);
+      IF type.isCharArrayType() THEN out.CallRTS(Ju.StrCmp,2,1);
       ELSIF cmpE = Xp.equal     THEN code := Jvm.opc_if_acmpeq;
       ELSIF cmpE = Xp.notEq     THEN code := Jvm.opc_if_acmpne;
       END;
@@ -709,7 +740,7 @@ MODULE JavaMaker;
  *  IF type IS Ty.Base THEN
  *    tNum := type(Ty.Base).tpOrd;
  *    IF (tNum = Ty.strN) OR (tNum = Ty.sStrN) THEN
- *      out.CallRTS(J.StrCmp,2,1);
+ *      out.CallRTS(Ju.StrCmp,2,1);
  *    ELSIF tNum = Ty.realN THEN
  *      out.Code(Jvm.opc_dcmpl);
  *    ELSIF tNum = Ty.sReaN THEN
@@ -728,7 +759,7 @@ MODULE JavaMaker;
  *    END;
  *  ELSE  (* This must be a reference or string comparison *)
  *    IF type.isCharArrayType() THEN
- *      out.CallRTS(J.StrCmp,2,1);
+ *      out.CallRTS(Ju.StrCmp,2,1);
  *    ELSIF cmpE = Xp.equal THEN
  *      code := Jvm.opc_if_acmpeq;
  *    ELSIF cmpE = Xp.notEq THEN
@@ -741,23 +772,23 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)SetCmp(lOp,rOp : D.Expr; 
-                                    theLabl : J.Label;
+  PROCEDURE (e : JavaEmitter)SetCmp(lOp,rOp : Sy.Expr; 
+                                    theLabl : Ju.Label;
                                     theTest : INTEGER),NEW;
-    VAR out : J.JavaFile;
+    VAR out : Ju.JavaFile;
         l,r : INTEGER;
-        xit : J.Label;
+        xit : Ju.Label;
   BEGIN
     out := e.outF;
-    e.PushValue(lOp, G.setTp);
+    e.PushValue(lOp, Bi.setTp);
     CASE theTest OF
     (* ---------------------------------- *)
     | Xp.equal: 
-        e.PushValue(rOp, G.setTp);
+        e.PushValue(rOp, Bi.setTp);
         out.CodeLb(Jvm.opc_if_icmpeq, theLabl);
     (* ---------------------------------- *)
     | Xp.notEq : 
-        e.PushValue(rOp, G.setTp);
+        e.PushValue(rOp, Bi.setTp);
         out.CodeLb(Jvm.opc_if_icmpne, theLabl);
     (* ---------------------------------- *)
     | Xp.greEq, Xp.lessEq : 
@@ -768,7 +799,7 @@ MODULE JavaMaker;
         *   (L >= R) == (L OR  R = L)
         *)
         out.Code(Jvm.opc_dup);
-        e.PushValue(rOp, G.setTp);
+        e.PushValue(rOp, Bi.setTp);
         IF theTest = Xp.greEq THEN
           out.Code(Jvm.opc_ior);
         ELSE
@@ -788,18 +819,18 @@ MODULE JavaMaker;
         xit := out.newLabel();
         out.Code(Jvm.opc_dup);            (* ... L,L       *)
         out.Code(Jvm.opc_dup);            (* ... L,L,L     *)
-        out.StoreLocal(l, G.setTp);       (* ... L,L,      *)
-        e.PushValue(rOp, G.setTp);        (* ... L,L,R     *)
+        out.StoreLocal(l, Bi.setTp);      (* ... L,L,      *)
+        e.PushValue(rOp, Bi.setTp);       (* ... L,L,R     *)
         out.Code(Jvm.opc_dup);            (* ... L,L,R,R   *)
-        out.StoreLocal(r, G.setTp);       (* ... L,L,R     *)
+        out.StoreLocal(r, Bi.setTp);      (* ... L,L,R     *)
         IF theTest = Xp.greT THEN        
           out.Code(Jvm.opc_ior);          (* ... L,LvR     *)
         ELSE
           out.Code(Jvm.opc_iand);         (* ... L,L^R     *)
         END; 
         out.CodeLb(Jvm.opc_if_icmpne, xit);
-        out.LoadLocal(l, G.setTp);        (* ... L@R,l     *)
-        out.LoadLocal(r, G.setTp);        (* ... L@R,l,r   *)
+        out.LoadLocal(l, Bi.setTp);       (* ... L@R,l     *)
+        out.LoadLocal(r, Bi.setTp);       (* ... L@R,l,r   *)
         out.CodeLb(Jvm.opc_if_icmpne, theLabl);
         out.ReleaseLocal(r);
         out.ReleaseLocal(l);
@@ -809,26 +840,26 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)BinCmp(exp : D.Expr; 
-        	                    tst : INTEGER;
+  PROCEDURE (e : JavaEmitter)BinCmp(exp : Sy.Expr; 
+                                    tst : INTEGER;
                                     rev : BOOLEAN;  (* reverse sense *)
-        			    lab : J.Label),NEW;
+                                    lab : Ju.Label),NEW;
     VAR binOp : Xp.BinaryX;
-        lType : D.Type;
+        lType : Sy.Type;
   BEGIN
     binOp := exp(Xp.BinaryX);
     lType := binOp.lKid.type;
     IF rev THEN tst := RevTest(tst) END;
-    IF  lType = G.setTp THEN (* only partially ordered *)
+    IF  lType = Bi.setTp THEN (* only partially ordered *)
       e.SetCmp(binOp.lKid, binOp.rKid, lab, tst);
     ELSE                      (* a totally ordered type *)
       e.PushValue(binOp.lKid, lType);
       IF isStrExp(binOp.lKid) THEN
-        e.outF.CallRTS(J.StrToChrOpen,1,1);
+        e.outF.CallRTS(Ju.StrToChrOpen,1,1);
       END;
       e.PushValue(binOp.rKid, binOp.rKid.type);
       IF isStrExp(binOp.rKid) THEN
-        e.outF.CallRTS(J.StrToChrOpen,1,1);
+        e.outF.CallRTS(Ju.StrToChrOpen,1,1);
       END;
       e.DoCmp(tst, lab, lType);
     END;
@@ -836,11 +867,11 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)FallTrue(exp : D.Expr; fLb : J.Label),NEW;
+  PROCEDURE (e : JavaEmitter)FallTrue(exp : Sy.Expr; fLb : Ju.Label),NEW;
    (** Evaluate exp, fall through if true, jump to fLab otherwise *)
     VAR binOp : Xp.BinaryX;
-        label : J.Label;
-        out   : J.JavaFile;
+        label : Ju.Label;
+        out   : Ju.JavaFile;
   BEGIN
     out := e.outF;
     CASE exp.kind OF
@@ -883,11 +914,11 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)FallFalse(exp : D.Expr; tLb : J.Label),NEW;
+  PROCEDURE (e : JavaEmitter)FallFalse(exp : Sy.Expr; tLb : Ju.Label),NEW;
    (** Evaluate exp, fall through if false, jump to tLb otherwise *)
     VAR binOp : Xp.BinaryX;
-        label : J.Label;
-        out   : J.JavaFile;
+        label : Ju.Label;
+        out   : Ju.JavaFile;
   BEGIN
     out := e.outF;
     CASE exp.kind OF
@@ -930,23 +961,23 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)PushUnary(exp : Xp.UnaryX; dst : D.Type),NEW;
+  PROCEDURE (e : JavaEmitter)PushUnary(exp : Xp.UnaryX; dst : Sy.Type),NEW;
     VAR dNum : INTEGER;
         code : INTEGER;
-        labl : J.Label;
-        out  : J.JavaFile;
+        labl : Ju.Label;
+        out  : Ju.JavaFile;
   (* ------------------------------------- *)
     PROCEDURE MkBox(emt : JavaEmitter; exp : Xp.UnaryX);
-      VAR dst : D.Type;
-          src : D.Type;
-          out : J.JavaFile;
+      VAR dst : Sy.Type;
+          src : Sy.Type;
+          out : Ju.JavaFile;
     BEGIN
       out := emt.outF;
       src := exp.kid.type;
       dst := exp.type(Ty.Pointer).boundTp;
       IF isStrExp(exp.kid) THEN
         emt.PushValue(exp.kid, src);
-        out.CallRTS(J.StrToChrOpen,1,1);
+        out.CallRTS(Ju.StrToChrOpen,1,1);
       ELSE 
         emt.ValueCopy(exp.kid, dst);
       END;
@@ -962,11 +993,11 @@ MODULE JavaMaker;
   	out.CodeT(Jvm.opc_checkcast, exp.type.boundRecTp()(Ty.Record));
     | Xp.mkNStr :
         IF ~isStrExp(exp.kid) THEN 
-          out.CallRTS(J.ChrsToStr,1,1);
+          out.CallRTS(Ju.ChrsToStr,1,1);
         END;
     | Xp.strChk :			(* Some range checks required *)
         out.Code(Jvm.opc_dup);
-        out.CallRTS(J.StrCheck,1,0);	
+        out.CallRTS(Ju.StrCheck,1,0);	
     | Xp.compl :
         out.Code(Jvm.opc_iconst_m1);
         out.Code(Jvm.opc_ixor);
@@ -1015,15 +1046,15 @@ MODULE JavaMaker;
          // skip the call in that case, falling through
          // into the round-to-zero mode opc_d2l.
          *)
-          out.CallRTS(J.DFloor,1,1);	
+          out.CallRTS(Ju.DFloor,1,1);	
           out.Code(Jvm.opc_d2l);
     | Xp.capCh :
-        out.CallRTS(J.ToUpper,1,1);	
+        out.CallRTS(Ju.ToUpper,1,1);	
     | Xp.blNot :
         out.Code(Jvm.opc_iconst_1);
         out.Code(Jvm.opc_ixor); 
     | Xp.strLen :
-        out.CallRTS(J.StrLen,1,1);	
+        out.CallRTS(Ju.StrLen,1,1);	
     | Xp.oddTst :
         IF exp.kid.type.isLongType() THEN out.Code(Jvm.opc_l2i) END;
         out.Code(Jvm.opc_iconst_1);
@@ -1035,12 +1066,12 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)PushVecElemHandle(lOp,rOp : D.Expr),NEW;
+  PROCEDURE (e : JavaEmitter)PushVecElemHandle(lOp,rOp : Sy.Expr),NEW;
     VAR vTp : Ty.Vector;
-        eTp : D.Type;
+        eTp : Sy.Type;
         tde : INTEGER;
-        out : J.JavaFile;
-        xLb : J.Label;
+        out : Ju.JavaFile;
+        xLb : Ju.Label;
   BEGIN
     out := e.outF;
     vTp := lOp.type(Ty.Vector);
@@ -1051,12 +1082,12 @@ MODULE JavaMaker;
     e.PushValue(lOp, eTp);              (* vRef ...                *)
     out.Code(Jvm.opc_dup);              (* vRef, vRef ...          *)
     out.GetVecLen();                    (* tide, vRef ...          *)
-    out.StoreLocal(tde, G.intTp);       (* vRef ...                *)
+    out.StoreLocal(tde, Bi.intTp);       (* vRef ...                *)
 
     e.outF.GetVecArr(eTp);              (* arr ...                 *)
-    e.PushValue(rOp, G.intTp);          (* idx, arr ...            *)
+    e.PushValue(rOp, Bi.intTp);          (* idx, arr ...            *)
     out.Code(Jvm.opc_dup);              (* idx, idx, arr ...       *)
-    out.LoadLocal(tde, G.intTp);        (* tide, idx, idx, arr ... *)
+    out.LoadLocal(tde, Bi.intTp);        (* tide, idx, idx, arr ... *)
 
     out.CodeLb(Jvm.opc_if_icmplt, xLb);
     out.Trap("Vector index out of bounds");
@@ -1067,19 +1098,19 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)PushBinary(exp : Xp.BinaryX; dst : D.Type),NEW;
-    VAR out  : J.JavaFile;
-        lOp  : D.Expr;
-        rOp  : D.Expr;
-        eTp  : D.Type;
+  PROCEDURE (e : JavaEmitter)PushBinary(exp : Xp.BinaryX; dst : Sy.Type),NEW;
+    VAR out  : Ju.JavaFile;
+        lOp  : Sy.Expr;
+        rOp  : Sy.Expr;
+        eTp  : Sy.Type;
 
         dNum : INTEGER;
         sNum : INTEGER;
         code : INTEGER;
         indx : INTEGER;
         rLit : LONGINT;
-        exLb : J.Label;
-        tpLb : J.Label;
+        exLb : Ju.Label;
+        tpLb : Ju.Label;
         long : BOOLEAN;
     (* -------------------------------- *)
     PROCEDURE plusCode(tNnm : INTEGER) : INTEGER;
@@ -1136,7 +1167,7 @@ MODULE JavaMaker;
  *        out.GetElement(dst);                    (* load the element   *)
  *)
           out.GetElement(lOp.type(Ty.Array).elemTp);  (* load the element   *)
-          IF dst = Builtin.uBytTp THEN e.UbyteClear() END;
+          IF dst = Bi.uBytTp THEN e.UbyteClear() END;
         END;
     (* -------------------------------- *)
     | Xp.range :                                (* set i..j range ...	*)
@@ -1160,13 +1191,13 @@ MODULE JavaMaker;
         *	*)					*
         *	out.Code(Jvm.opc_iconst_1);		*
         *	out.Code(Jvm.opc_iconst_1);		*
-        *	e.PushValue(rOp, G.intTp);		*
+        *	e.PushValue(rOp, Bi.intTp);		*
         *      (* Do unsigned less than 32 test here *)	*
         *	out.Code(Jvm.opc_iadd);			*
         *	out.Code(Jvm.opc_ishl);			*
         *	out.Code(Jvm.opc_ineg);			*
         *	out.Code(Jvm.opc_iconst_1);		*
-        *	e.PushValue(lOp, G.intTp);		*
+        *	e.PushValue(lOp, Bi.intTp);		*
         *      (* Do unsigned less than 32 test here *) *
         *	out.Code(Jvm.opc_ishl);			*
         *	out.Code(Jvm.opc_ineg);			*
@@ -1181,7 +1212,7 @@ MODULE JavaMaker;
         ELSE
           out.Code(Jvm.opc_iconst_m1);
           out.PushInt(31);
-          e.PushValue(rOp, G.intTp);
+          e.PushValue(rOp, Bi.intTp);
          (* Do unsigned less than 32 test here ...*)
           out.Code(Jvm.opc_isub);
           out.Code(Jvm.opc_iushr);
@@ -1191,7 +1222,7 @@ MODULE JavaMaker;
           out.PushInt(ORD({intValue(lOp) .. 31}));
           out.Code(Jvm.opc_iand);
         ELSE
-          e.PushValue(lOp, G.intTp);
+          e.PushValue(lOp, Bi.intTp);
          (* Do unsigned less than 32 test here ...*)
           out.Code(Jvm.opc_dup_x1);
           out.Code(Jvm.opc_ishr);
@@ -1326,9 +1357,9 @@ MODULE JavaMaker;
         e.PushValue(lOp, dst);
         e.PushValue(rOp, dst);
         IF dNum = Ty.lIntN THEN
-          out.CallRTS(J.ModL,4,2);
+          out.CallRTS(Ju.ModL,4,2);
         ELSE
-          out.CallRTS(J.ModI,2,1);
+          out.CallRTS(Ju.ModI,2,1);
         END;
     (* -------------------------------- *)
     | Xp.divOp :
@@ -1337,9 +1368,9 @@ MODULE JavaMaker;
  *	e.PushValue(lOp, dst);
  *	e.PushValue(rOp, dst);
  *	IF dNum = Ty.lIntN THEN
- *	  out.CallRTS(J.DivL,4,2);
+ *	  out.CallRTS(Ju.DivL,4,2);
  *	ELSE
- *	  out.CallRTS(J.DivI,2,1);
+ *	  out.CallRTS(Ju.DivI,2,1);
  *	END;
  *
  *  Alternative, inline code ...
@@ -1372,9 +1403,9 @@ MODULE JavaMaker;
         ELSE
           e.PushValue(rOp, dst);
           IF long THEN
-            out.CallRTS(J.DivL,4,2);
+            out.CallRTS(Ju.DivL,4,2);
           ELSE
-            out.CallRTS(J.DivI,2,1);
+            out.CallRTS(Ju.DivI,2,1);
           END;
         END;
     (* -------------------------------- *)
@@ -1465,23 +1496,23 @@ MODULE JavaMaker;
     | Xp.strCat :
         e.PushValue(lOp, lOp.type);
         e.PushValue(rOp, rOp.type);
-        IF (lOp.type = G.strTp) &
+        IF (lOp.type = Bi.strTp) &
            (lOp.kind # Xp.mkStr) OR 
             lOp.type.isNativeStr() THEN
-          IF (rOp.type = G.strTp) &
+          IF (rOp.type = Bi.strTp) &
              (rOp.kind # Xp.mkStr) OR 
               rOp.type.isNativeStr() THEN
-            out.CallRTS(J.StrCatSS,2,1);
+            out.CallRTS(Ju.StrCatSS,2,1);
           ELSE
-            out.CallRTS(J.StrCatSA, 2, 1);
+            out.CallRTS(Ju.StrCatSA, 2, 1);
           END;
         ELSE
-          IF (rOp.type = G.strTp) &
+          IF (rOp.type = Bi.strTp) &
              (rOp.kind # Xp.mkStr) OR 
               rOp.type.isNativeStr() THEN
-            out.CallRTS(J.StrCatAS, 2, 1);
+            out.CallRTS(Ju.StrCatAS, 2, 1);
           ELSE
-            out.CallRTS(J.StrCatAA, 2, 1);
+            out.CallRTS(Ju.StrCatAA, 2, 1);
           END;
         END;
     (* -------------------------------- *)
@@ -1490,11 +1521,11 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)PushValue(exp : D.Expr; typ : D.Type),NEW;
-    VAR out : J.JavaFile;
+  PROCEDURE (e : JavaEmitter)PushValue(exp : Sy.Expr; typ : Sy.Type),NEW;
+    VAR out : Ju.JavaFile;
         rec : Ty.Record;
         ix  : INTEGER;
-        elm : D.Expr;
+        elm : Sy.Expr;
         emt : BOOLEAN;		(* ==> more than one set element expr *)
   BEGIN
     out := e.outF;
@@ -1505,7 +1536,7 @@ MODULE JavaMaker;
           out.LoadType(exp.ident);
         ELSE
           out.GetVar(exp.ident);
-          IF typ = Builtin.uBytTp THEN e.UbyteClear() END;
+          IF typ = Bi.uBytTp THEN e.UbyteClear() END;
         END;
     | exp : Xp.SetExp DO
         emt := TRUE;
@@ -1523,10 +1554,10 @@ MODULE JavaMaker;
         FOR ix := 0 TO exp.varSeq.tide-1 DO
           elm := exp.varSeq.a[ix];
           IF elm.kind = Xp.range THEN
-            e.PushValue(elm, G.intTp);
+            e.PushValue(elm, Bi.intTp);
           ELSE
             out.PushInt(1);
-            e.PushValue(exp.varSeq.a[ix], G.intTp);
+            e.PushValue(exp.varSeq.a[ix], Bi.intTp);
             out.Code(Jvm.opc_ishl);
           END;
           IF ~emt THEN out.Code(Jvm.opc_ior) END;
@@ -1544,31 +1575,31 @@ MODULE JavaMaker;
         | Xp.charLt : out.PushInt(ORD(exp.value.char()));
         | Xp.setLt  : out.PushInt(exp.value.int());
         | Xp.numLt  : 
-            IF typ = G.lIntTp THEN
+            IF typ = Bi.lIntTp THEN
               out.PushLong(exp.value.long());
             ELSE
               out.PushInt(exp.value.int());
             END;
         | Xp.realLt : 
-            IF typ = G.realTp THEN
+            IF typ = Bi.realTp THEN
               out.PushReal(exp.value.real());
             ELSE
               out.PushSReal(exp.value.real());
             END;
         | Xp.strLt  :
-            IF typ = G.charTp THEN
+            IF typ = Bi.charTp THEN
               out.PushInt(ORD(exp.value.chr0()));
             ELSE
               out.PushStr(exp.value.chOpen());
             END;
         | Xp.infLt  :
-            IF typ = G.realTp THEN
+            IF typ = Bi.realTp THEN
               out.GetVar(CompState.dblInf);
             ELSE
               out.GetVar(CompState.fltInf);
             END;
         | Xp.nInfLt :
-            IF typ = G.realTp THEN
+            IF typ = Bi.realTp THEN
               out.GetVar(CompState.dblNInf);
             ELSE
               out.GetVar(CompState.fltNInf);
@@ -1581,7 +1612,7 @@ MODULE JavaMaker;
         IF exp.kind = Xp.selct THEN
           rec := exp.kid.type(Ty.Record);
           out.PutGetF(Jvm.opc_getfield, rec, exp.ident(Id.FldId));
-          IF typ = Builtin.uBytTp THEN e.UbyteClear() END;
+          IF typ = Bi.uBytTp THEN e.UbyteClear() END;
         ELSIF exp.kind = Xp.cvrtUp THEN
           out.ConvertUp(exp.kid.type, typ);
         ELSIF exp.kind = Xp.cvrtDn THEN
@@ -1596,12 +1627,12 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE SwapHandle(out : J.JavaFile; exp : D.Expr; long : BOOLEAN);
+  PROCEDURE SwapHandle(out : Ju.JavaFile; exp : Sy.Expr; long : BOOLEAN);
    (* Precondition: exp must be a variable designator 		*)
    (* A value is below a handle of 0,1,2 words. Swap val to top *)
     VAR hSiz : INTEGER;
-        idnt : D.Idnt;
-        type : D.Type;
+        idnt : Sy.Idnt;
+        type : Sy.Type;
   BEGIN
     type := exp.type;
     IF (type IS Ty.Record) OR 
@@ -1619,35 +1650,35 @@ MODULE JavaMaker;
         hSiz := 2;
       ELSE
         hSiz := 1;
-      END;					(* -------------------- *)
-    END;					(* -------------------- *)
-        					(*  Before ==>  After	*)
+      END;                          (* -------------------- *)
+    END;                            (* -------------------- *)
+                                    (*  Before ==>  After	*)
     IF hSiz = 1 THEN				(* -------------------- *)
       IF ~long THEN 				(* [hndl]  ==>	[valu]	*)
-        out.Code(Jvm.opc_swap);			(* [valu]	[hndl]	*)
-        					(* -------------------- *)
-      ELSE  					(* [hndl]  ==>	[val2]	*)
-        out.Code(Jvm.opc_dup_x2);		(* [val2]	[val1]	*)
-        out.Code(Jvm.opc_pop);			(* [val1]	[hndl]	*)
-      END;					(* -------------------- *)
+        out.Code(Jvm.opc_swap);	    (* [valu]	[hndl]	*)
+                                    (* -------------------- *)
+      ELSE                          (* [hndl]  ==>	[val2]	*)
+        out.Code(Jvm.opc_dup_x2);   (* [val2]	[val1]	*)
+        out.Code(Jvm.opc_pop);      (* [val1]	[hndl]	*)
+      END;	                        (* -------------------- *)
     ELSIF hSiz = 2 THEN				(* -------------------- *)
       IF ~long THEN 				(* [indx]  ==>	[valu]	*)
-        out.Code(Jvm.opc_dup2_x1);		(* [hndl]	[indx]	*)
-        out.Code(Jvm.opc_pop2);			(* [valu]	[hndl]	*)
-        					(* -------------------- *)
-      ELSE  					(* [indx]  ==>	[val2]	*)
-        out.Code(Jvm.opc_dup2_x2);		(* [hdnl]	[val1]	*)
-        out.Code(Jvm.opc_pop2);			(* [val2]	[indx]	*)
-      END;					(* [val1]	[hndl]	*)
-    (* ELSE nothing to do *) 			(* -------------------- *)
+        out.Code(Jvm.opc_dup2_x1);  (* [hndl]	[indx]	*)
+        out.Code(Jvm.opc_pop2);	    (* [valu]	[hndl]	*)
+                                    (* -------------------- *)
+      ELSE                          (* [indx]  ==>	[val2]	*)
+        out.Code(Jvm.opc_dup2_x2);  (* [hdnl]	[val1]	*)
+        out.Code(Jvm.opc_pop2);     (* [val2]	[indx]	*)
+      END;                          (* [val1]	[hndl]	*)
+    (* ELSE nothing to do *)        (* -------------------- *)
     END;
   END SwapHandle;
 
 (* -------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)PushHandle(exp : D.Expr; typ : D.Type),NEW;
+  PROCEDURE (e : JavaEmitter)PushHandle(exp : Sy.Expr; typ : Sy.Type),NEW;
    (* Precondition: exp must be a variable designator 		*)
-    VAR idnt : D.Idnt;
+    VAR idnt : Sy.Idnt;
   BEGIN
     ASSERT(exp.isVarDesig());
     IF (typ IS Ty.Record) OR ((typ IS Ty.Array) & (typ.kind # Ty.vecTp)) THEN
@@ -1661,11 +1692,11 @@ MODULE JavaMaker;
 (*
  *          e.PushValue(exp.lKid, exp.lKid.type);
  *          e.outF.GetVecArr(exp.lKid.type(Ty.Vector).elemTp);
- *          e.PushValue(exp.rKid, G.intTp);
+ *          e.PushValue(exp.rKid, Bi.intTp);
  *)
           ELSE
             e.PushValue(exp.lKid, exp.lKid.type);
-            e.PushValue(exp.rKid, G.intTp);
+            e.PushValue(exp.rKid, Bi.intTp);
           END;
       | exp : Xp.IdLeaf DO
           idnt := exp.ident;
@@ -1679,8 +1710,8 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)ScalarAssign(exp : D.Expr),NEW;
-    VAR out : J.JavaFile;
+  PROCEDURE (e : JavaEmitter)ScalarAssign(exp : Sy.Expr),NEW;
+    VAR out : Ju.JavaFile;
         rec : Ty.Record;
   BEGIN
     out := e.outF;
@@ -1707,8 +1738,8 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)ValueCopy(act : D.Expr; fmT : D.Type),NEW;
-    VAR out : J.JavaFile;
+  PROCEDURE (e : JavaEmitter)ValueCopy(act : Sy.Expr; fmT : Sy.Type),NEW;
+    VAR out : Ju.JavaFile;
   BEGIN
    (*
     *  Copy this actual, where fmT is either an array or record.
@@ -1727,8 +1758,8 @@ MODULE JavaMaker;
         e.PushValue(act, fmT);			(* (top) src...		*)
         out.Code(Jvm.opc_dup);			(* (top) src,src...	*)
         IF act.kind = Xp.mkStr THEN
-          out.CallRTS(J.StrLP1,1,1);		(* (top) len,src...	*)
-          out.Alloc1d(G.charTp);		(* (top) dst,src...	*)
+          out.CallRTS(Ju.StrLP1,1,1);		(* (top) len,src...	*)
+          out.Alloc1d(Bi.charTp);		(* (top) dst,src...	*)
         ELSE
           out.MkArrayCopy(fmT);			(* (top) dst,src...	*)
         END;
@@ -1740,7 +1771,7 @@ MODULE JavaMaker;
         e.PushValue(act, fmT);			(* (top) src,dst,dst...	*)
       END;
       IF act.kind = Xp.mkStr THEN
-        out.CallRTS(J.StrVal, 2, 0);		(* (top) dst...		*)
+        out.CallRTS(Ju.StrVal, 2, 0);		(* (top) dst...		*)
       ELSE
         out.ValArrCopy(fmT);			(* (top) dst...		*)
       END;
@@ -1751,26 +1782,26 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)StringCopy(act : D.Expr; fmT : Ty.Array),NEW;
-    VAR out : J.JavaFile;
+  PROCEDURE (e : JavaEmitter)StringCopy(act : Sy.Expr; fmT : Ty.Array),NEW;
+    VAR out : Ju.JavaFile;
   BEGIN
     out := e.outF;
     IF act.kind = Xp.mkStr THEN
       e.ValueCopy(act, fmT);
     ELSIF fmT.length = 0 THEN 		(* str passed to open array 	*)
       e.PushValue(act, fmT);
-      out.CallRTS(J.StrToChrOpen,1,1);
+      out.CallRTS(Ju.StrToChrOpen,1,1);
     ELSE				(* str passed to fixed array	*)
-      out.MkNewFixedArray(G.charTp, fmT.length);	
+      out.MkNewFixedArray(Bi.charTp, fmT.length);	
       out.Code(Jvm.opc_dup);
       e.PushValue(act, fmT); 
-      out.CallRTS(J.StrToChrs,2,0);
+      out.CallRTS(Ju.StrToChrs,2,0);
     END;
   END StringCopy;
 
 (* ============================================================ *)
 
-  PROCEDURE (e : JavaEmitter)Invoke(exp : D.Expr; typ : Ty.Procedure),NEW;
+  PROCEDURE (e : JavaEmitter)Invoke(exp : Sy.Expr; typ : Ty.Procedure),NEW;
     VAR code : INTEGER;
         prcI : Id.PrcId;
         mthI : Id.MthId;
@@ -1801,17 +1832,17 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)PushAndGetReturn(act : D.Expr;
-        					typ : D.Type;
-        			            OUT ret : D.Expr),NEW;
+  PROCEDURE (e : JavaEmitter)PushAndGetReturn(act : Sy.Expr;
+        					typ : Sy.Type;
+        			            OUT ret : Sy.Expr),NEW;
    (* ------------------------- *)
-    VAR out   : J.JavaFile;
+    VAR out   : Ju.JavaFile;
         local : INTEGER;
-        recXp : D.Expr;
-        array : D.Expr;
-        index : D.Expr;
+        recXp : Sy.Expr;
+        array : Sy.Expr;
+        index : Sy.Expr;
    (* ----------------------------------------- *)
-    PROCEDURE simple(x : D.Expr) : BOOLEAN;
+    PROCEDURE simple(x : Sy.Expr) : BOOLEAN;
     BEGIN
       IF x.kind = Xp.deref THEN x := x(Xp.UnaryX).kid END;
       RETURN x IS Xp.LeafX;	(* IdLeaf or LeafX *)
@@ -1862,13 +1893,13 @@ MODULE JavaMaker;
         index := act.rKid;
         e.PushValue(array, array.type);
         IF simple(array) THEN		(* don't save handle  *)
-          e.PushValue(index, G.intTp);
+          e.PushValue(index, Bi.intTp);
           IF ~simple(index) THEN	(* must save index    *)
             local := out.newLocal();
             out.Code(Jvm.opc_dup);
-            out.StoreLocal(local, G.intTp); (* #### *)
-            act.rKid := e.newLeaf(local, G.intTp);
-            act.rKid.type := G.intTp;
+            out.StoreLocal(local, Bi.intTp); (* #### *)
+            act.rKid := e.newLeaf(local, Bi.intTp);
+            act.rKid.type := Bi.intTp;
           END;
         ELSE				(* must save handle   *)
           local := out.newLocal();
@@ -1876,13 +1907,13 @@ MODULE JavaMaker;
           out.StoreLocal(local, NIL);
           act.lKid := e.newLeaf(local, array.type);
           act.lKid.type := array.type;
-          e.PushValue(index, G.intTp);
+          e.PushValue(index, Bi.intTp);
           IF ~simple(index) THEN	(* save index as well *)
             local := out.newLocal();
             out.Code(Jvm.opc_dup);
-            out.StoreLocal(local, G.intTp); (* #### *)
-            act.rKid := e.newLeaf(local, G.intTp);
-            act.rKid.type := G.intTp;
+            out.StoreLocal(local, Bi.intTp); (* #### *)
+            act.rKid := e.newLeaf(local, Bi.intTp);
+            act.rKid.type := Bi.intTp;
           END;
         END;
         out.GetElement(typ);
@@ -1893,26 +1924,26 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)PushArg(act : D.Expr;
+  PROCEDURE (e : JavaEmitter)PushArg(act : Sy.Expr;
         			     frm : Id.ParId;
-        			 VAR seq : D.ExprSeq),NEW;
+        			 VAR seq : Sy.ExprSeq),NEW;
    (* ------------------------- *)
     VAR idExp : Xp.IdentX;
-        out   : J.JavaFile;
+        out   : Ju.JavaFile;
         local : INTEGER;
    (* ----------------------------------------- *)
-    PROCEDURE boxNumber(exp : D.Expr) : INTEGER;
+    PROCEDURE boxNumber(exp : Sy.Expr) : INTEGER;
     BEGIN
       RETURN exp(Xp.IdLeaf).ident(Id.ParId).boxOrd;
     END boxNumber;
    (* ----------------------------------------- *)
-    PROCEDURE boxedPar(exp : D.Expr) : BOOLEAN;
-      VAR idnt : D.Idnt;
+    PROCEDURE boxedPar(exp : Sy.Expr) : BOOLEAN;
+      VAR idnt : Sy.Idnt;
     BEGIN
       WITH exp : Xp.IdLeaf DO
         idnt := exp.ident;
         WITH idnt : Id.ParId DO
-          RETURN (idnt.boxOrd # J.retMarker) & J.needsBox(idnt);
+          RETURN (idnt.boxOrd # Ju.retMarker) & Ju.needsBox(idnt);
         ELSE 
           RETURN FALSE;
         END;
@@ -1923,15 +1954,15 @@ MODULE JavaMaker;
    (* ----------------------------------------- *)
   BEGIN
     out := e.outF;
-    IF J.needsBox(frm) THEN (* value is returned *)
+    IF Ju.needsBox(frm) THEN (* value is returned *)
       NEW(idExp);
       idExp.ident := frm;
-      IF frm.parMod = D.out THEN (* no value push *)
+      IF frm.parMod = Sy.out THEN (* no value push *)
         idExp.kid := act;
       ELSE
         e.PushAndGetReturn(act, frm.type, idExp.kid);
       END;
-      IF frm.boxOrd # J.retMarker THEN 
+      IF frm.boxOrd # Ju.retMarker THEN 
        (* ==> out value but not in return slot *)
         frm.rtsTmp := out.newLocal();
         IF boxedPar(act) THEN
@@ -1942,11 +1973,11 @@ MODULE JavaMaker;
         out.Code(Jvm.opc_dup);
         out.StoreLocal(frm.rtsTmp, NIL);
       END;
-      D.AppendExpr(seq, idExp);
+      Sy.AppendExpr(seq, idExp);
     ELSIF (frm.type IS Ty.Array) &
-          ((act.type = G.strTp) OR act.type.isNativeStr()) THEN
+          ((act.type = Bi.strTp) OR act.type.isNativeStr()) THEN
       e.StringCopy(act, frm.type(Ty.Array));    (* special string case	*)
-    ELSIF (frm.parMod = D.val) &
+    ELSIF (frm.parMod = Sy.val) &
           ((frm.type IS Ty.Record) OR 
 (*
            (frm.type IS Ty.Array)) THEN		(* value-par copy case	*)
@@ -1962,15 +1993,15 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)CopyOut(exp : D.Expr; idD : D.Idnt),NEW;
-    VAR out : J.JavaFile;
+  PROCEDURE (e : JavaEmitter)CopyOut(exp : Sy.Expr; idD : Sy.Idnt),NEW;
+    VAR out : Ju.JavaFile;
         par : Id.ParId;
   BEGIN
    (* Assert : this is an unboxed type *)
     out := e.outF;
     par := idD(Id.ParId);
     e.PushHandle(exp, par.type);
-    IF par.boxOrd # J.retMarker THEN 
+    IF par.boxOrd # Ju.retMarker THEN 
       out.LoadLocal(par.rtsTmp, NIL);
       out.Code(Jvm.opc_iconst_0);
       out.GetElement(par.type);
@@ -1998,25 +2029,25 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)PushCall(callX : Xp.CallX),NEW;
-    VAR jFile : J.JavaFile;
+    VAR jFile : Ju.JavaFile;
         mark0 : INTEGER;	(* local ord limit on entry *)
         tide0 : INTEGER;	(* parameter tide on entry  *)
         index : INTEGER;	(* just a counter for loops *)
         formT : Ty.Procedure;	(* formal type of procedure *)
         formP : Id.ParId;	(* current formal parameter *)
-        prExp : D.Expr;
+        prExp : Sy.Expr;
         idExp : Xp.IdentX;
  (* ---------------------------------------------------- *)
-    PROCEDURE CheckCall(expr : D.Expr; pTyp : Ty.Procedure);
+    PROCEDURE CheckCall(expr : Sy.Expr; pTyp : Ty.Procedure);
       VAR prcI : Id.PrcId;
           mthI : Id.MthId;
     BEGIN
       WITH expr : Xp.IdLeaf DO (* qualid *)
           prcI := expr.ident(Id.PrcId);
-          IF pTyp.xName = NIL THEN J.MkCallAttr(prcI, pTyp) END;
+          IF pTyp.xName = NIL THEN Ju.MkCallAttr(prcI, pTyp) END;
       | expr : Xp.IdentX DO (* selct *)
           mthI := expr.ident(Id.MthId);
-          IF pTyp.xName = NIL THEN J.MkCallAttr(mthI, pTyp) END;
+          IF pTyp.xName = NIL THEN Ju.MkCallAttr(mthI, pTyp) END;
       END;
     END CheckCall;
  (* ---------------------------------------------------- *)
@@ -2090,21 +2121,21 @@ MODULE JavaMaker;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE IncByLit(out : J.JavaFile; ord : INTEGER; inc : INTEGER);
+  PROCEDURE IncByLit(out : Ju.JavaFile; ord : INTEGER; inc : INTEGER);
   BEGIN
     IF (ord < 256) & (inc >= -128) & (inc <= 127) THEN
       out.CodeInc(ord, inc);
     ELSE
-      out.LoadLocal(ord, G.intTp);
+      out.LoadLocal(ord, Bi.intTp);
       out.PushInt(inc);
       out.Code(Jvm.opc_iadd);
-      out.StoreLocal(ord, G.intTp);
+      out.StoreLocal(ord, Bi.intTp);
     END;
   END IncByLit;
 
-  PROCEDURE LitIncLocal(out : J.JavaFile; proc, vOrd, incr : INTEGER);
+  PROCEDURE LitIncLocal(out : Ju.JavaFile; proc, vOrd, incr : INTEGER);
   BEGIN
-    IF proc = G.decP THEN incr := -incr END;
+    IF proc = Bi.decP THEN incr := -incr END;
     IncByLit(out, vOrd, incr);
   END LitIncLocal;
 
@@ -2112,20 +2143,20 @@ MODULE JavaMaker;
 
   PROCEDURE (e : JavaEmitter)EmitStdProc(callX : Xp.CallX),NEW;
     CONST fMsg = "Assertion failure ";
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         prId : Id.PrcId;
         flId : Id.FldId;
         pOrd : INTEGER;
-        arg0 : D.Expr;
-        argX : D.Expr;
-        dstT : D.Type;
-        idX0 : D.Idnt;
+        arg0 : Sy.Expr;
+        argX : Sy.Expr;
+        dstT : Sy.Type;
+        idX0 : Sy.Idnt;
         argN : INTEGER;
         numL : INTEGER;
         incr : INTEGER;
         vRef : INTEGER;
         tide : INTEGER;
-        okLb : J.Label;
+        okLb : Ju.Label;
         long : BOOLEAN;
         c    : INTEGER;
   BEGIN
@@ -2137,7 +2168,7 @@ MODULE JavaMaker;
     pOrd := prId.stdOrd;
     CASE pOrd OF
    (* --------------------------- *)
-    | G.asrtP :
+    | Bi.asrtP :
         okLb := out.newLabel();
         e.FallFalse(arg0, okLb);
        (*
@@ -2153,7 +2184,7 @@ MODULE JavaMaker;
         END;
         out.DefLab(okLb);
    (* --------------------------- *)
-    | G.incP, G.decP :
+    | Bi.incP, Bi.decP :
         argX := callX.actuals.a[1];
         dstT := arg0.type;
         long := dstT.isLongType();
@@ -2183,7 +2214,7 @@ MODULE JavaMaker;
  *	    IF (argX.kind = Xp.numLt) & ~long & arg0.ident.isLocalVar() THEN
  *   	      numL := arg0.ident(Id.LocId).varOrd;
  *	      incr := intValue(argX);
- *	      IF pOrd = G.decP THEN incr := -incr END;
+ *	      IF pOrd = Bi.decP THEN incr := -incr END;
  *	      IncByLit(out, numL, incr); RETURN;	(* PREMATURE EXIT *)
  *	    ELSE
  *	      e.PushValue(arg0, dstT);
@@ -2199,14 +2230,14 @@ MODULE JavaMaker;
         END;
         e.PushValue(argX, dstT);
         IF long THEN
-          IF pOrd = G.incP THEN c := Jvm.opc_ladd ELSE c := Jvm.opc_lsub END;
+          IF pOrd = Bi.incP THEN c := Jvm.opc_ladd ELSE c := Jvm.opc_lsub END;
         ELSE
-          IF pOrd = G.incP THEN c := Jvm.opc_iadd ELSE c := Jvm.opc_isub END;
+          IF pOrd = Bi.incP THEN c := Jvm.opc_iadd ELSE c := Jvm.opc_isub END;
         END;
         out.Code(c);
         e.ScalarAssign(arg0);
    (* --------------------------- *)
-    | G.cutP :
+    | Bi.cutP :
        (* ------------------------------------- *
         *  Emit the code ...
         *     <push vector ref>
@@ -2224,7 +2255,7 @@ MODULE JavaMaker;
         e.PushValue(arg0, arg0.type);
         out.Code(Jvm.opc_dup);
         out.GetVecLen();
-        e.PushValue(argX, G.intTp);
+        e.PushValue(argX, Bi.intTp);
         out.Code(Jvm.opc_dup_x1);
 
         out.Code(Jvm.opc_iconst_1); (* Chop the sign bit *)
@@ -2237,7 +2268,7 @@ MODULE JavaMaker;
         out.DefLab(okLb);
         out.PutVecLen();
    (* --------------------------- *)
-    | G.apndP :  
+    | Bi.apndP :  
        (* -------------------------------------- *
         *  Emit the code ...
         *     <push vector ref>
@@ -2273,32 +2304,32 @@ MODULE JavaMaker;
         out.Code(Jvm.opc_dup);
         out.StoreLocal(vRef, NIL);
         out.GetVecLen();
-        out.StoreLocal(tide, G.intTp);
+        out.StoreLocal(tide, Bi.intTp);
         out.LoadLocal(vRef, NIL);
         out.GetVecArr(dstT);
         out.Code(Jvm.opc_arraylength);
-        out.LoadLocal(tide, G.intTp);
+        out.LoadLocal(tide, Bi.intTp);
         out.CodeLb(Jvm.opc_if_icmpgt, okLb);
         out.LoadLocal(vRef, NIL);
         out.InvokeExpand(dstT);
         out.DefLab(okLb);
         out.LoadLocal(vRef, NIL);
         out.GetVecArr(dstT);
-        out.LoadLocal(tide, G.intTp);
+        out.LoadLocal(tide, Bi.intTp);
 (*
  *      e.PushValue(argX, argX.type);
  *)
         e.ValueCopy(argX, dstT);
         out.PutVecElement(dstT);
         out.LoadLocal(vRef, NIL);
-        out.LoadLocal(tide, G.intTp);
+        out.LoadLocal(tide, Bi.intTp);
         out.Code(Jvm.opc_iconst_1);
         out.Code(Jvm.opc_iadd);
         out.PutVecLen();
         out.ReleaseLocal(tide);
         out.ReleaseLocal(vRef);
    (* --------------------------- *)
-    | G.exclP, G.inclP :
+    | Bi.exclP, Bi.inclP :
         dstT := arg0.type;
         argX := callX.actuals.a[1];
 
@@ -2346,10 +2377,10 @@ MODULE JavaMaker;
           out.PushInt(ORD({intValue(argX)}));
         ELSE
           out.Code(Jvm.opc_iconst_1);
-          e.PushValue(argX, G.intTp);
+          e.PushValue(argX, Bi.intTp);
           out.Code(Jvm.opc_ishl);
         END;
-        IF pOrd = G.inclP THEN
+        IF pOrd = Bi.inclP THEN
           out.Code(Jvm.opc_ior);
         ELSE
           out.Code(Jvm.opc_iconst_m1);
@@ -2358,12 +2389,12 @@ MODULE JavaMaker;
         END;
         e.ScalarAssign(arg0);
    (* --------------------------- *)
-    | G.haltP :
+    | Bi.haltP :
         out.PushInt(intValue(arg0));
-        out.CallRTS(J.SysExit,1,0);
+        out.CallRTS(Ju.SysExit,1,0);
         out.PushJunkAndReturn();
    (* --------------------------- *)
-    | G.throwP :
+    | Bi.throwP :
         IF CompState.ntvExc.assignCompat(arg0) THEN
           e.PushValue(arg0, CompState.ntvExc);
           out.Code(Jvm.opc_athrow);
@@ -2375,7 +2406,7 @@ MODULE JavaMaker;
           out.Code(Jvm.opc_athrow);
         END;
    (* --------------------------- *)
-    | G.newP :
+    | Bi.newP :
        (*
         *   arg0 is a pointer to a Record or Array, or else a vector type.
         *)
@@ -2395,7 +2426,7 @@ MODULE JavaMaker;
         ELSIF arg0.type.kind = Ty.ptrTp THEN
           FOR numL := 1 TO argN-1 DO
             argX := callX.actuals.a[numL];
-            e.PushValue(argX, G.intTp);
+            e.PushValue(argX, Bi.intTp);
           END;
           dstT := arg0.type(Ty.Pointer).boundTp;
           out.MkNewOpenArray(dstT(Ty.Array), argN-1);
@@ -2403,7 +2434,7 @@ MODULE JavaMaker;
           dstT := arg0.type(Ty.Vector).elemTp;
           out.MkVecRec(dstT);
           out.Code(Jvm.opc_dup);
-          e.PushValue(callX.actuals.a[1], G.intTp);
+          e.PushValue(callX.actuals.a[1], Bi.intTp);
           out.MkVecArr(dstT);
         END;
         e.ScalarAssign(arg0);
@@ -2416,7 +2447,7 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)EmitAssign(stat : St.Assign),NEW;
-    VAR lhTyp : D.Type;
+    VAR lhTyp : Sy.Type;
   BEGIN
    (*
     *  This is a value assign in CP.
@@ -2428,9 +2459,9 @@ MODULE JavaMaker;
         e.ScalarAssign(stat.lhsX);
     | lhTyp : Ty.Array DO 
         IF stat.rhsX.kind = Xp.mkStr THEN
-          e.outF.CallRTS(J.StrVal, 2, 0);
-        ELSIF stat.rhsX.type = G.strTp THEN
-          e.outF.CallRTS(J.StrToChrs,2, 0);
+          e.outF.CallRTS(Ju.StrVal, 2, 0);
+        ELSIF stat.rhsX.type = Bi.strTp THEN
+          e.outF.CallRTS(Ju.StrToChrs,2, 0);
         ELSE
           e.outF.ValArrCopy(lhTyp);
         END;
@@ -2457,15 +2488,15 @@ MODULE JavaMaker;
 (* ---------------------------------------------------- *)
 
   PROCEDURE (e : JavaEmitter)EmitIf(stat : St.Choice; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         high : INTEGER;			(* Branch count.  *)
-        exLb : J.Label;			(* Exit label	  *)
-        nxtP : J.Label;			(* Next predicate *)
+        exLb : Ju.Label;			(* Exit label	  *)
+        nxtP : Ju.Label;			(* Next predicate *)
         indx : INTEGER;
         live : BOOLEAN;			(* then is live   *)
         else : BOOLEAN;			(* else not seen  *)
-        then : D.Stmt;
-        pred : D.Expr;
+        then : Sy.Stmt;
+        pred : Sy.Expr;
   BEGIN
     ok := FALSE;
     out := e.outF;
@@ -2501,12 +2532,12 @@ MODULE JavaMaker;
         		maxR : INTEGER;  	(* max rng-ix   *)
         		minI : INTEGER;  	(* min index    *)
         		maxI : INTEGER;  	(* max index    *)
-        		labs : ARRAY OF J.Label),NEW;
+        		labs : ARRAY OF Ju.Label),NEW;
    (* --------------------------------------------------------- * 
     *   This procedure emits the code for a single,
     *   dense range of selector values in the label-list.
     * --------------------------------------------------------- *)
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         loIx : INTEGER;		(* low selector value for dense range  *)
         hiIx : INTEGER;		(* high selector value for dense range *)
         rNum : INTEGER;		(* total number of ranges in the group *)
@@ -2514,8 +2545,8 @@ MODULE JavaMaker;
         indx : INTEGER;
         pos  : INTEGER;
         rnge : St.Triple;
-        dfLb : J.Label;
-        lab  : J.Label;
+        dfLb : Ju.Label;
+        lab  : Ju.Label;
   BEGIN
     out := e.outF;
     dfLb := labs[0];
@@ -2531,7 +2562,7 @@ MODULE JavaMaker;
       *)
       loIx := rnge.loC;
       peel := rnge.hiC;
-      out.LoadLocal(locV, G.intTp);
+      out.LoadLocal(locV, Bi.intTp);
      (*
       *   There are a number of special cases
       *   that can benefit from special code.
@@ -2567,7 +2598,7 @@ MODULE JavaMaker;
       *)
       loIx := rnge.loC;			(* low of min-range  *)
       hiIx := stat.labels.a[maxR].hiC;	(* high of max-range *)
-      out.LoadLocal(locV, G.intTp);
+      out.LoadLocal(locV, Bi.intTp);
       out.CodeSwitch(loIx, hiIx, dfLb);
       pos := 0;
       FOR indx := minR TO maxR DO
@@ -2592,13 +2623,13 @@ MODULE JavaMaker;
         		maxG : INTEGER;  	(* max grp-indx	*)
         		minI : INTEGER;  	(* min index  	*)
         		maxI : INTEGER;  	(* max index  	*)
-        		labs : ARRAY OF J.Label),NEW;
+        		labs : ARRAY OF Ju.Label),NEW;
    (* --------------------------------------------------------- * 
     *  This function emits the branching code which sits on top
     *  of the selection code for each dense range of case values.
     * --------------------------------------------------------- *)
-    VAR out   : J.JavaFile;
-        newLb : J.Label;
+    VAR out   : Ju.JavaFile;
+        newLb : Ju.Label;
         midPt : INTEGER;
         group : St.Triple;
         range : St.Triple;
@@ -2621,7 +2652,7 @@ MODULE JavaMaker;
       *)
       out := e.outF;
       newLb := out.newLabel();
-      out.LoadLocal(locV, G.intTp);
+      out.LoadLocal(locV, Bi.intTp);
       out.PushInt(range.loC);
       out.CodeLb(Jvm.opc_if_icmpge, newLb);
      (*
@@ -2636,26 +2667,26 @@ MODULE JavaMaker;
 (* ---------------------------------------------------- *)
 
   PROCEDURE (e : JavaEmitter)EmitCase(stat : St.CaseSt; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         indx : INTEGER;
-        dfLb : J.Label;
-        exLb : J.Label;
+        dfLb : Ju.Label;
+        exLb : Ju.Label;
         selV : INTEGER;
         live : BOOLEAN;
         minI : INTEGER;
         maxI : INTEGER;
-        labs : POINTER TO ARRAY OF J.Label;
+        labs : POINTER TO ARRAY OF Ju.Label;
   BEGIN
    (* ---------------------------------------------------------- *
-    *  CaseSt* = POINTER TO RECORD (D.Stmt)
+    *  CaseSt* = POINTER TO RECORD (Sy.Stmt)
     *	     (* ----------------------------------------- *
     *	      *	kind-  : INTEGER;	(* tag for unions *)
     *	      *	token* : S.Token;	(* stmt first tok *)
     *	      * ----------------------------------------- *)
-    *		select* : D.Expr;	(* case selector  *)
+    *		select* : Sy.Expr;	(* case selector  *)
     *		chrSel* : BOOLEAN;	(* ==> use chars  *)
-    *		blocks* : D.StmtSeq;	(* case bodies    *)
-    *		elsBlk* : D.Stmt;	(* elseCase | NIL *)
+    *		blocks* : Sy.StmtSeq;	(* case bodies    *)
+    *		elsBlk* : Sy.Stmt;	(* elseCase | NIL *)
     *		labels* : TripleSeq;	(* label seqence  *)
     *		groups- : TripleSeq;	(* dense groups   *)
     *	      END;
@@ -2691,7 +2722,7 @@ MODULE JavaMaker;
     *    Push the selector value, and save in local variable;
     *)
     e.PushValue(stat.select, stat.select.type);
-    out.StoreLocal(selV, G.intTp);
+    out.StoreLocal(selV, Bi.intTp);
     e.EmitGroups(selV, stat, 0, stat.groups.tide-1, minI, maxI, labs);
    (*
     *    Now we emit the code for the cases.
@@ -2724,9 +2755,9 @@ MODULE JavaMaker;
 
   PROCEDURE (e : JavaEmitter)
         		EmitWhile(stat : St.TestLoop; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
-        lpLb : J.Label;
-        exLb : J.Label;
+    VAR out  : Ju.JavaFile;
+        lpLb : Ju.Label;
+        exLb : Ju.Label;
   BEGIN
     out := e.outF;
     lpLb := out.newLabel();
@@ -2742,8 +2773,8 @@ MODULE JavaMaker;
 
   PROCEDURE (e : JavaEmitter)
         		EmitRepeat(stat : St.TestLoop; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
-        lpLb : J.Label; 
+    VAR out  : Ju.JavaFile;
+        lpLb : Ju.Label; 
   BEGIN
     out := e.outF;
     lpLb := out.newLabel();
@@ -2770,7 +2801,7 @@ MODULE JavaMaker;
     *   used by ForLoop::flowAttr() for initialization analysis.
     *   If this were not the case, the verifier could barf.
     * ----------------------------------------------------------- *)
-    PROCEDURE SetVar(cv : Id.AbVar; ln : BOOLEAN; ou : J.JavaFile);
+    PROCEDURE SetVar(cv : Id.AbVar; ln : BOOLEAN; ou : Ju.JavaFile);
     BEGIN
       WITH cv : Id.LocId DO (* check if implemented inside XHR *)
         IF Id.uplevA IN cv.locAtt THEN 
@@ -2788,12 +2819,12 @@ MODULE JavaMaker;
     END SetVar;
    (* ----------------------------------------------------------- *)
     PROCEDURE LongForUp(e: JavaEmitter; stat: St.ForLoop; OUT ok: BOOLEAN);
-      VAR out  : J.JavaFile;
+      VAR out  : Ju.JavaFile;
           cVar : Id.AbVar;
           top1 : INTEGER;
           top2 : INTEGER;
-          exLb : J.Label;
-          lpLb : J.Label;
+          exLb : Ju.Label;
+          lpLb : Ju.Label;
           step : LONGINT;
           smpl : BOOLEAN;
     BEGIN
@@ -2811,16 +2842,16 @@ MODULE JavaMaker;
       ELSE
         top1 := out.newLocal();	(* actually a pair of locals *)
         top2 := out.newLocal();
-        e.PushValue(stat.hiXp, G.lIntTp);
+        e.PushValue(stat.hiXp, Bi.lIntTp);
         out.Code(Jvm.opc_dup2);
-        out.StoreLocal(top1, G.lIntTp);
-        e.PushValue(stat.loXp, G.lIntTp);
+        out.StoreLocal(top1, Bi.lIntTp);
+        e.PushValue(stat.loXp, Bi.lIntTp);
         out.Code(Jvm.opc_dup2);
         SetVar(cVar, TRUE, out);
        (*
         *   The top test is NEVER inside the loop.
         *)
-        e.DoCmp(Xp.lessT, exLb, G.lIntTp);
+        e.DoCmp(Xp.lessT, exLb, Bi.lIntTp);
       END;
       out.DefLabC(lpLb, "Loop header");
      (*
@@ -2836,14 +2867,14 @@ MODULE JavaMaker;
         IF smpl THEN
           out.PushLong(longValue(stat.hiXp));
         ELSE
-          out.LoadLocal(top1, G.lIntTp);
+          out.LoadLocal(top1, Bi.lIntTp);
         END;
         out.GetVar(cVar);			(* (top) cv,hi		*)
         out.PushLong(step);
         out.Code(Jvm.opc_ladd);			(* (top) cv',hi		*)
         out.Code(Jvm.opc_dup2);			(* (top) cv',cv',hi	*)
         SetVar(cVar, TRUE, out);
-        e.DoCmp(Xp.greEq,  lpLb, G.lIntTp);
+        e.DoCmp(Xp.greEq,  lpLb, Bi.lIntTp);
       END;
      (*
       *   The exit label.
@@ -2854,12 +2885,12 @@ MODULE JavaMaker;
    (* ----------------------------------------- *)
 
     PROCEDURE LongForDn(e: JavaEmitter; stat: St.ForLoop; OUT ok: BOOLEAN);
-      VAR out  : J.JavaFile;
+      VAR out  : Ju.JavaFile;
           cVar : Id.AbVar;
           top1 : INTEGER;
           top2 : INTEGER;
-          exLb : J.Label;
-          lpLb : J.Label;
+          exLb : Ju.Label;
+          lpLb : Ju.Label;
           step : LONGINT;
           smpl : BOOLEAN;
     BEGIN
@@ -2877,16 +2908,16 @@ MODULE JavaMaker;
       ELSE
         top1 := out.newLocal();	(* actually a pair of locals *)
         top2 := out.newLocal();
-        e.PushValue(stat.hiXp, G.lIntTp);
+        e.PushValue(stat.hiXp, Bi.lIntTp);
         out.Code(Jvm.opc_dup2);
-        out.StoreLocal(top1, G.lIntTp);
-        e.PushValue(stat.loXp, G.lIntTp);
+        out.StoreLocal(top1, Bi.lIntTp);
+        e.PushValue(stat.loXp, Bi.lIntTp);
         out.Code(Jvm.opc_dup2);
         SetVar(cVar, TRUE, out);
        (*
         *   The top test is NEVER inside the loop.
         *)
-        e.DoCmp(Xp.greT,  exLb, G.lIntTp);
+        e.DoCmp(Xp.greT,  exLb, Bi.lIntTp);
       END;
       out.DefLabC(lpLb, "Loop header");
      (*
@@ -2902,14 +2933,14 @@ MODULE JavaMaker;
         IF smpl THEN
           out.PushLong(longValue(stat.hiXp));
         ELSE
-          out.LoadLocal(top1, G.lIntTp);
+          out.LoadLocal(top1, Bi.lIntTp);
         END;
         out.GetVar(cVar);			(* (top) cv,hi		*)
         out.PushLong(step);
         out.Code(Jvm.opc_ladd);			(* (top) cv',hi		*)
         out.Code(Jvm.opc_dup2);			(* (top) cv',cv',hi	*)
         SetVar(cVar, TRUE, out);
-        e.DoCmp(Xp.lessEq, lpLb, G.lIntTp);
+        e.DoCmp(Xp.lessEq, lpLb, Bi.lIntTp);
       END;
      (*
       *   The exit label.
@@ -2920,11 +2951,11 @@ MODULE JavaMaker;
    (* ----------------------------------------- *)
 
     PROCEDURE IntForUp(e: JavaEmitter; stat: St.ForLoop; OUT ok: BOOLEAN);
-      VAR out  : J.JavaFile;
+      VAR out  : Ju.JavaFile;
           cVar : Id.AbVar;
           topV : INTEGER;
-          exLb : J.Label;
-          lpLb : J.Label;
+          exLb : Ju.Label;
+          lpLb : Ju.Label;
           step : INTEGER;
           smpl : BOOLEAN;
     BEGIN
@@ -2943,16 +2974,16 @@ MODULE JavaMaker;
         topV := -1;			(* keep the verifier happy! *)
       ELSE
         topV := out.newLocal();
-        e.PushValue(stat.hiXp, G.intTp);
+        e.PushValue(stat.hiXp, Bi.intTp);
         out.Code(Jvm.opc_dup);
-        out.StoreLocal(topV, G.intTp);
-        e.PushValue(stat.loXp, G.intTp);
+        out.StoreLocal(topV, Bi.intTp);
+        e.PushValue(stat.loXp, Bi.intTp);
         out.Code(Jvm.opc_dup);
         SetVar(cVar, FALSE, out);
        (*
         *   The top test is NEVER inside the loop.
         *)
-        e.DoCmp(Xp.lessT, exLb, G.intTp);
+        e.DoCmp(Xp.lessT, exLb, Bi.intTp);
       END;
       out.DefLabC(lpLb, "Loop header");
      (*
@@ -2966,14 +2997,14 @@ MODULE JavaMaker;
         IF smpl THEN
           out.PushInt(intValue(stat.hiXp));
         ELSE
-          out.LoadLocal(topV, G.intTp);
+          out.LoadLocal(topV, Bi.intTp);
         END;
         out.GetVar(cVar);			(* (top) cv,hi		*)
         out.PushInt(step);
         out.Code(Jvm.opc_iadd);			(* (top) cv',hi		*)
         out.Code(Jvm.opc_dup);			(* (top) cv',cv',hi	*)
         SetVar(cVar, FALSE, out);
-        e.DoCmp(Xp.greEq, lpLb, G.intTp);
+        e.DoCmp(Xp.greEq, lpLb, Bi.intTp);
       END;
      (*
       *   The exit label.
@@ -2984,11 +3015,11 @@ MODULE JavaMaker;
    (* ----------------------------------------- *)
 
     PROCEDURE IntForDn(e: JavaEmitter; stat: St.ForLoop; OUT ok: BOOLEAN);
-      VAR out  : J.JavaFile;
+      VAR out  : Ju.JavaFile;
           cVar : Id.AbVar;
           topV : INTEGER;
-          exLb : J.Label; 
-          lpLb : J.Label;
+          exLb : Ju.Label; 
+          lpLb : Ju.Label;
           step : INTEGER;
           smpl : BOOLEAN;
     BEGIN
@@ -3004,16 +3035,16 @@ MODULE JavaMaker;
         SetVar(cVar, FALSE, out);
         topV := -1;			(* keep the verifier happy! *)
       ELSE
-        e.PushValue(stat.hiXp, G.intTp);
+        e.PushValue(stat.hiXp, Bi.intTp);
         out.Code(Jvm.opc_dup);
-        out.StoreLocal(topV, G.intTp);
-        e.PushValue(stat.loXp, G.intTp);
+        out.StoreLocal(topV, Bi.intTp);
+        e.PushValue(stat.loXp, Bi.intTp);
         out.Code(Jvm.opc_dup);
         SetVar(cVar, FALSE, out);
        (*
         *   The top test is NEVER inside the loop.
         *)
-        e.DoCmp(Xp.greT, exLb, G.intTp);
+        e.DoCmp(Xp.greT, exLb, Bi.intTp);
       END;
       out.DefLabC(lpLb, "Loop header");
      (*
@@ -3027,14 +3058,14 @@ MODULE JavaMaker;
         IF smpl THEN
           out.PushInt(intValue(stat.hiXp));
         ELSE
-          out.LoadLocal(topV, G.intTp);
+          out.LoadLocal(topV, Bi.intTp);
         END;
         out.GetVar(cVar);			(* (top) cv,hi		*)
         out.PushInt(step);
         out.Code(Jvm.opc_iadd);			(* (top) cv',hi		*)
         out.Code(Jvm.opc_dup);			(* (top) cv',cv',hi	*)
         SetVar(cVar, FALSE, out);
-        e.DoCmp(Xp.lessEq, lpLb, G.intTp);
+        e.DoCmp(Xp.lessEq, lpLb, Bi.intTp);
       END;
      (*
       *   The exit label.
@@ -3059,9 +3090,9 @@ MODULE JavaMaker;
 
   PROCEDURE (e : JavaEmitter)
         		EmitLoop(stat : St.TestLoop; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
-        lpLb : J.Label;
-        tmpLb : J.Label;
+    VAR out  : Ju.JavaFile;
+        lpLb : Ju.Label;
+        tmpLb : Ju.Label;
   BEGIN
     out := e.outF;
     lpLb  := out.newLabel();
@@ -3077,23 +3108,23 @@ MODULE JavaMaker;
 (* ---------------------------------------------------- *)
 
   PROCEDURE (e : JavaEmitter)EmitWith(stat : St.Choice; OUT ok : BOOLEAN),NEW;
-    VAR out  : J.JavaFile;
+    VAR out  : Ju.JavaFile;
         high : INTEGER;			(* Branch count.  *)
-        exLb : J.Label;			(* Exit label	  *)
-        nxtP : J.Label;			(* Next predicate *)
+        exLb : Ju.Label;			(* Exit label	  *)
+        nxtP : Ju.Label;			(* Next predicate *)
         indx : INTEGER;
         live : BOOLEAN;
-        then : D.Stmt;
-        pred : D.Expr;
+        then : Sy.Stmt;
+        pred : Sy.Expr;
         tVar : Id.LocId;
    (* --------------------------- *)
     PROCEDURE WithTest(je : JavaEmitter; 
-        	       os : J.JavaFile; 
-        	       pr : D.Expr; 
-        	       nx : J.Label;
+        	       os : Ju.JavaFile; 
+        	       pr : Sy.Expr; 
+        	       nx : Ju.Label;
         	       tm : INTEGER);
       VAR bX : Xp.BinaryX;
-          ty : D.Type;
+          ty : Sy.Type;
     BEGIN
       bX := pr(Xp.BinaryX);
       ty := bX.rKid(Xp.IdLeaf).ident.type;
@@ -3153,9 +3184,9 @@ MODULE JavaMaker;
 (* ---------------------------------------------------- *)
 
   PROCEDURE (e : JavaEmitter)EmitReturn(stat : St.Return),NEW;
-    VAR out : J.JavaFile;
+    VAR out : Ju.JavaFile;
         pId : Id.Procs;
-        ret : D.Type;
+        ret : Sy.Type;
   BEGIN
     out := e.outF;
     pId := out.getScope()(Id.Procs);
@@ -3188,7 +3219,7 @@ MODULE JavaMaker;
 (* ---------------------------------------------------- *)
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (e : JavaEmitter)EmitStat(stat : D.Stmt; OUT ok : BOOLEAN),NEW;
+  PROCEDURE (e : JavaEmitter)EmitStat(stat : Sy.Stmt; OUT ok : BOOLEAN),NEW;
     VAR depth : INTEGER;
   BEGIN
     IF (stat = NIL) OR (stat.kind = St.emptyS) THEN ok := TRUE; RETURN END;

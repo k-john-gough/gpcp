@@ -578,7 +578,7 @@ MODULE Browse;
 (* ============================================================ *)
 (* ========		Symbol File Reader		======= *)
 (* ============================================================ *)
-
+(*
   PROCEDURE DiagnoseSymbol();
     VAR arg : ARRAY 24 OF CHAR;
   BEGIN
@@ -639,6 +639,8 @@ MODULE Browse;
     END;
     Console.WriteLn;
   END DiagnoseSymbol;
+*)
+(* ============================================================ *)
 
   PROCEDURE GetSym();
   BEGIN
