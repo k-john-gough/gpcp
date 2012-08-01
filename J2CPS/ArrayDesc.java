@@ -35,6 +35,7 @@ public class ArrayDesc extends TypeDesc {
     name = name + eType.name;
     typeOrd = TypeDesc.arrT;
     dim = dimNum;
+    elemType = eType;
     ultimateElemType = eType; 
     if (makePtr) {
       ptrType = new PtrDesc(this);
