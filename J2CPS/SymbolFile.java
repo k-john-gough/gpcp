@@ -600,7 +600,6 @@ class SymbolFile {
 
     ClearTypeList();
     ClassDesc aClass, impClass;
-    PackageDesc impPack;
     int maxInNum = 0;
     FileInputStream fIn = new FileInputStream(symFile);
     in = new DataInputStream(fIn);
@@ -655,19 +654,18 @@ class SymbolFile {
     }
     Expect(start);
     while (sSym != close) {
-      int impNum = -1;
-      impPack = null;
+      PackageDesc impPack;
       impClass = null;
-      String impName = null, impModName = null;
+      String impModName = null;
       int impAcc = 0, impModAcc = 0;
       Check(tDefS); 
       int tNum = tOrd; GetSym(); 
       if (tNum > maxInNum) { maxInNum = tNum; }
-      if (sSym == fromS) { 
-        impNum = tOrd - 1;
+      if (sSym == fromS) {
+        int impNum = tOrd - 1;
         GetSym(); 
         Check(namSy);
-        impName = name;
+        String impName = name;
         impAcc = acc; 
         if (impNum < 0) {
           impPack = thisPack;
@@ -816,9 +814,7 @@ class SymbolFile {
     fIn.close();
     // do fix ups...
     for (int i = TypeDesc.specT; i <= maxInNum; i++) {
-      int size = 0;
       if ((typeList[i] != null) && (typeList[i] instanceof ClassDesc)) {
-        aClass = (ClassDesc)typeList[i];
         if (!((ClassDesc)typeList[i]).read) {
           aClass = (ClassDesc)typeList[i];
           if (aClass.superNum != 0) {
@@ -828,7 +824,9 @@ class SymbolFile {
           for (int j=0; j < aClass.numInts; j++) {
             aClass.interfaces[j] = (ClassDesc) GetFixUpType(aClass.intNums[j]); 
           }
-          if (aClass.fieldList == null) { size = 0; 
+          int size;
+          if (aClass.fieldList == null) { 
+            size = 0; 
           } else {
             size = aClass.fieldList.size(); 
           }
