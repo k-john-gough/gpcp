@@ -115,7 +115,16 @@ public class ClassDesc extends TypeDesc  {
 //    }
 //*/
     cp = new ConstantPool(stream);
-    access = stream.readUnsignedShort(); 
+    access = stream.readUnsignedShort();
+    // Experimental code to only transform packages that
+    // are reachable from classes that are not private.
+    // Under consideration for next version, controlled 
+    // by a command line option.
+//    if (!ConstantPool.isPublic(access) && !ConstantPool.isProtected(access)) {
+//        cp.EmptyConstantPool();
+//        return true;
+//    }
+    // End experimental code
     ClassRef thisClass = (ClassRef) cp.Get(stream.readUnsignedShort());
     String clName = thisClass.GetName();
     if (!qualName.equals(clName)) {
@@ -430,12 +439,12 @@ public class ClassDesc extends TypeDesc  {
     if (this.packageDesc != thisPack) {
       out.writeByte(SymbolFile.fromS);
 // ------------
-      if (this.packageDesc.impNum < 0) {
-        System.out.println("impNum is " + this.packageDesc.impNum);
-        System.out.println("packageDesc " + this.packageDesc.javaName);
-        System.out.println("objName " + objName);
-        this.packageDesc.impNum = 0;
-      }
+//      if (this.packageDesc.impNum < 0) {
+//        System.out.println("impNum is " + this.packageDesc.impNum);
+//        System.out.println("packageDesc " + this.packageDesc.javaName);
+//        System.out.println("objName " + objName);
+//        this.packageDesc.impNum = 0;
+//      }
 // ------------
       SymbolFile.writeOrd(out,this.packageDesc.impNum);
       SymbolFile.writeName(out,access,objName);
@@ -474,62 +483,68 @@ public class ClassDesc extends TypeDesc  {
         SymbolFile.writeTypeOrd(out,interfaces[i]); 
       }
     }
-    for (int i=0; i < fields.length; i++) {
-      if (fields[i].isExported() && !fields[i].isStatic()) {
-        SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
-        SymbolFile.writeTypeOrd(out,fields[i].type);
-      }
-    }
-    for (int i=0; i < methods.length; i++) {
-      if (methods[i].isExported() && !methods[i].deprecated &&
-         !methods[i].isStatic() && !methods[i].isInitProc &&
-         !methods[i].isCLInitProc) {
-        out.writeByte(SymbolFile.mthSy);
-// --------------------
-        if (methods[i].userName == null) {
-          System.out.println("packageDesc " + this.packageDesc.javaName);
-          System.out.println("objName " + objName);
-          for (int j=0; j < methods.length; j++) {
-            System.out.println("Method " + j +  
-                (methods[i].userName == null ? " null" : methods[j].userName));
-          }
+    if (fields != null && fields.length > 0) {
+      for (int i=0; i < fields.length; i++) {
+        if (fields[i].isExported() && !fields[i].isStatic()) {
+            SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
+            SymbolFile.writeTypeOrd(out,fields[i].type);
         }
-// --------------------
-        SymbolFile.writeName(out,methods[i].accessFlags,methods[i].userName);
-        int attr = 0;
-        if (!methods[i].overridding) { attr = 1; }
-        if (methods[i].isAbstract()) { attr += 2; }
-        else if (!methods[i].isFinal()){ attr += 6; } 
-        out.writeByte(attr); 
-        out.writeByte(0); /* all java receivers are value mode */
-        SymbolFile.writeOrd(out,outTypeNum);
-        SymbolFile.writeString(out,methods[i].name);
-        SymbolFile.WriteFormalType(methods[i],out);
-      }
-    } 
-    for (int i=0; i < fields.length; i++) {
-      if (fields[i].isConstant()) {
-        out.writeByte(SymbolFile.conSy);
-        SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
-        SymbolFile.writeLiteral(out,fields[i].GetConstVal());
-      } else if (fields[i].isExported() && fields[i].isStatic()) {
-        out.writeByte(SymbolFile.varSy);
-        SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
-        SymbolFile.writeTypeOrd(out,fields[i].type);
       }
     }
-    for (int i=0; i < methods.length; i++) {
-      if (methods[i].isExported() && !methods[i].deprecated &&
-          methods[i].isStatic() && !methods[i].isCLInitProc) {
-        out.writeByte(SymbolFile.prcSy);
-        SymbolFile.writeName(out,methods[i].accessFlags,methods[i].userName);
-        SymbolFile.writeString(out,methods[i].name);
-        if (methods[i].isInitProc) { out.writeByte(SymbolFile.truSy); }
-        SymbolFile.WriteFormalType(methods[i],out);
+    if (methods != null && methods.length > 0) {
+      for (int i=0; i < methods.length; i++) {
+        if (methods[i].isExported() && !methods[i].deprecated &&
+            !methods[i].isStatic() && !methods[i].isInitProc &&
+            !methods[i].isCLInitProc) {
+            out.writeByte(SymbolFile.mthSy);
+    // --------------------
+    //        if (methods[i].userName == null) {
+    //          System.out.println("packageDesc " + this.packageDesc.javaName);
+    //          System.out.println("objName " + objName);
+    //          for (int j=0; j < methods.length; j++) {
+    //            System.out.println("Method " + j +  
+    //                (methods[i].userName == null ? " null" : methods[j].userName));
+    //          }
+    //        }
+    // --------------------
+            SymbolFile.writeName(out,methods[i].accessFlags,methods[i].userName);
+            int attr = 0;
+            if (!methods[i].overridding) { attr = 1; }
+            if (methods[i].isAbstract()) { attr += 2; }
+            else if (!methods[i].isFinal()){ attr += 6; } 
+            out.writeByte(attr); 
+            out.writeByte(0); /* all java receivers are value mode */
+            SymbolFile.writeOrd(out,outTypeNum);
+            SymbolFile.writeString(out,methods[i].name);
+            SymbolFile.WriteFormalType(methods[i],out);
+        }
+      }
+    }
+    if (fields != null && fields.length > 0) {
+      for (int i=0; i < fields.length; i++) {
+        if (fields[i].isConstant()) {
+            out.writeByte(SymbolFile.conSy);
+            SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
+            SymbolFile.writeLiteral(out,fields[i].GetConstVal());
+        } else if (fields[i].isExported() && fields[i].isStatic()) {
+            out.writeByte(SymbolFile.varSy);
+            SymbolFile.writeName(out,fields[i].accessFlags,fields[i].name);
+            SymbolFile.writeTypeOrd(out,fields[i].type);
+        }
+      }
+    }
+    if (methods != null && methods.length > 0) {
+      for (int i=0; i < methods.length; i++) {
+        if (methods[i].isExported() && !methods[i].deprecated &&
+            methods[i].isStatic() && !methods[i].isCLInitProc) {
+            out.writeByte(SymbolFile.prcSy);
+            SymbolFile.writeName(out,methods[i].accessFlags,methods[i].userName);
+            SymbolFile.writeString(out,methods[i].name);
+            if (methods[i].isInitProc) { out.writeByte(SymbolFile.truSy); }
+            SymbolFile.WriteFormalType(methods[i],out);
+        }
       }
     }
     out.writeByte(SymbolFile.endRc);
   }
-
-
 }

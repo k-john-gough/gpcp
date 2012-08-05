@@ -20,7 +20,7 @@ public class J2CPS {
     String filename = null;
     TypeDesc.InitTypes();
     if (argLen == 0) {
-      System.err.println("J2CPS version 1.3.12 (Nov. 2011)");
+      System.err.println("J2CPS version 1.3.13.2 (August 2012)");
       System.err.println("Usage: java J2CPS [options] packagename");
       System.err.println("Options may be in any order.");
       System.err.println("  -d dir  symbol file directory");
