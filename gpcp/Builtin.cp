@@ -162,6 +162,7 @@ MODULE Builtin;
     tId.SetMode(Symbols.pubMode);
     tId.dfScp := blk;
     tId.hash  := NameHash.enterStr(nam);
+	tId.SetNameFromHash(tId.hash);
     jnk := blk.symTb.enter(tId.hash, tId);
   END MkDummyClass;
 
@@ -171,35 +172,38 @@ MODULE Builtin;
                                        prcTyp : TypeDesc.Procedure;
                                        hostTp : Symbols.Type;
                                        scope  : IdDesc.BlkId;
-									   access : INTEGER;
-									   rcvFrm : INTEGER;
+                                       access : INTEGER;
+                                       rcvFrm : INTEGER;
                                        mthAtt : SET);
     VAR mthD : IdDesc.MthId;
-	    recT : TypeDesc.Record;
-	    rcvD : IdDesc.ParId;
-		oldD : IdDesc.OvlId;
+        recT : TypeDesc.Record;
+        rcvD : IdDesc.ParId;
+       	oldD : IdDesc.OvlId;
         junk : BOOLEAN;
   BEGIN
     recT := hostTp.boundRecTp()(TypeDesc.Record);
     prcTyp.receiver := hostTp;
 
     mthD := IdDesc.newMthId();
-	mthD.SetMode(access);
-	mthD.setPrcKind(IdDesc.conMth);
+    mthD.SetMode(access);
+    mthD.setPrcKind(IdDesc.conMth);
     mthD.hash := NameHash.enterStr(namStr);
     mthD.dfScp := scope;
-	mthD.type := prcTyp;
-	mthD.bndType := hostTp;
-	mthD.mthAtt := mthAtt;
+    mthD.type := prcTyp;
+    mthD.bndType := hostTp;
+    mthD.mthAtt := mthAtt;
+	mthD.SetNameFromString(BOX(namStr));
 
     rcvD := IdDesc.newParId();
     rcvD.varOrd := 0;
-	rcvD.parMod := rcvFrm;
-	rcvD.type := hostTp;
+    rcvD.parMod := rcvFrm;
+    rcvD.type := hostTp;
+	rcvD.hash := NameHash.enterStr("this");
+	rcvD.dfScp := mthD;
 
-	mthD.rcvFrm := rcvD;
-	TypeDesc.InsertInRec(mthD, recT, TRUE, oldD, junk);
-	Symbols.AppendIdnt(recT.methods, mthD);
+    mthD.rcvFrm := rcvD;
+    TypeDesc.InsertInRec(mthD, recT, TRUE, oldD, junk);
+    Symbols.AppendIdnt(recT.methods, mthD);
   END MkDummyMethodAndInsert;
 
 (* ------------------------------------------------------------	*)

@@ -125,9 +125,6 @@ MODULE CPascal;
       CSt.CheckOptionsOK;
       retVal := 0;
       CSt.totalS := RTS.GetMillis();
-(*
-      Scnr.src := TxtFil.findLocal(nam);
- *)
       Scnr.src := BinFil.findLocal(nam);
       IF Scnr.src = NIL THEN
         CSt.Message("cannot open local file <" + nam + ">");

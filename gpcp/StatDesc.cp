@@ -535,7 +535,7 @@ MODULE StatDesc;
         IF ~rTp.valCopyOK() THEN s.rhsX.ExprError(152) END;
         IF rTp IS T.Procedure THEN
           s.StmtError(301);
-          IF G.targetIsJVM() THEN s.StmtError(213);
+          IF G.targetIsJVM() THEN s.StmtError(320 (*213*));
           ELSIF (rTp # lTp) & ~s.rhsX.isProcLit() THEN s.StmtError(191);
           END;
         END;

@@ -535,6 +535,7 @@ MODULE CPascalErrors;
     | 317: str := "Empty CASE statement will trap if control reaches here";
     | 318: str := "Empty WITH statement will trap if control reaches here";
     | 319: str := "STA has no effect without CPmain or WinMain";
+    | 320: str := "Procedure variables with JVM target are experimental";
     (* ==================== END WARNINGS ====================== *)
     ELSE
       str := "Semantic error: " + LitValue.intToCharOpen(num)^;	

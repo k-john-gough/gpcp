@@ -30,6 +30,7 @@ MODULE JavaBase;
   VAR worklist*   : ClassEmitter;
 
   PROCEDURE (list : ClassEmitter)AddNewRecEmitter*(rec : Ty.Record),NEW,EMPTY;
+  PROCEDURE (list : ClassEmitter)AddNewProcTypeEmitter*(prc : Ty.Procedure),NEW,EMPTY;
 
 (* ============================================================ *)
 END JavaBase.

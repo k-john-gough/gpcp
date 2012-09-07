@@ -1111,6 +1111,9 @@ MODULE ClassUtil;
     | typ : Ty.Vector DO
         IF typ.xName = NIL THEN J.MkVecName(typ) END;
         RETURN typ.xName;
+    | typ : Ty.Procedure DO
+        IF typ.xName = NIL THEN J.MkProcTypeName(typ) END;
+        RETURN typ.hostClass.scopeNm;
     | typ : Ty.Array DO
         IF typ.xName = NIL THEN
           L.InitCharOpenSeq(arrayName,3);
@@ -1125,14 +1128,14 @@ MODULE ClassUtil;
         ASSERT(typ.xName # NIL);
         RETURN typ.xName;
     | typ : Ty.Record DO
-	IF typ.xName = NIL THEN J.MkRecName(typ) END;
+        IF typ.xName = NIL THEN J.MkRecName(typ) END;
         RETURN typ.scopeNm;
     | typ : Ty.Enum DO
-	RETURN G.intTp.xName;
+        RETURN G.intTp.xName;
     | typ : Ty.Pointer DO
         RETURN GetTypeName(typ.boundTp);
     | typ : Ty.Opaque DO
-	IF typ.xName = NIL THEN J.MkAliasName(typ) END;
+        IF typ.xName = NIL THEN J.MkAliasName(typ) END;
         RETURN typ.scopeNm;
     END;
   END GetTypeName;

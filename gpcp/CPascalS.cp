@@ -714,8 +714,8 @@ END tokToChar;
     index := 0;
     FOR linIx := 0 TO LEN(source) - 1 DO
       lineP := source[linIx];
-      chrIx := 0;
-      theCh := lineP[0]; 
+      chrIx := 0; 
+	  IF lineP = NIL THEN theCh := 0X ELSE theCh := lineP[0] END;
       WHILE theCh # 0X DO
         buf[0][index] := USHORT(ORD(theCh)); INC(index); INC(chrIx);
         theCh := lineP[chrIx];
@@ -729,8 +729,7 @@ END tokToChar;
     curLine := 1; lineStart := -2; bp := -1;
     oldEols := 0; apx := 0;
     spaces := 0; (* # new # *)
-    NextCh;
-      
+    NextCh;      
   END NewReadBuffer;
   
   PROCEDURE RestoreFileBuffer*();

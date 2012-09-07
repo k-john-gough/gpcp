@@ -244,6 +244,7 @@ MODULE TypeDesc;
                    retType*  : Sy.Type;    (* ret-type | NIL *)
                    receiver* : Sy.Type;    (* element tpDesc *)
                    formals*  : Id.ParSeq;  (* formal params  *)
+                   hostClass*: Record;     (* host classType *)
                    retN*,argN* : INTEGER;
                 END;       (* ------------------------------ *)
 
