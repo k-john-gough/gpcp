@@ -668,6 +668,17 @@ MODULE IdDesc;
 
 (* -------------------------------------------- *)
 
+  PROCEDURE cloneParInScope*(par : ParId; scope : D.Scope) : ParId;
+    VAR rslt : ParId;
+  BEGIN
+    rslt := newParId();
+	rslt^ := par^;
+    rslt.dfScp  := scope;
+    RETURN rslt;
+  END cloneParInScope;
+
+(* -------------------------------------------- *)
+
   PROCEDURE newQuaId*() : ParId;
     VAR rslt : ParId;
   BEGIN

@@ -229,12 +229,6 @@ VAR
       G.thisMod.scopeNm := name;
       Expect(T.rbrackSym);
       IF G.verbose THEN G.Message('external modName "' + name^ + '"') END;
-(*
- *    SemError(144);
- *    Get;
- *    Expect(T.stringSym);
- *    Expect(T.rbrackSym);
- *)
     END;
    (* End addition 15-June-2000 kjg *)
     Expect(T.semicolonSym);

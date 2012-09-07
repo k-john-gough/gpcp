@@ -1,9 +1,9 @@
 
 (* ============================================================ *)
 (*  JavaUtil is the module which writes java classs file        *)
-(*  structures  						*)
-(*  Copyright (c) John Gough 1999, 2000.			*)
-(*  Modified DWC September, 2000.				*)
+(*  structures                                                  *)
+(*  Copyright (c) John Gough 1999, 2000.                        *)
+(*  Modified DWC September, 2000.                               *)
 (* ============================================================ *)
 
 MODULE JavaUtil;
@@ -12,19 +12,17 @@ MODULE JavaUtil;
 	GPCPcopyright,
 	RTS,
 	Console,
-        GPFiles,
-	L   := LitValue,
 	JavaBase,
-        NameHash,
-        FileNames,
-	CompState,
-	ClassMaker,
-        F   := GPBinFiles,
+	Hsh := NameHash,
+	Cst := CompState,
+	Psr := CPascalP,
 	Jvm := JVMcodes,
-	D   := Symbols,
-	G   := Builtin,
+	Sym := Symbols,
+	Blt := Builtin,
 	Id  := IdDesc,
-	Ty  := TypeDesc;
+	Xp  := ExprDesc,
+	Ty  := TypeDesc,
+	L   := LitValue;
 
 (* ============================================================ *)
 
@@ -77,16 +75,20 @@ MODULE JavaUtil;
 	typeGetE-  : ARRAY 16 OF INTEGER;
 
   VAR	nmArray*   : L.CharOpenSeq;
-	fmArray*   : L.CharOpenSeq;
+        fmArray*   : L.CharOpenSeq;
 
-  VAR   semi-,lPar-,rPar-,rParV-,brac-,lCap-,
-	void-,lowL-,dlar-,slsh-,prfx- : L.CharOpen;
+  VAR   semi-,comma-,colon-,lPar-,rPar-,rParV-,
+        brac-,lCap-, void-,lowL-,dlar-,slsh-,prfx- : L.CharOpen;
 
 (* ============================================================ *)
 
   VAR   xhrIx : INTEGER;
         xhrDl : L.CharOpen;
         xhrMk : L.CharOpen;
+
+  VAR   invokeHash : INTEGER;
+		ptvIx      : INTEGER;    (* Index number for procedure type literals *)
+        procLitPrefix : L.CharOpen;
 
 (* ============================================================ *)
 
@@ -105,12 +107,12 @@ MODULE JavaUtil;
   PROCEDURE (jf : JavaFile)EndProc*(),NEW,EMPTY;
   PROCEDURE (jf : JavaFile)isAbstract*():BOOLEAN,NEW,ABSTRACT;
 
-  PROCEDURE (jf : JavaFile)getScope*():D.Scope,NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)getScope*():Sym.Scope,NEW,ABSTRACT;
 
   PROCEDURE (jf : JavaFile) EmitField*(field : Id.AbVar),NEW,ABSTRACT;
 
   PROCEDURE (jf : JavaFile)MkNewRecord*(typ : Ty.Record),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)MkNewFixedArray*(topE : D.Type;
+  PROCEDURE (jf : JavaFile)MkNewFixedArray*(topE : Sym.Type;
                                             len0 : INTEGER),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)MkNewOpenArray*(arrT : Ty.Array;
                                            dims : INTEGER),NEW,ABSTRACT;
@@ -146,7 +148,7 @@ MODULE JavaUtil;
   PROCEDURE (jf : JavaFile)DefLabC*(lab : Label; 
                                     IN c : ARRAY OF CHAR),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)CodeInc*(localIx,incVal : INTEGER),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)CodeT*(code : INTEGER; ty : D.Type),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)CodeT*(code : INTEGER; ty : Sym.Type),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)CodeSwitch*(low,high : INTEGER; 
                                        defLab : Label),NEW,ABSTRACT;
 
@@ -184,37 +186,40 @@ MODULE JavaUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (jf : JavaFile)PutGetS*(code : INTEGER;
+  PROCEDURE (jf : JavaFile)PutGetS*(code : INTEGER; (* static field *)
 				    blk  : Id.BlkId;
 				    fld  : Id.VarId),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)PutGetF*(code : INTEGER;
+
+  PROCEDURE (jf : JavaFile)PutGetF*(code : INTEGER; (* instance field *)
 				    rec  : Ty.Record;
 				    fld  : Id.AbVar),NEW,ABSTRACT;
 
 (* ============================================================ *)
 
-  PROCEDURE (jf : JavaFile)Alloc1d*(elTp : D.Type),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)VarInit*(var : D.Idnt),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)Alloc1d*(elTp : Sym.Type),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)VarInit*(var : Sym.Idnt),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)Trap*(IN str : ARRAY OF CHAR),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)CaseTrap*(i : INTEGER),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)WithTrap*(id : D.Idnt),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)WithTrap*(id : Sym.Idnt),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)Line*(nm : INTEGER),NEW,ABSTRACT;
 
 (* ============================================================ *)
-(*			Some XHR utilities			*)
+(*                      Some XHR utilities                      *)
 (* ============================================================ *)
 
   PROCEDURE^ (jf : JavaFile)PutUplevel*(var : Id.LocId),NEW;
   PROCEDURE^ (jf : JavaFile)GetUplevel*(var : Id.LocId),NEW;
   PROCEDURE^ (jf : JavaFile)PushInt*(num : INTEGER),NEW;
-  PROCEDURE^ (jf : JavaFile)PutElement*(typ : D.Type),NEW;
-  PROCEDURE^ (jf : JavaFile)GetElement*(typ : D.Type),NEW;
-  PROCEDURE^ (jf : JavaFile)ConvertDn*(inT, outT : D.Type),NEW;
+  PROCEDURE^ (jf : JavaFile)PutElement*(typ : Sym.Type),NEW;
+  PROCEDURE^ (jf : JavaFile)GetElement*(typ : Sym.Type),NEW;
+  PROCEDURE^ (jf : JavaFile)ConvertDn*(inT, outT : Sym.Type),NEW;
 
   PROCEDURE^ cat2*(i,j : L.CharOpen) : L.CharOpen;
   PROCEDURE^ MkRecName*(typ : Ty.Record);
   PROCEDURE^ MkProcName*(proc : Id.Procs);
   PROCEDURE^ NumberParams(pIdn : Id.Procs; pTyp : Ty.Procedure);
+  PROCEDURE^ typeToChOpen(typ : Sym.Type) : L.CharOpen;
+
 
 (* ============================================================ *)
 
@@ -248,12 +253,12 @@ MODULE JavaUtil;
 	locVr : Id.LocId;
 	fldVr : Id.FldId;
   BEGIN
-    G.MkDummyClass(newXHR(), CompState.thisMod, Ty.noAtt, typId);
-    typId.SetMode(D.prvMode);
+    Blt.MkDummyClass(newXHR(), Cst.thisMod, Ty.noAtt, typId);
+    typId.SetMode(Sym.prvMode);
     scp.xhrType := typId.type;
     recTp := typId.type.boundRecTp()(Ty.Record);
-    recTp.baseTp := CompState.rtsXHR.boundRecTp();
-    INCL(recTp.xAttr, D.noCpy);
+    recTp.baseTp := Cst.rtsXHR.boundRecTp();
+    INCL(recTp.xAttr, Sym.noCpy);
 
     FOR index := 0 TO scp.locals.tide-1 DO
       locVr := scp.locals.a[index](Id.LocId);
@@ -262,7 +267,7 @@ MODULE JavaUtil;
         fldVr.hash := locVr.hash;
         fldVr.type := locVr.type;
         fldVr.recTyp := recTp;
-	D.AppendIdnt(recTp.fields, fldVr);
+	Sym.AppendIdnt(recTp.fields, fldVr);
       END;
     END;
   END MkXHR;
@@ -271,7 +276,7 @@ MODULE JavaUtil;
 (*			Some vector utilities			*)
 (* ============================================================ *)
 
-  PROCEDURE mapVecElTp(typ : D.Type) : INTEGER;
+  PROCEDURE mapVecElTp(typ : Sym.Type) : INTEGER;
   BEGIN
     WITH typ : Ty.Base DO
       CASE typ.tpOrd OF
@@ -284,15 +289,15 @@ MODULE JavaUtil;
     END;
   END mapVecElTp;
 
-  PROCEDURE mapOrdRepT(ord : INTEGER) : D.Type;
+  PROCEDURE mapOrdRepT(ord : INTEGER) : Sym.Type;
   BEGIN
     CASE ord OF
-    | Ty.charN  : RETURN G.charTp;
-    | Ty.intN   : RETURN G.intTp;
-    | Ty.lIntN  : RETURN G.lIntTp;
-    | Ty.sReaN  : RETURN G.sReaTp;
-    | Ty.realN  : RETURN G.realTp;
-    | Ty.anyPtr : RETURN G.anyPtr;
+    | Ty.charN  : RETURN Blt.charTp;
+    | Ty.intN   : RETURN Blt.intTp;
+    | Ty.lIntN  : RETURN Blt.lIntTp;
+    | Ty.sReaN  : RETURN Blt.sReaTp;
+    | Ty.realN  : RETURN Blt.realTp;
+    | Ty.anyPtr : RETURN Blt.anyPtr;
     END;
   END mapOrdRepT;
 
@@ -314,16 +319,16 @@ MODULE JavaUtil;
   PROCEDURE vecModId() : Id.BlkId;
   BEGIN
     IF vecBlkId = NIL THEN
-      G.MkDummyImport("$CPJvec$", "CP.CPJvec", vecBlkId);
-      G.MkDummyClass("VecBase", vecBlkId, Ty.noAtt, vecBase);
+      Blt.MkDummyImport("$CPJvec$", "CP.CPJvec", vecBlkId);
+      Blt.MkDummyClass("VecBase", vecBlkId, Ty.noAtt, vecBase);
      (*
       *  Initialize vecTide while we are at it ...
       *)
       vecTide := Id.newFldId();
-      vecTide.hash := NameHash.enterStr("tide");
+      vecTide.hash := Hsh.enterStr("tide");
       vecTide.dfScp := vecBlkId;
       vecTide.recTyp := vecBase.type.boundRecTp();
-      vecTide.type := G.intTp;
+      vecTide.type := Blt.intTp;
       MkRecName(vecTide.recTyp(Ty.Record)); 
     END;
     RETURN vecBlkId;
@@ -343,11 +348,8 @@ MODULE JavaUtil;
       | Ty.realN  : str := "VecR64";
       | Ty.anyPtr : str := "VecRef";
       END;
-      G.MkDummyClass(str, vecModId(), Ty.noAtt, tId);
+      Blt.MkDummyClass(str, vecModId(), Ty.noAtt, tId);
       rcT := tId.type.boundRecTp()(Ty.Record);
-(*
- *    rcT.baseTp := vecBase.type.boundRecTp();
- *)
       rcT.baseTp := vecTide.recTyp;
       vecTypes[ord] := tId;
     END;
@@ -364,7 +366,7 @@ MODULE JavaUtil;
   BEGIN
     IF vecElms[ord] = NIL THEN
       fld := Id.newFldId();
-      fld.hash := NameHash.enterStr("elms");
+      fld.hash := Hsh.enterStr("elms");
       fld.dfScp := vecModId();
       fld.recTyp := vecRecTyp(ord);
       fld.type := Ty.mkArrayOf(mapOrdRepT(ord));
@@ -375,7 +377,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)MkVecRec*(eTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)MkVecRec*(eTp : Sym.Type),NEW;
     VAR ord : INTEGER;
   BEGIN
     ord := mapVecElTp(eTp);
@@ -384,9 +386,9 @@ MODULE JavaUtil;
 
 (* ------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)MkVecArr*(eTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)MkVecArr*(eTp : Sym.Type),NEW;
     VAR ord : INTEGER;
-        vTp : D.Type;
+        vTp : Sym.Type;
   BEGIN
     ord := mapVecElTp(eTp);
     jf.Alloc1d(mapOrdRepT(ord));
@@ -395,7 +397,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)GetVecArr*(eTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)GetVecArr*(eTp : Sym.Type),NEW;
     VAR ord : INTEGER;
         fId : Id.FldId;
   BEGIN
@@ -420,7 +422,7 @@ MODULE JavaUtil;
 
 (* ------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)InvokeExpand*(eTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)InvokeExpand*(eTp : Sym.Type),NEW;
     VAR ord : INTEGER;
         mth : Id.MthId;
         typ : Ty.Procedure;
@@ -428,7 +430,7 @@ MODULE JavaUtil;
     ord := mapVecElTp(eTp);
     IF vecExpnd[ord] = NIL THEN
       mth := Id.newMthId();
-      mth.hash := G.xpndBk;
+      mth.hash := Blt.xpndBk;
       mth.dfScp := vecModId();
       typ := Ty.newPrcTp();
       typ.idnt := mth;
@@ -447,15 +449,15 @@ MODULE JavaUtil;
 
 (* ------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)PutVecElement*(eTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)PutVecElement*(eTp : Sym.Type),NEW;
   BEGIN
     jf.PutElement(mapOrdRepT(mapVecElTp(eTp)));
   END PutVecElement;
 
 (* ------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)GetVecElement*(eTp : D.Type),NEW;
-    VAR rTp : D.Type; (* representation type *)
+  PROCEDURE (jf : JavaFile)GetVecElement*(eTp : Sym.Type),NEW;
+    VAR rTp : Sym.Type; (* representation type *)
   BEGIN
     rTp := mapOrdRepT(mapVecElTp(eTp));
    (*
@@ -463,7 +465,7 @@ MODULE JavaUtil;
     *)
     jf.GetElement(rTp);
     IF rTp # eTp THEN
-      IF rTp = G.anyPtr THEN
+      IF rTp = Blt.anyPtr THEN
         jf.CodeT(Jvm.opc_checkcast, eTp);
       ELSE
         jf.ConvertDn(rTp, eTp);
@@ -472,13 +474,21 @@ MODULE JavaUtil;
   END GetVecElement;
 
 (* ============================================================ *)
-(*			Some static utilities			*)
+(*                     Some static utilities                    *)
 (* ============================================================ *)
 
-  PROCEDURE jvmSize*(t : D.Type) : INTEGER;
+  PROCEDURE jvmSize*(t : Sym.Type) : INTEGER;
   BEGIN
     IF t.isLongType() THEN RETURN 2 ELSE RETURN 1 END;
   END jvmSize;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE newAnonLit() : L.CharOpen;
+  BEGIN
+    INC(ptvIx);
+    RETURN cat2(procLitPrefix, L.intToCharOpen(ptvIx));
+  END newAnonLit;
 
 (* ------------------------------------------------------------ *)
 
@@ -486,7 +496,7 @@ MODULE JavaUtil;
   (*   A parameter needs to be boxed if it has non-reference 	*)
   (*   representation in the JVM, and is OUT or VAR mode.	*)
   BEGIN
-    RETURN ((i.parMod = D.var) OR (i.parMod = D.out)) & 
+    RETURN ((i.parMod = Sym.var) OR (i.parMod = Sym.out)) & 
 	   i.type.isScalarType();
   END needsBox;
 
@@ -522,49 +532,17 @@ MODULE JavaUtil;
       END;
       RETURN arr;
     END dotToSlash;
-  (* -------------------------------------------------- * 
-   * PROCEDURE defaultClass(arr : L.CharOpen) : L.CharOpen;
-   *   VAR ix : INTEGER;
-   *       ln : INTEGER;
-   *       ch : CHAR;
-   * BEGIN
-   *  (*
-   *   *  The incoming literal package name has a name
-   *   *  of the form "blah/.../final".  We want the 
-   *   *  default class name to be "final".
-   *   *)
-   *   ln := 0;
-   *   FOR ix := 0 TO LEN(arr)-1 DO
-   *     IF arr[ix] = "/" THEN ln := ix+1 END;
-   *   END;
-   *   RETURN L.subChOToChO(arr, ln, LEN(arr) - ln);
-   * END defaultClass;
- * ---------------------------------------------------- *
- * BEGIN
- *   IF mod.xName # NIL THEN RETURN END;
- *   IF mod.scopeNm # NIL THEN 
- *     mod.scopeNm := dotToSlash(mod.scopeNm);
- *     mod.xName   := defaultClass(mod.scopeNm);
- *   ELSE
- *     mNm := D.getName.ChPtr(mod);
- *     mod.scopeNm := cat3(prfx, slsh, mNm); (* "CP/<modname>" *)
- *     IF CompState.doCode & ~CompState.doJsmn THEN
- *       mod.xName := cat3(mod.scopeNm, slsh, mNm);
- *     ELSE
- *       mod.xName   := mNm;
- *     END;
- *   END;
- * ---------------------------------------------------- *)
+  (* -------------------------------------------------- *)
   BEGIN
     IF mod.xName # NIL THEN RETURN END;
-    mNm := D.getName.ChPtr(mod);
+    mNm := Sym.getName.ChPtr(mod);
     IF mod.scopeNm # NIL THEN 
       mod.scopeNm := dotToSlash(mod.scopeNm);
     ELSE
       mod.scopeNm := cat3(prfx, slsh, mNm); (* "CP/<modname>" *)
     END;
-    IF ~CompState.doCode         (* Only doing Jasmin output       *)
-        OR CompState.doJsmn      (* Forcing assembly via Jasmin    *)
+    IF ~Cst.doCode         (* Only doing Jasmin output       *)
+        OR Cst.doJsmn      (* Forcing assembly via Jasmin    *)
         OR (mod.scopeNm[0] = 0X) (* Explicitly forcing no package! *) THEN
       mod.xName   := mNm;
     ELSE (* default case *)
@@ -574,12 +552,12 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE scopeName(scp : D.Scope) : L.CharOpen;
+  PROCEDURE scopeName(scp : Sym.Scope) : L.CharOpen;
   BEGIN
     WITH scp : Id.BlkId DO
         IF scp.xName = NIL THEN MkBlkName(scp) END;
-        IF CompState.doCode & ~CompState.doJsmn THEN
-          RETURN D.getName.ChPtr(scp);
+        IF Cst.doCode & ~Cst.doJsmn THEN
+          RETURN Sym.getName.ChPtr(scp);
         ELSE
           RETURN scp.xName; 
         END;
@@ -591,39 +569,55 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE qualScopeName(scp : D.Scope) : L.CharOpen;
+  PROCEDURE qualScopeName(scp : Sym.Scope) : L.CharOpen;
   BEGIN
     WITH scp : Id.BlkId DO
-        IF scp.xName = NIL THEN MkBlkName(scp) END;
-	RETURN scp.scopeNm;
+      IF scp.xName = NIL THEN MkBlkName(scp) END;
+      RETURN scp.scopeNm;
     | scp : Id.Procs DO
-        IF scp.prcNm = NIL THEN MkProcName(scp) END;
-	RETURN scp.scopeNm;
+      IF scp.prcNm = NIL THEN MkProcName(scp) END;
+      RETURN scp.scopeNm;
     END;
   END qualScopeName;
 
 (* ------------------------------------------------------------ *)
+  PROCEDURE newMthId*(IN name : ARRAY OF CHAR; dfScp : Id.BlkId; bndTp : Sym.Type) : Id.MthId;
+    VAR rslt : Id.MthId;
+  BEGIN
+    rslt := Id.newMthId();
+	rslt.SetKind(Id.conMth);
+	rslt.hash := Hsh.enterStr(name);
+	rslt.dfScp := dfScp;
+	rslt.bndType := bndTp;
+	rslt.rcvFrm := Id.newParId();
+	rslt.rcvFrm.type := bndTp;
+	IF bndTp IS Ty.Record THEN rslt.rcvFrm.parMod := Sym.var END; 
+    RETURN rslt;
+  END newMthId;
 
+(* ------------------------------------------------------------ *)
+(* Generate all naming strings for this record type, and put    *)
+(* a corresponding emitter record on the work list.             *)
+(* ------------------------------------------------------------ *)
   PROCEDURE MkRecName*(typ : Ty.Record);
     VAR mNm : L.CharOpen;
 	qNm : L.CharOpen;
 	rNm : L.CharOpen;
-	tId : D.Idnt;
+	tId : Sym.Idnt;
   BEGIN
+   (* ###################################### *)
     IF typ.xName # NIL THEN RETURN END;
+   (* ###################################### *)
     IF typ.bindTp # NIL THEN		(* Synthetically named rec'd *)
       tId := typ.bindTp.idnt;
-      rNm := D.getName.ChPtr(tId);
     ELSE				(* Normal, named record type *)
       IF typ.idnt = NIL THEN		(* Anonymous record type     *)
         typ.idnt := Id.newAnonId(typ.serial);
       END;
       tId := typ.idnt;
-      rNm := D.getName.ChPtr(tId);
     END;
-
-    IF tId.dfScp = NIL THEN tId.dfScp := CompState.thisMod END;
-
+    IF tId.dfScp = NIL THEN tId.dfScp := Cst.thisMod END;
+    rNm := Sym.getName.ChPtr(tId);
     mNm := scopeName(tId.dfScp);
     qNm := qualScopeName(tId.dfScp);
    (*
@@ -648,7 +642,6 @@ MODULE JavaUtil;
       typ.xName := typ.extrnNm;
     END;
     typ.scopeNm := cat3(lCap, typ.xName, semi);
-
    (*
     *   It is at this point that we link records into the
     *   class-emission worklist.
@@ -658,6 +651,159 @@ MODULE JavaUtil;
     END;
   END MkRecName;
 
+(* ============================================================ *)
+(*               Some Procedure Variable utilities              *)
+(* ============================================================ *)
+
+  PROCEDURE getProcWrapperInvoke*(typ : Ty.Record) : Id.MthId;
+    VAR idnt : Sym.Idnt;
+  BEGIN 
+   (*  We could get the method descriptor more cheaply by
+    *  indexing into the symbol table, but this would be
+	*  very fragile against future code changes.
+	*)
+    idnt := typ.symTb.lookup(invokeHash);
+	RETURN idnt(Id.MthId);
+  END getProcWrapperInvoke;
+
+  PROCEDURE getProcVarInvoke*(typ : Ty.Procedure) : Id.MthId;
+  BEGIN
+    IF (typ = NIL) OR (typ.hostClass = NIL) THEN RETURN NIL;
+	ELSE RETURN getProcWrapperInvoke(typ.hostClass);
+	END;
+  END getProcVarInvoke;
+
+(* ------------------------------------------------------------ *)
+
+ (*
+  *  Copy the formals from the template procedure type descriptor
+  *  to the type descriptor for the method 'scp'.  Change the 
+  *  dfScp of the params (and receiver) to be local to scp.
+  *  Also, in the case of methods imported without parameter
+  *  names, generate synthetic names for the formals.
+  *)
+  PROCEDURE RescopeFormals(template : Ty.Procedure; scp : Id.MthId);
+	VAR param : Id.ParId;
+	    index : INTEGER;
+		synthH : INTEGER;
+		newTyp : Ty.Procedure;
+  BEGIN
+	newTyp := scp.type(Ty.Procedure);
+	newTyp.retType := template.retType;
+	FOR index := 0 TO template.formals.tide -1 DO
+	  param := Id.cloneParInScope(template.formals.a[index], scp);
+	  IF param.hash = 0 THEN 
+	    synthH := Hsh.enterStr("p" + L.intToCharOpen(index)^);
+		template.formals.a[index].hash := synthH;
+		param.hash := synthH;
+	  END;
+      IF ~Sym.refused(param, scp) THEN
+	    Id.AppendParam(newTyp.formals, param);
+	    Sym.AppendIdnt(scp.locals, param);
+      END;
+	END;
+  END RescopeFormals;
+
+(* ------------------------------------------------------------ *)
+(* Generate all naming strings for this procedure type, and     *)
+(* put a corresponding emitter record on the work list.         *)
+(* ------------------------------------------------------------ *)
+  PROCEDURE MkProcTypeName*(typ : Ty.Procedure);
+    VAR tIdent : Sym.Idnt;
+	    hostTp : Ty.Record;
+		(*invoke : Id.MthId;*)
+	    rNm, mNm, qNm : L.CharOpen;
+  BEGIN
+   (* ###################################### *)
+    IF typ.xName # NIL THEN RETURN END;
+   (* ###################################### *)
+	tIdent := typ.idnt;
+    IF tIdent.dfScp = NIL THEN tIdent.dfScp := Cst.thisMod END;
+	NEW(hostTp);
+	rNm := Sym.getName.ChPtr(tIdent);
+	mNm := scopeName(tIdent.dfScp);
+	qNm := qualScopeName(tIdent.dfScp);
+   (*
+    *  At this point:
+    *	    rNm holds the simple record name
+    *	    mNm holds the qualifying module name
+    *	    qNm holds the qualifying scope name
+    *  At exit we want:
+    *	    xName to hold the fully qualified name
+    *)
+	hostTp.extrnNm := cat3(mNm, lowL, rNm);
+    hostTp.xName := cat3(qNm, slsh, hostTp.extrnNm);
+    hostTp.scopeNm := cat3(lCap, hostTp.xName, semi);
+	typ.hostClass := hostTp;
+	Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostTp, Cst.thisMod, Sym.pubMode, Sym.var, Id.isAbs);
+	RescopeFormals(typ, getProcVarInvoke(typ));
+	typ.xName := hostTp.xName;
+   (*
+    *   It is at this point that we link records into the
+    *   class-emission worklist.
+    *)
+	IF tIdent.dfScp.kind # Id.impId THEN
+	  JavaBase.worklist.AddNewProcTypeEmitter(typ);
+	END;
+  END MkProcTypeName;
+
+(* ------------------------------------------------------------ *)
+(*  Generate the body statement sequence for the proc-type      *)
+(*  wrapper class to invoke the encapsulated procedure literal. *) 
+(* ------------------------------------------------------------ *)
+  PROCEDURE procLitBodyStatement(targetId : Sym.Idnt; thisMth : Id.MthId) : Sym.Stmt;
+    VAR text  : L.CharOpenSeq;
+	    mthTp : Ty.Procedure;
+	    param : Id.ParId;
+	    index : INTEGER;
+   (* ###################################### *)
+	PROCEDURE textName(trgt : Sym.Idnt) : L.CharOpen;
+	  VAR simple : L.CharOpen;
+	BEGIN
+	  simple := trgt.name();
+	  IF trgt.dfScp = Cst.thisMod THEN
+	    RETURN simple;
+	  ELSE
+	    RETURN BOX(trgt.dfScp.name()^ + '.' + simple^);
+	  END;
+	END textName;
+   (* ###################################### *)
+ BEGIN
+    mthTp := thisMth.type(Ty.Procedure);
+    IF mthTp.retType # NIL THEN L.AppendCharOpen(text, BOX("RETURN ")) END;
+	L.AppendCharOpen(text, textName(targetId));
+	L.AppendCharOpen(text, lPar);
+    FOR index := 0 TO mthTp.formals.tide - 1 DO
+	  IF index # 0 THEN L.AppendCharOpen(text, comma) END;
+	  param := mthTp.formals.a[index];
+	  L.AppendCharOpen(text, param.name());
+	END;
+	L.AppendCharOpen(text, rPar);
+	L.AppendCharOpen(text, BOX("END"));
+	RETURN Psr.parseTextAsStatement(text.a, thisMth);
+  END procLitBodyStatement;
+
+(* ------------------------------------------------------------ *)
+(*  Every value of procedure type is represented by a singleton *) 
+(*  class derived from the abstract host type of the proc-type. *)
+(* ------------------------------------------------------------ *)
+  PROCEDURE newProcLitWrapperClass(exp : Sym.Expr; typ : Ty.Procedure) : Ty.Record;
+    VAR singleton : Id.TypId;
+	    hostClass : Ty.Record;
+		newInvoke : Id.MthId;
+  BEGIN
+    ASSERT(exp IS Xp.IdLeaf);
+	Blt.MkDummyClass(newAnonLit(), Cst.thisMod, Ty.noAtt, singleton);
+	hostClass := singleton.type.boundRecTp()(Ty.Record);
+	Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostClass, Cst.thisMod, Sym.pubMode, Sym.var, {});
+	MkRecName(hostClass); (* Add this class to the emission work-list *)
+	newInvoke := getProcWrapperInvoke(hostClass);
+	RescopeFormals(typ, newInvoke);
+	newInvoke.body := procLitBodyStatement(exp(Xp.IdLeaf).ident, newInvoke);
+	RETURN hostClass;
+  END newProcLitWrapperClass;
+
+(* ------------------------------------------------------------ *)
 (* ------------------------------------------------------------ *)
 
   PROCEDURE MkVecName*(typ : Ty.Vector);
@@ -675,12 +821,12 @@ MODULE JavaUtil;
   PROCEDURE MkProcName*(proc : Id.Procs);
     VAR pNm : L.CharOpen;
 	res : Id.Procs;
-	scp : D.Scope;
+	scp : Sym.Scope;
 	bTp : Ty.Record;
   (* -------------------------------------------------- *)
-    PROCEDURE clsNmFromRec(typ : D.Type) : L.CharOpen;
+    PROCEDURE clsNmFromRec(typ : Sym.Type) : L.CharOpen;
     BEGIN
-      IF CompState.doCode & ~CompState.doJsmn THEN
+      IF Cst.doCode & ~Cst.doJsmn THEN
         RETURN typ(Ty.Record).xName;
       ELSE
         RETURN typ(Ty.Record).extrnNm;
@@ -697,7 +843,7 @@ MODULE JavaUtil;
     PROCEDURE GetClassName(pr : Id.PrcId; bl : Id.BlkId);
       VAR nm : L.CharOpen;
     BEGIN
-      nm := D.getName.ChPtr(pr);
+      nm := Sym.getName.ChPtr(pr);
       IF pr.bndType = NIL THEN	(* normal case  *)
         pr.clsNm := bl.xName;
         IF pr.prcNm = NIL THEN pr.prcNm := nm END;
@@ -714,7 +860,7 @@ MODULE JavaUtil;
   (* -------------------------------------------------- *)
     PROCEDURE MkPrcNm(prc : Id.PrcId);
       VAR res : Id.PrcId;
-	  scp : D.Scope;
+	  scp : Sym.Scope;
 	  blk : Id.BlkId;
 	  rTp : Ty.Record;
     BEGIN
@@ -728,16 +874,16 @@ MODULE JavaUtil;
         scp := prc.dfScp;
         WITH scp : Id.BlkId DO
             IF scp.xName = NIL THEN MkBlkName(scp) END;
-            IF  D.isFn IN scp.xAttr THEN
+            IF  Sym.isFn IN scp.xAttr THEN
               GetClassName(prc, scp);
             ELSE
               prc.clsNm := scp.xName;
-              IF prc.prcNm = NIL THEN prc.prcNm := D.getName.ChPtr(prc) END;
+              IF prc.prcNm = NIL THEN prc.prcNm := Sym.getName.ChPtr(prc) END;
             END;
         | scp : Id.Procs DO
             MkProcName(scp);
             prc.clsNm := className(scp);
-            prc.prcNm   := cat3(D.getName.ChPtr(prc), dlar, scp.prcNm);
+            prc.prcNm   := cat3(Sym.getName.ChPtr(prc), dlar, scp.prcNm);
         END;
         prc.scopeNm := scp.scopeNm;
       ELSE (* prc.kind = Id.ctorP *)
@@ -754,7 +900,7 @@ MODULE JavaUtil;
     PROCEDURE MkMthNm(mth : Id.MthId);
       VAR res : Id.MthId;
           scp : Id.BlkId;
-          typ : D.Type;
+          typ : Sym.Type;
     BEGIN
       IF mth.scopeNm # NIL THEN RETURN;
       ELSIF mth.kind = Id.fwdMth THEN
@@ -767,7 +913,7 @@ MODULE JavaUtil;
         IF scp.xName = NIL THEN MkBlkName(scp) END;
 
         mth.scopeNm := scp.scopeNm;
-        IF mth.prcNm = NIL THEN mth.prcNm := D.getName.ChPtr(mth) END;
+        IF mth.prcNm = NIL THEN mth.prcNm := Sym.getName.ChPtr(mth) END;
       END;
     END MkMthNm;
   (* -------------------------------------------------- *)
@@ -789,7 +935,7 @@ MODULE JavaUtil;
     * at least for foreign explicit names 
     *)
     IF typ.xName # NIL THEN RETURN END;
-    rNm := D.getName.ChPtr(typ.idnt);
+    rNm := Sym.getName.ChPtr(typ.idnt);
    (* 
     * old code --
     *  mNm := scopeName(typ.idnt.dfScp);
@@ -810,7 +956,7 @@ MODULE JavaUtil;
   BEGIN
     IF var.varNm # NIL THEN RETURN END;
     mod := var.dfScp(Id.BlkId);
-    var.varNm := D.getName.ChPtr(var);
+    var.varNm := Sym.getName.ChPtr(var);
     IF var.recTyp = NIL THEN	(* normal case *)
       var.clsNm := mod.xName;
     ELSE			(* static field *)
@@ -825,9 +971,9 @@ MODULE JavaUtil;
     VAR parId : Id.ParId;
 	index : INTEGER;
 	count : INTEGER;
-	retTp : D.Type;
+	retTp : Sym.Type;
    (* ----------------------------------------- *)
-    PROCEDURE AppendTypeName(VAR lst : L.CharOpenSeq; typ : D.Type);
+    PROCEDURE AppendTypeName(VAR lst : L.CharOpenSeq; typ : Sym.Type);
     BEGIN
       WITH typ : Ty.Base DO
 	  L.AppendCharOpen(lst, typ.xName);
@@ -841,7 +987,7 @@ MODULE JavaUtil;
 	  IF typ.xName = NIL THEN MkRecName(typ) END;
 	  L.AppendCharOpen(lst, typ.scopeNm);
       | typ : Ty.Enum DO
-	  AppendTypeName(lst, G.intTp);
+	  AppendTypeName(lst, Blt.intTp);
       | typ : Ty.Pointer DO
 	  AppendTypeName(lst, typ.boundTp);
       | typ : Ty.Opaque DO
@@ -854,7 +1000,7 @@ MODULE JavaUtil;
    (*
     *  The parameter numbering scheme tries to use the return
     *  value for the first OUT or VAR parameter.  The variable
-    *  hasRt, notes whether this possiblity has been used up. If
+    *  'hasRt' notes whether this possiblity has been used up. If
     *  this is a value returning function hasRt is true at entry.
     *)
     count := pIdn.rtsFram;
@@ -872,7 +1018,7 @@ MODULE JavaUtil;
     FOR index := 0 TO pTyp.formals.tide-1 DO
       parId := pTyp.formals.a[index];
       IF needsBox(parId) THEN
-	IF parId.parMod = D.var THEN (* pass value as well *)
+	IF parId.parMod = Sym.var THEN (* pass value as well *)
 	  parId.varOrd := count;
 	  INC(count, jvmSize(parId.type));
 	  AppendTypeName(fmArray, parId.type);
@@ -923,10 +1069,10 @@ MODULE JavaUtil;
   END NumberParams;
 
 (* ------------------------------------------------------------ *)
-
+(* Proxies are the local variables corresponding to boxed       *)
+(* arguments that are not also passed by value i.e. OUT mode.   *)
+(* ------------------------------------------------------------ *)
   PROCEDURE NumberProxies(pIdn : Id.Procs; IN pars : Id.ParSeq);
-  (* Proxies are the local variables corresponding to boxed	*)
-  (* arguments that are not also passed by value i.e. OUT mode. *)
     VAR parId : Id.ParId;
 	index : INTEGER;
   BEGIN
@@ -934,24 +1080,23 @@ MODULE JavaUtil;
     *  Allocate an activation record slot for the XHR,
     *  if this is needed.  The XHR reference will be local
     *  number pIdn.type.argN.
-    *)
+    * ------------------ *)
     IF Id.hasXHR IN pIdn.pAttr THEN MkXHR(pIdn); INC(pIdn.rtsFram) END;
-   (* ------------------ *)
     FOR index := 0 TO pars.tide-1 DO
       parId := pars.a[index];
-      IF parId.parMod # D.var THEN
-	IF needsBox(parId) THEN
-	  parId.varOrd := pIdn.rtsFram;
-	  INC(pIdn.rtsFram, jvmSize(parId.type));
-	END;
+      IF parId.parMod # Sym.var THEN
+        IF needsBox(parId) THEN
+          parId.varOrd := pIdn.rtsFram;
+          INC(pIdn.rtsFram, jvmSize(parId.type));
+        END;
       END;
     END;
   END NumberProxies;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE NumberLocals(pIdn : Id.Procs; IN locs : D.IdSeq);
-    VAR ident : D.Idnt;
+  PROCEDURE NumberLocals(pIdn : Id.Procs; IN locs : Sym.IdSeq);
+    VAR ident : Sym.Idnt;
 	index : INTEGER;
 	count : INTEGER;
   BEGIN
@@ -969,20 +1114,20 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE MkCallAttr*(pIdn : D.Idnt; pTyp : Ty.Procedure);
+  PROCEDURE MkCallAttr*(pIdn : Sym.Idnt; pTyp : Ty.Procedure);
   BEGIN
     WITH pIdn : Id.MthId DO
-	IF ~needsBox(pIdn.rcvFrm) THEN 
-	  pIdn.rtsFram := 1;	(* count one for "this" *)
-	ELSE
-	  pIdn.rtsFram := 2;	(* this plus the retbox *)
-	END;
-	MkProcName(pIdn);
-	NumberParams(pIdn, pTyp);
+      IF ~needsBox(pIdn.rcvFrm) THEN 
+        pIdn.rtsFram := 1;	(* count one for "this" *)
+      ELSE
+        pIdn.rtsFram := 2;	(* this plus the retbox *)
+      END;
+      MkProcName(pIdn);
+      NumberParams(pIdn, pTyp);
     | pIdn : Id.PrcId DO 
         pIdn.rtsFram := 0;
-	MkProcName(pIdn);
-	NumberParams(pIdn, pTyp);
+        MkProcName(pIdn);
+        NumberParams(pIdn, pTyp);
     END;
   END MkCallAttr;
 
@@ -1032,8 +1177,21 @@ MODULE JavaUtil;
   END RenumberLocals;
 
 (* ------------------------------------------------------------ *)
+(* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)LoadLocal*(ord : INTEGER; typ : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)MakeAndPushProcLitValue*(exp : Sym.Expr; typ : Ty.Procedure),NEW;
+    VAR singleton : Id.TypId;
+	    hostClass : Ty.Record;
+  BEGIN
+	MkProcTypeName(typ);
+	hostClass := newProcLitWrapperClass(exp, typ);
+	hostClass.baseTp := typ.hostClass;
+	jf.MkNewRecord(hostClass);
+  END MakeAndPushProcLitValue;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (jf : JavaFile)LoadLocal*(ord : INTEGER; typ : Sym.Type),NEW;
     VAR code : INTEGER;
   BEGIN
     IF (typ # NIL) & (typ IS Ty.Base) THEN 
@@ -1066,7 +1224,7 @@ MODULE JavaUtil;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE typeToChOpen(typ : D.Type) : L.CharOpen;
+  PROCEDURE typeToChOpen(typ : Sym.Type) : L.CharOpen;
    (* --------------------------------------------- *)
     PROCEDURE slashToDot(a : L.CharOpen) : L.CharOpen;
       VAR nw : L.CharOpen; ix : INTEGER; ch : CHAR;
@@ -1078,17 +1236,17 @@ MODULE JavaUtil;
       RETURN nw;
     END slashToDot;
    (* --------------------------------------------- *)
-    PROCEDURE typeTag(typ : D.Type) : L.CharOpen;
+    PROCEDURE typeTag(typ : Sym.Type) : L.CharOpen;
     BEGIN
       WITH typ : Ty.Base DO
           RETURN typ.xName;
       | typ : Ty.Array DO
           RETURN cat2(brac, typeTag(typ.elemTp));
       | typ : Ty.Record DO
-	  IF typ.xName = NIL THEN MkRecName(typ) END;
+          IF typ.xName = NIL THEN MkRecName(typ) END;
           RETURN slashToDot(typ.scopeNm);
       | typ : Ty.Enum DO
-          RETURN G.intTp.xName;
+          RETURN Blt.intTp.xName;
       | typ : Ty.Pointer DO
           RETURN typeTag(typ.boundTp);
       | typ : Ty.Opaque DO
@@ -1098,7 +1256,9 @@ MODULE JavaUtil;
     END typeTag;
    (* --------------------------------------------- *)
   BEGIN 
-    WITH typ : Ty.Array DO
+    WITH typ : Ty.Base DO
+	    RETURN typeTag(typ);
+	| typ : Ty.Array DO
         RETURN cat2(brac, typeTag(typ.elemTp));
     | typ : Ty.Record DO
 	IF typ.xName = NIL THEN MkRecName(typ) END;
@@ -1113,8 +1273,8 @@ MODULE JavaUtil;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)LoadType*(id : D.Idnt),NEW;
-    VAR tp : D.Type;
+  PROCEDURE (jf : JavaFile)LoadType*(id : Sym.Idnt),NEW;
+    VAR tp : Sym.Type;
   BEGIN
     ASSERT(id IS Id.TypId);
     tp := id.type;
@@ -1136,9 +1296,9 @@ MODULE JavaUtil;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)GetVar*(id : D.Idnt),NEW;
+  PROCEDURE (jf : JavaFile)GetVar*(id : Sym.Idnt),NEW;
     VAR var : Id.AbVar;
-        scp : D.Scope;
+        scp : Sym.Scope;
   BEGIN
     var := id(Id.AbVar);
     IF var.kind = Id.conId THEN
@@ -1155,7 +1315,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)StoreLocal*(ord : INTEGER; typ : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)StoreLocal*(ord : INTEGER; typ : Sym.Type),NEW;
     VAR code : INTEGER;
   BEGIN
     IF (typ # NIL) & (typ IS Ty.Base) THEN 
@@ -1188,9 +1348,9 @@ MODULE JavaUtil;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE (jf : JavaFile)PutVar*(id : D.Idnt),NEW;
+  PROCEDURE (jf : JavaFile)PutVar*(id : Sym.Idnt),NEW;
     VAR var : Id.AbVar;
-	scp : D.Scope;
+	scp : Sym.Scope;
   BEGIN
     var := id(Id.AbVar);
     scp := var.dfScp;
@@ -1203,7 +1363,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)PutElement*(typ : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)PutElement*(typ : Sym.Type),NEW;
     VAR code : INTEGER;
   BEGIN
     IF (typ # NIL) & (typ IS Ty.Base) THEN
@@ -1216,7 +1376,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)GetElement*(typ : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)GetElement*(typ : Sym.Type),NEW;
     VAR code : INTEGER;
   BEGIN
     IF (typ # NIL) & (typ IS Ty.Base) THEN
@@ -1322,7 +1482,7 @@ MODULE JavaUtil;
         clr := clr.dfScp(Id.Procs);
         IF Id.hasXHR IN clr.pAttr THEN 
 	  jf.PutGetF(Jvm.opc_getfield, 
-		CompState.rtsXHR.boundRecTp()(Ty.Record), CompState.xhrId);
+		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
         END;
       UNTIL clr.lxDepth = tgt.lxDepth;
     END;
@@ -1355,7 +1515,7 @@ MODULE JavaUtil;
       *)
       WHILE del > 1 DO
 	jf.PutGetF(Jvm.opc_getfield, 
-		CompState.rtsXHR.boundRecTp()(Ty.Record), CompState.xhrId);
+		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
         DEC(del);
       END;
      (*
@@ -1368,7 +1528,7 @@ MODULE JavaUtil;
 (* ------------------------------------------------------------ *)
 
   PROCEDURE (jf : JavaFile)PutGetX*(cde : INTEGER; var : Id.LocId),NEW;
-    VAR pTyp : D.Type;
+    VAR pTyp : Sym.Type;
   BEGIN
     pTyp := var.dfScp(Id.Procs).xhrType;
     jf.PutGetF(cde, pTyp.boundRecTp()(Ty.Record), var);
@@ -1398,7 +1558,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)ConvertUp*(inT, outT : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)ConvertUp*(inT, outT : Sym.Type),NEW;
    (* Conversion "up" is always safe at runtime. Many are nop.	*)
     VAR inB, outB, code : INTEGER;
   BEGIN
@@ -1424,7 +1584,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)ConvertDn*(inT, outT : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)ConvertDn*(inT, outT : Sym.Type),NEW;
    (* Conversion "down" often needs a runtime check. *)
     VAR inB, outB, code : INTEGER;
   BEGIN
@@ -1449,22 +1609,22 @@ MODULE JavaUtil;
 	ELSE  RETURN;				(* PREMATURE RETURN! *)
         END;
     | Ty.sIntN :
-	jf.ConvertDn(inT, G.intTp);
+	jf.ConvertDn(inT, Blt.intTp);
 	(* jf.RangeCheck(...); STILL TO DO *)
 	code := Jvm.opc_i2s;
     | Ty.uBytN :
-	jf.ConvertDn(inT, G.intTp);
+	jf.ConvertDn(inT, Blt.intTp);
 	(* jf.RangeCheck(...); STILL TO DO *)
         jf.PushInt(255);
 	code := Jvm.opc_iand;
     | Ty.byteN :
-	jf.ConvertDn(inT, G.intTp);
+	jf.ConvertDn(inT, Blt.intTp);
 	(* jf.RangeCheck(...); STILL TO DO *)
 	code := Jvm.opc_i2b;
     | Ty.setN  : 
-	jf.ConvertDn(inT, G.intTp); RETURN;	(* PREMATURE RETURN! *)
+	jf.ConvertDn(inT, Blt.intTp); RETURN;	(* PREMATURE RETURN! *)
     | Ty.charN, Ty.sChrN  : 
-	jf.ConvertDn(inT, G.intTp);
+	jf.ConvertDn(inT, Blt.intTp);
 	(* jf.RangeCheck(...); STILL TO DO *)
 	code := Jvm.opc_i2c;
     END;
@@ -1494,7 +1654,7 @@ MODULE JavaUtil;
     IF (min = loC) & (max = hiC) THEN	(* fully compact: just GOTO *)
       jf.CodeLb(Jvm.opc_goto, target);
     ELSE
-      jf.LoadLocal(var, G.intTp);
+      jf.LoadLocal(var, Blt.intTp);
       IF loC = hiC THEN (* a singleton *)
 	jf.PushInt(loC);
 	jf.CodeLb(Jvm.opc_if_icmpeq, target);
@@ -1507,7 +1667,7 @@ MODULE JavaUtil;
       ELSE				(* Shucks! The general case *)
 	jf.PushInt(loC);
 	jf.CodeLb(Jvm.opc_if_icmplt, def);
-	jf.LoadLocal(var, G.intTp);
+	jf.LoadLocal(var, Blt.intTp);
 	jf.PushInt(hiC);
 	jf.CodeLb(Jvm.opc_if_icmple, target);
       END;
@@ -1517,7 +1677,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)Return*(ret : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)Return*(ret : Sym.Type),NEW;
   BEGIN
     IF ret = NIL THEN
       jf.Code(Jvm.opc_return);
@@ -1547,7 +1707,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)FixOutPars*(pId : Id.Procs; OUT ret : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)FixOutPars*(pId : Id.Procs; OUT ret : Sym.Type),NEW;
     VAR frm : Ty.Procedure;
 	par : Id.ParId;
 	idx : INTEGER;
@@ -1588,7 +1748,7 @@ MODULE JavaUtil;
 
   PROCEDURE (jf : JavaFile)PushJunkAndReturn*(),NEW;
     VAR frm : Ty.Procedure;
-        ret : D.Type;
+        ret : Sym.Type;
         idx : INTEGER;
         par : Id.ParId;
   BEGIN
@@ -1631,7 +1791,7 @@ MODULE JavaUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)Init1dArray*(elTp : D.Type; leng : INTEGER),NEW;
+  PROCEDURE (jf : JavaFile)Init1dArray*(elTp : Sym.Type; leng : INTEGER),NEW;
     CONST inlineLimit = 4;
     VAR indx : INTEGER;
 	labl : Label;
@@ -1693,7 +1853,7 @@ MODULE JavaUtil;
 
 (* ============================================================ *)
 	
-  PROCEDURE (jf : JavaFile)InitNdArray*(desc : D.Type; elTp : D.Type),NEW;
+  PROCEDURE (jf : JavaFile)InitNdArray*(desc : Sym.Type; elTp : Sym.Type),NEW;
     VAR labl : Label;
   BEGIN
    (* ------------------------------------------------------ *
@@ -1764,7 +1924,7 @@ MODULE JavaUtil;
     VAR	local : INTEGER;
 	sTemp : INTEGER;
 	label : Label;
-	elTyp : D.Type;
+	elTyp : Sym.Type;
   BEGIN
    (*
     *    Stack at entry is (top) srcRef, dstRef...
@@ -1777,7 +1937,7 @@ MODULE JavaUtil;
     ELSE 
       jf.PushInt(typ.length);
     END;
-    jf.StoreLocal(local, G.intTp);
+    jf.StoreLocal(local, Blt.intTp);
    (*
     *      <get length>	; (top) n,rr,lr...
     *      store(n)	; (top) rr,lr...
@@ -1794,7 +1954,7 @@ MODULE JavaUtil;
     jf.DefLab(label);
     jf.Code(Jvm.opc_dup2);
     jf.CodeInc(local, -1);
-    jf.LoadLocal(local, G.intTp);
+    jf.LoadLocal(local, Blt.intTp);
     jf.Code(Jvm.opc_dup_x1);
    (*
     *    Assign the element
@@ -1819,7 +1979,7 @@ MODULE JavaUtil;
    (*
     *    stack is (top) rr,lr...
     *)
-    jf.LoadLocal(local, G.intTp);
+    jf.LoadLocal(local, Blt.intTp);
     jf.CodeLb(Jvm.opc_ifne, label);
     jf.Code(Jvm.opc_pop2);
     jf.ReleaseLocal(local);
@@ -1827,10 +1987,10 @@ MODULE JavaUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (jf : JavaFile)InitVars*(scp : D.Scope),NEW;
+  PROCEDURE (jf : JavaFile)InitVars*(scp : Sym.Scope),NEW;
     VAR index : INTEGER;
         xhrNo : INTEGER;
-	ident : D.Idnt;
+	ident : Sym.Idnt;
         scalr : BOOLEAN;
   BEGIN
     xhrNo := 0;
@@ -1846,7 +2006,7 @@ MODULE JavaUtil;
           jf.Code(Jvm.opc_dup);
           jf.Code(Jvm.opc_aload_0);
           jf.PutGetF(Jvm.opc_putfield, 
-		CompState.rtsXHR.boundRecTp()(Ty.Record), CompState.xhrId);
+		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
 	END;
         jf.StoreLocal(xhrNo, NIL);
       END;
@@ -1896,6 +2056,8 @@ MODULE JavaUtil;
 (* ============================================================ *)
 
 BEGIN
+  invokeHash := Hsh.enterStr("Invoke");
+
   L.InitCharOpenSeq(fmArray, 8);
   L.InitCharOpenSeq(nmArray, 8);
 
@@ -1969,6 +2131,8 @@ BEGIN
   typeGetE[ Ty.uBytN] := Jvm.opc_baload;
 
   semi := L.strToCharOpen(";"); 
+  comma := L.strToCharOpen(","); 
+  colon := L.strToCharOpen(":"); 
   lPar := L.strToCharOpen("("); 
   rPar := L.strToCharOpen(")"); 
   brac := L.strToCharOpen("["); 
@@ -1981,20 +2145,21 @@ BEGIN
   prfx := L.strToCharOpen(classPrefix); 
   xhrDl := L.strToCharOpen("XHR$");
   xhrMk := L.strToCharOpen("LCP/CPJrts/XHR;");
+  procLitPrefix := L.strToCharOpen("Proc$Lit$");
 
-  G.setTp.xName := L.strToCharOpen("I");
-  G.intTp.xName := L.strToCharOpen("I");
-  G.boolTp.xName := L.strToCharOpen("Z");
-  G.byteTp.xName := L.strToCharOpen("B");
-  G.uBytTp.xName := L.strToCharOpen("B");  (* same as BYTE *)
-  G.charTp.xName := L.strToCharOpen("C");
-  G.sChrTp.xName := L.strToCharOpen("C");
-  G.sIntTp.xName := L.strToCharOpen("S");
-  G.lIntTp.xName := L.strToCharOpen("J");
-  G.realTp.xName := L.strToCharOpen("D");
-  G.sReaTp.xName := L.strToCharOpen("F");
-  G.anyRec.xName := L.strToCharOpen("Ljava/lang/Object;");
-  G.anyPtr.xName := G.anyRec.xName;
+  Blt.setTp.xName := L.strToCharOpen("I");
+  Blt.intTp.xName := L.strToCharOpen("I");
+  Blt.boolTp.xName := L.strToCharOpen("Z");
+  Blt.byteTp.xName := L.strToCharOpen("B");
+  Blt.uBytTp.xName := L.strToCharOpen("B");  (* same as BYTE *)
+  Blt.charTp.xName := L.strToCharOpen("C");
+  Blt.sChrTp.xName := L.strToCharOpen("C");
+  Blt.sIntTp.xName := L.strToCharOpen("S");
+  Blt.lIntTp.xName := L.strToCharOpen("J");
+  Blt.realTp.xName := L.strToCharOpen("D");
+  Blt.sReaTp.xName := L.strToCharOpen("F");
+  Blt.anyRec.xName := L.strToCharOpen("Ljava/lang/Object;");
+  Blt.anyPtr.xName := Blt.anyRec.xName;
 END JavaUtil.
 (* ============================================================ *)
 (* ============================================================ *)

@@ -549,6 +549,9 @@ MODULE JsmnUtil;
     | typ : Ty.Vector DO
 	IF typ.xName = NIL THEN J.MkVecName(typ) END;
 	GPText.WriteString(os.file, typ.xName);
+	| typ : Ty.Procedure DO
+        IF typ.xName = NIL THEN J.MkProcTypeName(typ) END;
+        GPText.WriteString(os.file, typ.hostClass.scopeNm);
     | typ : Ty.Array DO
 	GPTextFiles.WriteChar(os.file, "[");
 	os.Type(typ.elemTp);

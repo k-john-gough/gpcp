@@ -14,16 +14,13 @@ MODULE JavaMaker;
         L := LitValue,
         CPascalS,
         FileNames,
-        CompState,
         ClassMaker,
         JavaBase,
-        GPBinFiles,
-        GPTextFiles,
-        Jvm := JVMcodes,
-        Ju  := JavaUtil,
-        (* JasminAsm, jasmin is no longer used! *)
         ClassUtil,
         JsmnUtil,
+        Cst := CompState,
+        Jvm := JVMcodes,
+        Ju  := JavaUtil,
         Bi := Builtin,
         Sy := Symbols,
         Id := IdDesc,
@@ -76,6 +73,18 @@ MODULE JavaMaker;
           * outF : Ju.JavaFile; 		*
           * --------------------------- *)
             recT : Ty.Record;
+          END;
+
+(* ------------------------------------ *)
+
+  TYPE JavaProcTypeEmitter* = 	
+        POINTER TO 
+          RECORD (JavaEmitter)
+         (* --------------------------- *
+          * mod* : Id.BlkId; 		*
+          * outF : Ju.JavaFile; 		*
+          * --------------------------- *)
+            prcT : Ty.Procedure;
           END;
 
 (* ------------------------------------ *)
@@ -153,8 +162,6 @@ MODULE JavaMaker;
 
   PROCEDURE (list : JavaWorkList)AddNewRecEmitter*(inTp : Ty.Record);
     VAR emit : JavaRecEmitter;
-        mNam : LitValue.CharOpen;
-        rNam : LitValue.CharOpen;
   BEGIN
     NEW(emit);
     emit.mod  := list.mod;
@@ -167,6 +174,23 @@ MODULE JavaMaker;
     *)
     Append(list, emit);
   END AddNewRecEmitter;
+
+(* ============================================================ *)
+
+  PROCEDURE (list : JavaWorkList)AddNewProcTypeEmitter*(inTp : Ty.Procedure);
+    VAR emit : JavaProcTypeEmitter;
+  BEGIN
+    NEW(emit);
+    emit.mod  := list.mod;
+   (*
+    *  Set the current record type for this class.
+    *)
+    emit.prcT := inTp;
+   (*
+    *  Now append the new RecEmitter to the worklist.
+    *)
+    Append(list, emit);
+  END AddNewProcTypeEmitter;
 
 (* ============================================================ *)
 (*  Mainline emitter, consumes worklist emitting assembler	*)
@@ -207,40 +231,40 @@ MODULE JavaMaker;
     *  Create import descriptor for java.lang
     *)
     Bi.MkDummyImport("java_lang", "java.lang", blk);
-	CompState.SetSysLib(blk);
+	Cst.SetSysLib(blk);
    (*
     *  Create various classes.
     *)
     Bi.MkDummyClass("Object", blk, Ty.isAbs, obj);
-    CompState.ntvObj := obj.type;
+    Cst.ntvObj := obj.type;
     Bi.MkDummyClass("String", blk, Ty.noAtt, str);
-    CompState.ntvStr := str.type;
+    Cst.ntvStr := str.type;
     Bi.MkDummyClass("Exception", blk, Ty.extns, exc);
-    CompState.ntvExc := exc.type;
+    Cst.ntvExc := exc.type;
     Bi.MkDummyClass("Class", blk, Ty.noAtt, cls);
-    CompState.ntvTyp := cls.type;
+    Cst.ntvTyp := cls.type;
    (*
     *  Create import descriptor for CP.RTS
     *)
     Bi.MkDummyImport("RTS", "", blk);
-    Bi.MkDummyAlias("NativeType", blk, cls.type, CompState.clsId);
-    Bi.MkDummyAlias("NativeObject", blk, obj.type, CompState.objId);
-    Bi.MkDummyAlias("NativeString", blk, str.type, CompState.strId);
-    Bi.MkDummyAlias("NativeException", blk, exc.type, CompState.excId);
+    Bi.MkDummyAlias("NativeType", blk, cls.type, Cst.clsId);
+    Bi.MkDummyAlias("NativeObject", blk, obj.type, Cst.objId);
+    Bi.MkDummyAlias("NativeString", blk, str.type, Cst.strId);
+    Bi.MkDummyAlias("NativeException", blk, exc.type, Cst.excId);
 
-    Bi.MkDummyVar("dblPosInfinity",blk,Bi.realTp,CompState.dblInf);
-    Bi.MkDummyVar("dblNegInfinity",blk,Bi.realTp,CompState.dblNInf);
-    Bi.MkDummyVar("fltPosInfinity",blk,Bi.sReaTp,CompState.fltInf);
-    Bi.MkDummyVar("fltNegInfinity",blk,Bi.sReaTp,CompState.fltNInf);
+    Bi.MkDummyVar("dblPosInfinity",blk,Bi.realTp,Cst.dblInf);
+    Bi.MkDummyVar("dblNegInfinity",blk,Bi.realTp,Cst.dblNInf);
+    Bi.MkDummyVar("fltPosInfinity",blk,Bi.sReaTp,Cst.fltInf);
+    Bi.MkDummyVar("fltNegInfinity",blk,Bi.sReaTp,Cst.fltNInf);
     INCL(blk.xAttr, Sy.need);
    (*
     *  Uplevel addressing stuff.
     *)
     Bi.MkDummyImport("$CPJrts$", "CP.CPJrts", blk);
     Bi.MkDummyClass("XHR", blk, Ty.isAbs, xhr);
-    CompState.rtsXHR := xhr.type;
-    CompState.xhrId.recTyp := CompState.rtsXHR;
-    CompState.xhrId.type   := CompState.rtsXHR;
+    Cst.rtsXHR := xhr.type;
+    Cst.xhrId.recTyp := Cst.rtsXHR;
+    Cst.xhrId.type   := Cst.rtsXHR;
   END Init;
 
 (* ============================================================ *)
@@ -250,29 +274,29 @@ MODULE JavaMaker;
         thePar : Id.ParId;
   BEGIN
 	NEW(prcSig);
-    prcSig.retType := CompState.strId.type;
+    prcSig.retType := Cst.strId.type;
     Id.InitParSeq(prcSig.formals, 2);
-    Bi.MkDummyMethodAndInsert("toString", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, Id.extns);
+    Bi.MkDummyMethodAndInsert("toString", prcSig, Cst.ntvObj, Cst.sysLib, Sy.pubMode, Sy.var, Id.extns);
 
 	NEW(prcSig);
     prcSig.retType := Bi.intTp;
     Id.InitParSeq(prcSig.formals, 2);
-    Bi.MkDummyMethodAndInsert("hashCode", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, Id.extns);
+    Bi.MkDummyMethodAndInsert("hashCode", prcSig, Cst.ntvObj, Cst.sysLib, Sy.pubMode, Sy.var, Id.extns);
 
 	NEW(prcSig);
-    prcSig.retType := CompState.ntvObj;
+    prcSig.retType := Cst.ntvObj;
     Id.InitParSeq(prcSig.formals, 2);
-    Bi.MkDummyMethodAndInsert("clone", prcSig, CompState.ntvObj, CompState.sysLib, Sy.protect, Sy.var, Id.extns);
+    Bi.MkDummyMethodAndInsert("clone", prcSig, Cst.ntvObj, Cst.sysLib, Sy.protect, Sy.var, Id.extns);
 
 	NEW(prcSig);
 	NEW(thePar);
     prcSig.retType := Bi.boolTp;
     Id.InitParSeq(prcSig.formals, 2);
 	thePar.parMod := Sy.val;
-	thePar.type := CompState.ntvObj;
+	thePar.type := Cst.ntvObj;
 	thePar.varOrd := 1;
 	Id.AppendParam(prcSig.formals, thePar);
-    Bi.MkDummyMethodAndInsert("equals", prcSig, CompState.ntvObj, CompState.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
+    Bi.MkDummyMethodAndInsert("equals", prcSig, Cst.ntvObj, Cst.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
   END ObjectFeatures;
 
 (* ============================================================ *)
@@ -280,8 +304,8 @@ MODULE JavaMaker;
     VAR ix : INTEGER;
   BEGIN
     IF asmList.tide > 0 THEN
-      CompState.Message("Jasmin Assmbler no longer supported");
-      CompState.Message("The following jasmin text files were created:");
+      Cst.Message("Jasmin Assmbler no longer supported");
+      Cst.Message("The following jasmin text files were created:");
       FOR ix := 0 TO asmList.tide-1 DO
         Console.Write(ASCII.HT); 
         Console.WriteString(asmList.a[ix]^);
@@ -325,7 +349,7 @@ MODULE JavaMaker;
     *) 
     IF (t.recT.baseTp # NIL) & 
        (t.recT.baseTp IS Ty.Record) & 
-       ~t.recT.baseTp.isAbsRecType() THEN
+       ~t.recT.baseTp.isNativeObj() THEN
       out.Code(Jvm.opc_aload_0);
       out.Code(Jvm.opc_aload_1);
       out.ValRecCopy(t.recT.baseTp(Ty.Record));
@@ -353,6 +377,34 @@ MODULE JavaMaker;
     END;
     out.VoidTail();
   END CopyProc;
+
+(* ============================================================ *)
+
+  PROCEDURE (this : JavaProcTypeEmitter)EmitBody(out : Ju.JavaFile);
+  (** Create the assembler for a class file for this proc-type wrapper. *)
+    VAR pType : Ty.Procedure; (* The procedure type that is being emitted *)
+	    proxy : Ty.Record;    (* The record that stands for the proc-type *)
+		invoke : Id.MthId;    (* The abstract invoke method for this      *)
+  BEGIN
+    pType := this.prcT;
+	proxy := pType.hostClass;
+	proxy.idnt := pType.idnt;
+	proxy.recAtt := Ty.isAbs;
+	out.StartRecClass(proxy);
+
+   (* Emit the no-arg constructor *) 
+	out.RecMakeInit(proxy, NIL);
+	out.CallSuperCtor(proxy, NIL);
+	out.VoidTail();
+
+   (* Emit the abstract Invoke method *)
+    invoke := Ju.getProcVarInvoke(pType);
+	Ju.MkProcName(invoke);
+	Ju.RenumberLocals(invoke);
+	out.theP := invoke;
+	out.StartProc(invoke);
+	out.EndProc();
+  END EmitBody;
 
 (* ============================================================ *)
 
@@ -439,6 +491,10 @@ MODULE JavaMaker;
       ident  := record.methods.a[index];
       method := ident(Id.MthId);
       IF method.kind = Id.conMth THEN
+	    IF method.scopeNm = NIL THEN
+		  Ju.MkProcName(method);
+		  Ju.RenumberLocals(method);
+		END;
         this.EmitProc(method)
       END;
     END;
@@ -451,7 +507,7 @@ MODULE JavaMaker;
     VAR index : INTEGER;
         objIx : INTEGER;
         proc  : Id.Procs;
-        recT  : Sy.Type;
+        type  : Sy.Type;
         varId : Id.VarId;
         returned : BOOLEAN;
   BEGIN
@@ -475,6 +531,19 @@ MODULE JavaMaker;
       varId := this.mod.locals.a[index](Id.VarId);
       out.EmitField(varId);  
     END;
+	(*
+	FOR index := 0 TO this.mod.procs.tide-1 DO
+     (*
+      *  Create the mangled name for all non-forward procedures
+      *)
+      proc := this.mod.procs.a[index];
+      IF (proc.kind = Id.conPrc) OR 
+         (proc.kind = Id.conMth) THEN
+        Ju.MkProcName(proc);
+        Ju.RenumberLocals(proc);
+      END;
+    END;
+	*)
    (* 
     *  Do all the procs, including <init> and <clinit> 
     *)
@@ -510,10 +579,17 @@ MODULE JavaMaker;
     END;
    (* 
     *  And now, just in case exported types have been missed ...
+	*  For example, if they are unreferenced in this module.
     *)
     FOR index := 0 TO this.mod.expRecs.tide-1 DO
-      recT := this.mod.expRecs.a[index];
-      IF recT.xName = NIL THEN Ju.MkRecName(recT(Ty.Record)) END;
+      type := this.mod.expRecs.a[index];
+      IF type.xName = NIL THEN 
+	    WITH type : Ty.Record DO
+		  Ju.MkRecName(type);
+		| type : Ty.Procedure DO
+		  Ju.MkProcTypeName(type);
+		END;
+	  END;
     END;
   END EmitBody;
 
@@ -531,11 +607,13 @@ MODULE JavaMaker;
     *  directly.  The -jasmin option writes a jasmin output file
     *  but does not call the (now unavailable) assembler.
     *)
-    IF CompState.doCode & ~CompState.doJsmn THEN
+    IF Cst.doCode & ~Cst.doJsmn THEN
       WITH this : JavaModEmitter DO
           L.ToStr(this.mod.xName, fileName);
       | this : JavaRecEmitter DO
           L.ToStr(this.recT.xName, fileName);
+      | this : JavaProcTypeEmitter DO
+          L.ToStr(this.prcT.xName, fileName);
       END;
       fileName := fileName + ".class";
       cf := ClassUtil.newClassFile(fileName);
@@ -545,6 +623,8 @@ MODULE JavaMaker;
           Sy.getName.Of(this.mod, fileName);
       | this : JavaRecEmitter DO
           FileNames.StripUpToLast("/", this.recT.xName, fileName);
+	  | this : JavaProcTypeEmitter DO
+	      FileNames.StripUpToLast("/", this.prcT.xName, fileName);
       END;
       fileName := fileName + ".j";
       jf := JsmnUtil.newJsmnFile(fileName);
@@ -560,8 +640,8 @@ MODULE JavaMaker;
       Error.WriteLn;
       RETURN;
     ELSE
-      IF CompState.verbose THEN CompState.Message("Created "+ fileName) END;
-      this.outF.Header(CompState.srcNam);
+      IF Cst.verbose THEN Cst.Message("Created "+ fileName) END;
+      this.outF.Header(Cst.srcNam);
       this.EmitBody(this.outF);
       this.outF.Dump();
     END; 
@@ -1531,7 +1611,7 @@ MODULE JavaMaker;
     out := e.outF;
     WITH exp : Xp.IdLeaf DO
         IF exp.isProcLit() THEN
-          ASSERT(FALSE);
+          out.MakeAndPushProcLitValue(exp, typ(Ty.Procedure));
         ELSIF exp.kind = Xp.typOf THEN
           out.LoadType(exp.ident);
         ELSE
@@ -1594,15 +1674,15 @@ MODULE JavaMaker;
             END;
         | Xp.infLt  :
             IF typ = Bi.realTp THEN
-              out.GetVar(CompState.dblInf);
+              out.GetVar(Cst.dblInf);
             ELSE
-              out.GetVar(CompState.fltInf);
+              out.GetVar(Cst.fltInf);
             END;
         | Xp.nInfLt :
             IF typ = Bi.realTp THEN
-              out.GetVar(CompState.dblNInf);
+              out.GetVar(Cst.dblNInf);
             ELSE
-              out.GetVar(CompState.fltNInf);
+              out.GetVar(Cst.fltNInf);
             END;
         END;
     | exp : Xp.CallX DO
@@ -1806,36 +1886,42 @@ MODULE JavaMaker;
         prcI : Id.PrcId;
         mthI : Id.MthId;
   BEGIN
-    WITH exp : Xp.IdLeaf DO (* qualid *)
-        prcI := exp.ident(Id.PrcId);
-        IF prcI.kind = Id.ctorP THEN
-          code := Jvm.opc_invokespecial;
-        ELSE
-          code := Jvm.opc_invokestatic;
-        END;
-        e.outF.CallIT(code, prcI, typ);
-    | exp : Xp.IdentX DO (* selct *)
-        mthI := exp.ident(Id.MthId);
-        IF exp.kind = Xp.sprMrk THEN 
-          code := Jvm.opc_invokespecial;
-        ELSIF mthI.bndType.isInterfaceType() THEN
-          code := Jvm.opc_invokeinterface;
-        ELSE 
-          code := Jvm.opc_invokevirtual;
-        END;
-        e.outF.CallIT(code, mthI, typ);
-        IF Id.covar IN mthI.mthAtt THEN
-          e.outF.CodeT(Jvm.opc_checkcast, typ.retType);
-        END;
+    IF exp.isProcVar() THEN
+	  mthI := Ju.getProcVarInvoke(exp.type(Ty.Procedure));
+	  code := Jvm.opc_invokevirtual;
+	  e.outF.CallIT(code, mthI, typ);
+	ELSE
+      WITH exp : Xp.IdLeaf DO (* qualid *)
+          prcI := exp.ident(Id.PrcId);
+          IF prcI.kind = Id.ctorP THEN
+            code := Jvm.opc_invokespecial;
+          ELSE
+            code := Jvm.opc_invokestatic;
+          END;
+          e.outF.CallIT(code, prcI, typ);
+      | exp : Xp.IdentX DO (* selct *)
+          mthI := exp.ident(Id.MthId);
+          IF exp.kind = Xp.sprMrk THEN 
+            code := Jvm.opc_invokespecial;
+          ELSIF mthI.bndType.isInterfaceType() THEN
+            code := Jvm.opc_invokeinterface;
+          ELSE 
+            code := Jvm.opc_invokevirtual;
+          END;
+          e.outF.CallIT(code, mthI, typ);
+          IF Id.covar IN mthI.mthAtt THEN
+            e.outF.CodeT(Jvm.opc_checkcast, typ.retType);
+		  END;
+      END;
     END;
   END Invoke;
 
 (* ---------------------------------------------------- *)
 
   PROCEDURE (e : JavaEmitter)PushAndGetReturn(act : Sy.Expr;
-        					typ : Sy.Type;
-        			            OUT ret : Sy.Expr),NEW;
-   (* ------------------------- *)
+                                              typ : Sy.Type;
+                                          OUT ret : Sy.Expr),NEW;
+   (* ----------------------------------------- *)
     VAR out   : Ju.JavaFile;
         local : INTEGER;
         recXp : Sy.Expr;
@@ -1979,9 +2065,6 @@ MODULE JavaMaker;
       e.StringCopy(act, frm.type(Ty.Array));    (* special string case	*)
     ELSIF (frm.parMod = Sy.val) &
           ((frm.type IS Ty.Record) OR 
-(*
-           (frm.type IS Ty.Array)) THEN		(* value-par copy case	*)
- *)
 (* #### *)
            ((frm.type IS Ty.Array) & (frm.type.kind # Ty.vecTp))) THEN
 (* #### *)
@@ -2012,39 +2095,47 @@ MODULE JavaMaker;
   END CopyOut;
 
 (* ============================================================ *)
-(*    Possible structures of procedure call expressions are:	*)
+(*    Possible structures of procedure call expressions are:    *)
 (* ============================================================ *)
-(*	    o				    o			*)
-(*   	   /			   	   /			*)
-(*	[CallX] 			[CallX] 		*)
-(*	 / +--- actuals --> ...          / +--- actuals 	*)
-(*	/				/			*)
-(*    [IdentX]			    [IdLeaf]			*)
-(*      /  +--- ident ---> [Procs]      +--- ident ---> [PrcId]	*)
-(*     /							*)
-(* kid expr							*)
-(*								*)
+(*          o                               o                   *)
+(*         /                               /                    *)
+(*      [CallX]                         [CallX]                 *)
+(*       / +--- actuals --> ...          / +--- actuals         *)
+(*      /                               /                       *)
+(*    [IdentX]                      [IdLeaf]                    *)
+(*      /  +--- ident ---> [Procs]      +--- ident ---> [Procs] *)
+(*     /                                                        *)
+(* kid expr                                                     *)
+(*                                                              *)
 (* ============================================================ *)
-(*  only the right hand case can be a standard proc or function	*)
+(*  only the right hand case can be a standard proc or function *)
 (* ============================================================ *)
 
   PROCEDURE (e : JavaEmitter)PushCall(callX : Xp.CallX),NEW;
     VAR jFile : Ju.JavaFile;
-        mark0 : INTEGER;	(* local ord limit on entry *)
-        tide0 : INTEGER;	(* parameter tide on entry  *)
-        index : INTEGER;	(* just a counter for loops *)
-        formT : Ty.Procedure;	(* formal type of procedure *)
-        formP : Id.ParId;	(* current formal parameter *)
+        mark0 : INTEGER;	  (* local ord limit on entry *)
+        tide0 : INTEGER;	  (* parameter tide on entry  *)
+        index : INTEGER;	  (* just a counter for loops *)
+		prVar : BOOLEAN;      (* Procedure variable call  *)
+        formT : Ty.Procedure; (* formal type of procedure *)
+        formP : Id.ParId;	  (* current formal parameter *)
         prExp : Sy.Expr;
         idExp : Xp.IdentX;
  (* ---------------------------------------------------- *)
     PROCEDURE CheckCall(expr : Sy.Expr; pTyp : Ty.Procedure);
       VAR prcI : Id.PrcId;
           mthI : Id.MthId;
+		  idnt : Sy.Idnt;
     BEGIN
       WITH expr : Xp.IdLeaf DO (* qualid *)
-          prcI := expr.ident(Id.PrcId);
-          IF pTyp.xName = NIL THEN Ju.MkCallAttr(prcI, pTyp) END;
+	    idnt := expr.ident;
+	    WITH idnt : Id.PrcId DO
+            (* prcI := expr.ident(Id.PrcId); *)
+            IF pTyp.xName = NIL THEN Ju.MkCallAttr(idnt, pTyp) END;
+		| idnt : Id.AbVar DO
+		    mthI := Ju.getProcVarInvoke(pTyp);
+		    IF mthI.type.xName = NIL THEN Ju.MkCallAttr(mthI, mthI.type(Ty.Procedure)) END;
+		END;
       | expr : Xp.IdentX DO (* selct *)
           mthI := expr.ident(Id.MthId);
           IF pTyp.xName = NIL THEN Ju.MkCallAttr(mthI, pTyp) END;
@@ -2067,11 +2158,15 @@ MODULE JavaMaker;
     *  the formal-type name is computed, and the first
     *  out-value is moved to the return-slot, if possible.
     *)
-    CheckCall(prExp, formT);
+	prVar := prExp.isProcVar();
+	CheckCall(prExp, formT);
    (*
     *  We must first deal with the receiver if this is a method.
     *)
-    IF formT.receiver # NIL THEN
+	IF prVar THEN
+	  e.PushValue(prExp, prExp.type);
+	  formT := Ju.getProcVarInvoke(formT).type(Ty.Procedure);
+    ELSIF formT.receiver # NIL THEN
       idExp := prExp(Xp.IdentX);
       formP := idExp.ident(Id.MthId).rcvFrm;
       e.PushArg(idExp.kid, formP, callX.actuals);
@@ -2180,7 +2275,7 @@ MODULE JavaMaker;
           out.Trap(fMsg + LitValue.intToCharOpen(numL)^);
         ELSE
           numL := callX.token.lin;
-          out.Trap(fMsg + CompState.srcNam +":"+ LitValue.intToCharOpen(numL)^);
+          out.Trap(fMsg + Cst.srcNam +":"+ LitValue.intToCharOpen(numL)^);
         END;
         out.DefLab(okLb);
    (* --------------------------- *)
@@ -2210,16 +2305,6 @@ MODULE JavaMaker;
             ELSE
               e.PushValue(arg0, dstT);
             END;
-(*
- *	    IF (argX.kind = Xp.numLt) & ~long & arg0.ident.isLocalVar() THEN
- *   	      numL := arg0.ident(Id.LocId).varOrd;
- *	      incr := intValue(argX);
- *	      IF pOrd = Bi.decP THEN incr := -incr END;
- *	      IncByLit(out, numL, incr); RETURN;	(* PREMATURE EXIT *)
- *	    ELSE
- *	      e.PushValue(arg0, dstT);
- *	    END;
- *)
         | arg0 : Xp.IdentX DO
             flId := arg0.ident(Id.FldId);
             out.Code(Jvm.opc_dup);	(* handle is one slot only *)
@@ -2316,9 +2401,6 @@ MODULE JavaMaker;
         out.LoadLocal(vRef, NIL);
         out.GetVecArr(dstT);
         out.LoadLocal(tide, Bi.intTp);
-(*
- *      e.PushValue(argX, argX.type);
- *)
         e.ValueCopy(argX, dstT);
         out.PutVecElement(dstT);
         out.LoadLocal(vRef, NIL);
@@ -2356,23 +2438,6 @@ MODULE JavaMaker;
             out.PutGetF(Jvm.opc_getfield, 
         		arg0.kid.type(Ty.Record), arg0.ident(Id.FldId));
         END;
-(*
- *      IF arg0 IS Xp.IdLeaf THEN
- *	  e.PushValue(arg0, dstT);
- *	ELSE
- *	  e.PushHandle(arg0, dstT);
- *	  WITH arg0 : Xp.BinaryX DO
- *	      ASSERT(arg0.kind = Xp.index);
- *	      out.Code(Jvm.opc_dup2);
- *	      out.GetElement(dstT);
- *	  | arg0 : Xp.IdentX DO
- *	      ASSERT(arg0.kind = Xp.selct);
- *	      out.Code(Jvm.opc_dup);
- *	      out.PutGetF(Jvm.opc_getfield, 
- *			arg0.kid.type(Ty.Record), arg0.ident(Id.FldId));
- *	  END;
- *	END;
- *)
         IF argX.kind = Xp.numLt THEN
           out.PushInt(ORD({intValue(argX)}));
         ELSE
@@ -2395,13 +2460,13 @@ MODULE JavaMaker;
         out.PushJunkAndReturn();
    (* --------------------------- *)
     | Bi.throwP :
-        IF CompState.ntvExc.assignCompat(arg0) THEN
-          e.PushValue(arg0, CompState.ntvExc);
+        IF Cst.ntvExc.assignCompat(arg0) THEN
+          e.PushValue(arg0, Cst.ntvExc);
           out.Code(Jvm.opc_athrow);
         ELSE
           out.MkNewException();
           out.Code(Jvm.opc_dup);
-          e.PushValue(arg0, CompState.ntvStr);
+          e.PushValue(arg0, Cst.ntvStr);
           out.InitException();
           out.Code(Jvm.opc_athrow);
         END;
