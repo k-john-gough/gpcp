@@ -60,8 +60,8 @@ MODULE GPCPcopyright;
     W("GARDENS POINT COMPONENT PASCAL");
     W("The files which import this module constitute a compiler");
     W("for the programming language Component Pascal.");
-    W("Copyright (c) 1998 -- 2010 K John Gough.");
-    W("Copyright (c) 2000 -- 2010 Queensland University of Technology.");
+    W("Copyright (c) 1998 -- 2012 K John Gough.");
+    W("Copyright (c) 2000 -- 2012 Queensland University of Technology.");
     Console.WriteLn;
 
     W("This program is free software; you can redistribute it and/or modify");
