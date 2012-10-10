@@ -2867,7 +2867,24 @@ MODULE ExprDesc;
     lHash := lQual.ident.hash;
     tmp.hash := lHash;
     tmp.type := rQual.ident.type;
-    tmp.SetKind(I.conId);     (* mark immutable *)
+   (* 
+    *  It is an essential requirement of the host execution systems
+    *  that the runtime type of the guarded variable may not be changed
+    *  within the guarded region.  In the case of pointer to record
+    *  types this is guaranteed by making the "tmp" copy immutable.
+    *  Note that making the pointer variable read-only does not prevent
+    *  the guarded region from mutating fields of the record.
+    *
+    *  In case that the guarded variable is an extensible record type.
+    *  no action is required.  Any attempt to perform an entire
+    *  assignment that changes the type of the guarded variable 
+    *  will be a type-error.
+    *  For an attempted widening ...
+    *    Error 83 (Expression not assignment compatible with destination), OR
+    *  For an attempted narrowing ...
+    *    Error 143 (Cannot assign entire extensible or abstract record). 
+    *)
+    IF ~tmp.type.isRecordType() THEN tmp.SetKind(I.conId) END; (* mark immutable *)
     oldI := tmp.dfScp.symTb.lookup(lHash);
     IF oldI = NIL THEN (* not local *)
       junk := tmp.dfScp.symTb.enter(lHash, tmp);
