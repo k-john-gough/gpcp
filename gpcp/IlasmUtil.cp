@@ -1070,7 +1070,7 @@ MODULE IlasmUtil;
     VAR nam : ARRAY 64 OF CHAR;
   BEGIN
     os.Prefix(code);
-    RTS.RealToStr(real, nam);
+    RTS.RealToStrInvar(real, nam);
     os.Tstring(nam$);
     os.Suffix(code);
   END CodeR;
