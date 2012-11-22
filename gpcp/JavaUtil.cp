@@ -717,6 +717,10 @@ MODULE JavaUtil;
    (* ###################################### *)
     IF typ.xName # NIL THEN RETURN END;
    (* ###################################### *)
+    IF typ.idnt = NIL THEN              (* Anonymous procedure type *)
+      typ.idnt := Id.newAnonId(typ.serial);
+      typ.idnt.type := typ;
+    END;
 	tIdent := typ.idnt;
     IF tIdent.dfScp = NIL THEN tIdent.dfScp := Cst.thisMod END;
 	NEW(hostTp);
