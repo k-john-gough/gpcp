@@ -12,7 +12,7 @@ MODULE Target;
 	ClassMaker,
 	JavaMaker,
 (*
- *	DCodeMaker,
+ *	LlvmMaker,
  *)
 	MsilMaker,
 	IdDesc;
@@ -37,15 +37,17 @@ MODULE Target;
       assmb := MsilMaker.newMsilAsm();
       Symbols.SetTargetIsNET(TRUE);
 (*
- *  ELSIF str = "dcf" THEN
- *    maker := DCodeMaker.newDCodeEmitter(mod);		(* write DCode	*)
- *    assmb := DCodeMaker.newDCodeAsm();		(* call dgen	*)
+ *   (* LLVM backend coming in 2013? *)
+ *  ELSIF str = "llvm" THEN 
+ *    maker := LlvmMaker.newBitCodeEmitter(mod);
+ *    assmb := LlvmMaker.newBitCodeAssembler();
+ *    Symbols.SetTargetIsNET(FALSE);
  *  ELSIF ...
  *)
     ELSE
       CompState.Message("Unknown emitter name <" + str + ">");
     END;
-	CompState.SetEmitter(maker);
+    CompState.SetEmitter(maker);
   END Select;
 
 (* ============================================================ *)

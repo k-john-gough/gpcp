@@ -24,7 +24,7 @@ MODULE Builtin;
       chrP*  =  5; entP*  =  6; lenP*  =  7; longP* =  8; 
       maxP*  =  9; minP*  = 10; oddP*  = 11; ordP*  = 12; 
       shrtP* = 13; sizeP* = 14; mStrP* = 15; tpOfP* = 16;
-      boxP*  = 17; uBytP* = 18; 
+      boxP*  = 17; uBytP* = 18; lshP*  = 19; rotP*  = 20;
 	(* Builtin Proper Procedures				*)
       asrtP* = 21; decP*  = 22; incP*  = 23; inclP* = 24; 
       exclP* = 25; haltP* = 26; newP*  = 27; throwP*= 28;
@@ -95,6 +95,8 @@ MODULE Builtin;
       adrPd-  : Symbols.Idnt;	(* ident descriptor of ADR      *)
       getPd-  : Symbols.Idnt;	(* ident descriptor of GET      *)
       putPd-  : Symbols.Idnt;	(* ident descriptor of PUT      *)
+	  lshPd-  : Symbols.Idnt;	(* ident descriptor of LSH	*)
+      rotPd-  : Symbols.Idnt;	(* ident descriptor of ROT	*)
 	(* Builtin Proper Procedures				*)
       asrtPd- : Symbols.Idnt;	(* ident descriptor of ASSERT	*)
       decPd-  : Symbols.Idnt;	(* ident descriptor of DEC	*)
@@ -387,6 +389,8 @@ MODULE Builtin;
 
     BindName(absPd,  "ABS");
     BindName(ashPd,  "ASH");
+    BindName(lshPd,  "LSH");
+    BindName(rotPd,  "ROT");
     BindName(bitsPd, "BITS");
     BindName(capPd,  "CAP");
     BindName(chrPd,  "CHR");
@@ -460,6 +464,8 @@ MODULE Builtin;
 
     StdFunc(absP,  absPd);
     StdFunc(ashP,  ashPd);
+    StdFunc(lshP,  lshPd);
+    StdFunc(rotP,  rotPd);
     StdFunc(bitsP, bitsPd);
     StdFunc(capP,  capPd);
     StdFunc(chrP,  chrPd);

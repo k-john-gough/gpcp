@@ -1430,6 +1430,9 @@ MODULE MsilMaker;
         tpLb : Mu.Label;
         rpTp : Sy.Type;
         elTp : Sy.Type;
+		rtSz : INTEGER;
+		ixSv : INTEGER;
+		hstT : Sy.Type;
   BEGIN
     out := e.outF;
     lOp := exp.lKid;
@@ -1454,7 +1457,7 @@ MODULE MsilMaker;
           ELSIF rpTp = Bi.anyPtr THEN
             out.CodeT(Asm.opc_castclass, dst);
           ELSE
-            out.ConvertDn(rpTp, dst);
+            out.ConvertDn(rpTp, dst, out.proc.prId.ovfChk);
           END;
         END;
        (*
@@ -1717,18 +1720,21 @@ MODULE MsilMaker;
         out.Code(Asm.opc_ldnull);
         out.Code(Asm.opc_cgt_un);
     (* -------------------------------- *)
-    | Xp.ashInt :
+    | Xp.ashInt, Xp.lshInt:
         e.PushValue(lOp, lOp.type);
         IF rOp.kind = Xp.numLt THEN
           indx := intValue(rOp);
           IF indx = 0 THEN (* skip *)
-          ELSIF indx < 0 THEN
-            out.PushInt(-indx);
-            out.Code(Asm.opc_shr);
-          ELSE
+		  ELSIF indx > 0 THEN
             out.PushInt(indx);
             out.Code(Asm.opc_shl);
-          END;
+          ELSIF exp.kind = Xp.ashInt THEN
+            out.PushInt(-indx);
+            out.Code(Asm.opc_shr);
+		  ELSE (* ==> exp.kind = lshInt *)
+            out.PushInt(-indx);
+            out.Code(Asm.opc_shr_un);
+		  END;
         ELSE
           tpLb := out.newLabel();
           exLb := out.newLabel();
@@ -1750,8 +1756,84 @@ MODULE MsilMaker;
           *)
           out.DefLab(tpLb);
           out.Code(Asm.opc_neg);
-          out.Code(Asm.opc_shr);
+		  IF exp.kind = Xp.ashInt THEN
+            out.Code(Asm.opc_shr);
+		  ELSE (* ==> exp.kind = lshInt *)
+            out.Code(Asm.opc_shr_un);
+		  END;
           out.DefLab(exLb);
+        END;
+    (* -------------------------------- *)
+    | Xp.rotInt:
+        e.PushValue(lOp, lOp.type);
+	   (* Convert TOS value to unsigned *)
+	    hstT := Bi.intTp;
+		IF (lOp.type = Bi.sIntTp) THEN 
+		  rtSz := 16;
+		  out.Code(Asm.opc_conv_u2);
+		ELSIF (lOp.type = Bi.byteTp) OR (lOp.type = Bi.uBytTp) THEN
+		  rtSz := 8;
+		  out.Code(Asm.opc_conv_u1);
+		ELSIF lOp.type = Bi.lIntTp THEN
+		  rtSz := 64;
+		  hstT := Bi.lIntTp;
+		ELSE
+		  rtSz := 32;
+		  (* out.Code(Asm.opc_conv_u4); *)
+		END;
+		
+        IF rOp.kind = Xp.numLt THEN
+		  indx := intValue(rOp) MOD rtSz;
+          IF indx = 0 THEN  (* skip *)
+		  ELSE (* 
+		    *  Rotation is achieved by means of the identity
+			*  Forall 0 <= n < rtSz: 
+			*    ROT(a, n) = LSH(a,n) bitwiseOR LSH(a,n-rtSz);
+			*)
+			temp := out.proc.newLocal(hstT);
+			out.Code(Asm.opc_dup);
+			out.PushInt(indx);
+			out.Code(Asm.opc_shl);
+			out.StoreLocal(temp);
+			out.PushInt(rtSz - indx);
+			out.Code(Asm.opc_shr_un);
+			out.PushLocal(temp);
+			out.Code(Asm.opc_or);
+			out.proc.ReleaseLocal(temp);
+          END;
+		  out.ConvertDn(hstT, lOp.type, FALSE);
+		ELSE
+         (*
+          *  This is a variable rotate.
+		  *
+		  *  Note that in the case of a short left operand the value
+		  *  on the stack has been converted to unsigned.  The value is
+		  *  saved as a int (rather than a shorter type) so that the 
+		  *  value does not get sign extended on each new load, 
+		  *  necessitating a new conversion each time.
+          *)
+		  temp := out.proc.newLocal(hstT);
+		  ixSv := out.proc.newLocal(Bi.intTp);
+		  out.Code(Asm.opc_dup);         (* TOS: lOp, lOp, ...               *)
+		  out.StoreLocal(temp);          (* TOS: lOp, ...                    *)
+          e.PushValue(rOp, rOp.type);    (* TOS: rOp, lOp, ...               *)
+		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
+          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_dup);         (* TOS: rOp', rOp', lOp, ...        *)
+		  out.StoreLocal(ixSv);          (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_shl);         (* TOS: lRz, ...    (left fragment) *)
+		  out.PushLocal(temp);           (* TOS: lOp, lRz, ...               *)
+		  out.PushInt(rtSz);             (* TOS: 32, lOp, lRz, ...           *)
+		  out.PushLocal(ixSv);           (* TOS: rOp', 32, lOp, lRz, ...     *)
+		  out.Code(Asm.opc_sub);         (* TOS: rOp'', lOp, lRz, ...        *)
+	     (* mask the shift amount in case idx = 0 *)
+		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
+          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_shr_un);      (* TOS: rRz, lRz, ...               *)
+		  out.Code(Asm.opc_or);          (* TOS: ROT(lOp,rOp), ...           *)
+		  out.proc.ReleaseLocal(ixSv);
+		  out.proc.ReleaseLocal(temp);
+		  out.ConvertDn(hstT, lOp.type, FALSE);
         END;
     (* -------------------------------- *)
     | Xp.strCat :
@@ -1881,7 +1963,7 @@ MODULE MsilMaker;
           IF exp.kind = Xp.cvrtUp THEN
             out.ConvertUp(exp.kid.type, typ);
           ELSIF exp.kind = Xp.cvrtDn THEN
-            out.ConvertDn(exp.kid.type, typ);
+            out.ConvertDn(exp.kid.type, typ, out.proc.prId.ovfChk);
           END;
         END;
     | exp : Xp.UnaryX DO

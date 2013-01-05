@@ -645,7 +645,7 @@ BEGIN
 	dl[opc_fneg]		:= 0;
 	dl[opc_dneg]		:= 0;
 	dl[opc_ishl]		:= -1;
-	dl[opc_lshl]		:= -2;
+	dl[opc_lshl]		:= -1;
 	dl[opc_ishr]		:= -1;
 	dl[opc_lshr]		:= -1;
 	dl[opc_iushr]		:= -1;

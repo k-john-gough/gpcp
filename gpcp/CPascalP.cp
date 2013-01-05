@@ -371,7 +371,7 @@ VAR
       IF G.verbose THEN G.Message("contains CPmain entry point") END;
       INCL(modScope.xAttr, Sy.cMain); (* Console Main *)
     ELSIF ident.hash = NameHash.winMain THEN
-      modScope.main := TRUE;      (* the import is "CPmain" *)
+      modScope.main := TRUE;      (* the import is "WinMain" *)
       INCL(modScope.xAttr, Sy.wMain); (* Windows Main *)
       IF G.verbose THEN G.Message("contains WinMain entry point") END;
     ELSIF ident.hash = NameHash.staBkt THEN
@@ -2474,7 +2474,11 @@ END;
    (* --------------------------- *)
     PROCEDURE isPrivate(t : Sy.Type) : BOOLEAN;
     BEGIN
-      RETURN ~(t IS Ty.Base) & (t.idnt.vMod = Sy.prvMode);
+      WITH t : Ty.Array DO
+	    RETURN isPrivate(t.elemTp);
+      ELSE 
+        RETURN ~(t IS Ty.Base) & (t.idnt.vMod = Sy.prvMode);
+      END;
     END isPrivate;
    (* --------------------------- *)
     PROCEDURE CheckRetType(tst : BOOLEAN; tok : S.Token; typ : Sy.Type);

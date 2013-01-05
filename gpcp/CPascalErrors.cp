@@ -34,9 +34,9 @@ MODULE CPascalErrors;
 
       Err     = POINTER TO ErrDesc;
       ErrDesc = RECORD
-		  num, lin, col: INTEGER;
-		  msg: Message;
-		END;
+                  num, lin, col: INTEGER;
+                  msg: Message;
+                END;
       ErrBuff = POINTER TO ARRAY OF Err;
 
   VAR
