@@ -1162,12 +1162,12 @@ MODULE JavaMaker;
     e.PushValue(lOp, eTp);              (* vRef ...                *)
     out.Code(Jvm.opc_dup);              (* vRef, vRef ...          *)
     out.GetVecLen();                    (* tide, vRef ...          *)
-    out.StoreLocal(tde, Bi.intTp);       (* vRef ...                *)
+    out.StoreLocal(tde, Bi.intTp);      (* vRef ...                *)
 
     e.outF.GetVecArr(eTp);              (* arr ...                 *)
-    e.PushValue(rOp, Bi.intTp);          (* idx, arr ...            *)
+    e.PushValue(rOp, Bi.intTp);         (* idx, arr ...            *)
     out.Code(Jvm.opc_dup);              (* idx, idx, arr ...       *)
-    out.LoadLocal(tde, Bi.intTp);        (* tide, idx, idx, arr ... *)
+    out.LoadLocal(tde, Bi.intTp);       (* tide, idx, idx, arr ... *)
 
     out.CodeLb(Jvm.opc_if_icmplt, xLb);
     out.Trap("Vector index out of bounds");
@@ -1178,12 +1178,123 @@ MODULE JavaMaker;
 
 (* ============================================================ *)
 
+  (* Assert: lOp is already pushed. *)
+  PROCEDURE RotateInt(e : JavaEmitter; lOp : Sy.Expr; rOp : Sy.Expr);
+    VAR
+      temp, ixSv : INTEGER; (* local vars    *)
+	  indx : INTEGER;       (* literal index *)
+	  rtSz : INTEGER;
+	  out  : Ju.JavaFile;
+  BEGIN
+    out := e.outF;
+    IF lOp.type = Bi.sIntTp THEN 
+      rtSz := 16;
+	  out.ConvertDn(Bi.intTp, Bi.charTp);
+	ELSIF (lOp.type = Bi.byteTp) OR (lOp.type = Bi.uBytTp) THEN
+	  rtSz := 8;
+	  out.ConvertDn(Bi.intTp, Bi.uBytTp);
+	ELSE
+	  rtSz := 32;
+	END;
+	temp := out.newLocal();          
+    IF rOp.kind = Xp.numLt THEN
+          indx := intValue(rOp) MOD rtSz;
+      IF indx = 0 THEN  (* skip *)
+	  ELSE (* 
+	    *  Rotation is achieved by means of the identity
+	    *  Forall 0 <= n < rtSz: 
+	    *    ROT(a, n) = LSH(a,n) bitwiseOR LSH(a,n-rtSz);
+	    *)
+	    out.Code(Jvm.opc_dup);
+		out.StoreLocal(temp, Bi.intTp);
+		out.PushInt(indx);
+		out.Code(Jvm.opc_ishl);
+		out.LoadLocal(temp, Bi.intTp);
+		out.PushInt(rtSz - indx);
+		out.Code(Jvm.opc_iushr);
+		out.Code(Jvm.opc_ior);
+		out.ConvertDn(Bi.intTp, lOp.type);
+      END;
+    ELSE
+	  ixSv := out.newLocal();          
+	  out.Code(Jvm.opc_dup);          (* TOS: lOp, lOp, ...             *)
+	  out.StoreLocal(temp, Bi.intTp); (* TOS: lOp, ...                  *)
+      e.PushValue(rOp, rOp.type);     (* TOS: rOp, lOp, ...             *)
+	  out.PushInt(rtSz-1);            (* TOS: 31, rOp, lOp, ...         *)
+	  out.Code(Jvm.opc_iand);         (* TOS: rOp', lOp, ...            *)
+	  out.Code(Jvm.opc_dup);          (* TOS: rOp', rOp', lOp, ...      *)
+	  out.StoreLocal(ixSv, Bi.intTp); (* TOS: rOp', lOp, ...            *)
+	  out.Code(Jvm.opc_ishl);         (* TOS: lRz, ...                  *)
+	  out.LoadLocal(temp, Bi.intTp);  (* TOS: lOp, lRz, ...             *)
+	  out.PushInt(rtSz);              (* TOS: 32, lOp, lRz, ...         *)
+	  out.LoadLocal(ixSv, Bi.intTp);  (* TOS: rOp',32, lOp, lRz, ...    *)
+	  out.Code(Jvm.opc_isub);         (* TOS: rOp'', lOp, lRz, ...      *)
+	  out.Code(Jvm.opc_iushr);        (* TOS: rRz, lRz, ...             *)
+	  out.Code(Jvm.opc_ior);          (* TOS: ROT(lOp, rOp), ...        *)
+	  out.ReleaseLocal(ixSv);
+	  out.ConvertDn(Bi.intTp, lOp.type);
+	END;
+	out.ReleaseLocal(temp);
+  END RotateInt;
+
+(* ============================================================ *)
+
+  (* Assert: lOp is already pushed. *)
+  PROCEDURE RotateLong(e : JavaEmitter; lOp : Sy.Expr; rOp : Sy.Expr);
+    VAR
+	  tmp1,tmp2, ixSv : INTEGER; (* local vars    *)
+	  indx : INTEGER;            (* literal index *)
+	  out  : Ju.JavaFile;
+  BEGIN
+    out := e.outF;
+	tmp1 := out.newLocal();      (* Pair of locals *)     
+	tmp2 := out.newLocal();          
+    IF rOp.kind = Xp.numLt THEN
+      indx := intValue(rOp) MOD 64;
+      IF indx = 0 THEN  (* skip *)
+	  ELSE (* 
+		*  Rotation is achieved by means of the identity
+		*  Forall 0 <= n < rtSz: 
+		*    ROT(a, n) = LSH(a,n) bitwiseOR LSH(a,n-rtSz);
+		*)
+		out.Code(Jvm.opc_dup2);
+		out.StoreLocal(tmp1, Bi.lIntTp);
+		out.PushInt(indx);
+		out.Code(Jvm.opc_lshl);
+		out.LoadLocal(tmp1, Bi.lIntTp);
+		out.PushInt(64 - indx);
+		out.Code(Jvm.opc_lushr);
+		out.Code(Jvm.opc_lor);
+      END;
+    ELSE
+	  ixSv := out.newLocal();          
+	  out.Code(Jvm.opc_dup2);            (* TOS: lOp, lOp, ...             *)
+	  out.StoreLocal(tmp1, Bi.lIntTp);   (* TOS: lOp, ...                  *)
+      e.PushValue(rOp, rOp.type);        (* TOS: rOp, lOp, ...             *)
+	  out.PushInt(63);                   (* TOS: 31, rOp, lOp, ...         *)
+	  out.Code(Jvm.opc_iand);            (* TOS: rOp', lOp, ...            *)
+	  out.Code(Jvm.opc_dup);             (* TOS: rOp', rOp', lOp, ...      *)
+	  out.StoreLocal(ixSv, Bi.intTp);    (* TOS: rOp', lOp, ...            *)
+	  out.Code(Jvm.opc_lshl);            (* TOS: lRz, ...                  *)
+	  out.LoadLocal(tmp1, Bi.lIntTp);    (* TOS: lOp, lRz, ...             *)
+	  out.PushInt(64);                   (* TOS: 32, lOp, lRz, ...         *)
+	  out.LoadLocal(ixSv, Bi.intTp);     (* TOS: rOp',32, lOp, lRz, ...    *)
+	  out.Code(Jvm.opc_isub);            (* TOS: rOp'', lOp, lRz, ...      *)
+	  out.Code(Jvm.opc_lushr);           (* TOS: rRz, lRz, ...             *)
+	  out.Code(Jvm.opc_lor);             (* TOS: ROT(lOp, rOp), ...        *)
+	  out.ReleaseLocal(ixSv);
+	END;
+	out.ReleaseLocal(tmp2);
+	out.ReleaseLocal(tmp1);
+  END RotateLong;
+
+(* ============================================================ *)
+
   PROCEDURE (e : JavaEmitter)PushBinary(exp : Xp.BinaryX; dst : Sy.Type),NEW;
     VAR out  : Ju.JavaFile;
         lOp  : Sy.Expr;
         rOp  : Sy.Expr;
-        eTp  : Sy.Type;
-
+ 
         dNum : INTEGER;
         sNum : INTEGER;
         code : INTEGER;
@@ -1241,6 +1352,7 @@ MODULE JavaMaker;
  *        out.GetVecElement(vTp.elemTp);          (* load the element   *)
  *)
         ELSE
+		  IF rOp.type = NIL THEN rOp.type := Bi.intTp END;
           e.PushValue(lOp, lOp.type);             (* push arr. desig.   *)
           e.PushValue(rOp, rOp.type);             (* push index value   *)
 (*
@@ -1531,7 +1643,16 @@ MODULE JavaMaker;
         e.PushValue(lOp, lOp.type);
         out.CodeT(Jvm.opc_instanceof, rOp(Xp.IdLeaf).ident.type);
     (* -------------------------------- *)
-    | Xp.ashInt :
+    | Xp.rotInt :
+        e.PushValue(lOp, lOp.type);
+		IF lOp.type = Bi.lIntTp THEN
+		  RotateLong(e, lOp, rOp);
+		ELSE
+		  RotateInt(e, lOp, rOp);
+		END;
+    (* -------------------------------- *)
+    | Xp.ashInt, Xp.lshInt :
+(* FIXME: What about long types (here but not for .NET???) *)
         e.PushValue(lOp, lOp.type);
         IF rOp.kind = Xp.numLt THEN
           indx := intValue(rOp);
@@ -1542,8 +1663,12 @@ MODULE JavaMaker;
             *  A literal, negative ASH might be
             *  a long operation from a folded DIV.
             *)
-            IF dst.isLongType() THEN out.Code(Jvm.opc_lshr);
-            ELSE out.Code(Jvm.opc_ishr);
+            IF dst.isLongType() THEN 
+			  out.Code(Jvm.opc_lshr);
+            ELSIF exp.kind = Xp.ashInt THEN
+			  out.Code(Jvm.opc_ishr);
+            ELSE
+			  out.Code(Jvm.opc_iushr);
             END;
           ELSE
             out.PushInt(indx);
@@ -1569,7 +1694,11 @@ MODULE JavaMaker;
           *)
           out.DefLab(tpLb);
           out.Code(Jvm.opc_ineg);
-          out.Code(Jvm.opc_ishr);
+		  IF exp.kind = Xp.ashInt THEN
+            out.Code(Jvm.opc_ishr);
+		  ELSE
+            out.Code(Jvm.opc_iushr);
+		  END;
           out.DefLab(exLb);
         END;
     (* -------------------------------- *)

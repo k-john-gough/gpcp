@@ -2362,7 +2362,7 @@ MODULE MsilUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (os : MsilFile)ConvertDn*(inT, outT : Sy.Type),NEW;
+  PROCEDURE (os : MsilFile)ConvertDn*(inT, outT : Sy.Type; check : BOOLEAN),NEW;
    (* Conversion "down" often needs a runtime check. *)
     VAR inB, outB, code : INTEGER;
   BEGIN
@@ -2370,7 +2370,8 @@ MODULE MsilUtil;
     outB := outT(Ty.Base).tpOrd;
     IF inB = Ty.setN THEN inB := Ty.intN END;
     IF inB = outB THEN RETURN END;                     (* PREMATURE RETURN! *)
-    IF os.proc.prId.ovfChk THEN
+    (* IF os.proc.prId.ovfChk THEN *)
+	IF check THEN
       CASE outB OF
       | Ty.realN : RETURN;                             (* PREMATURE RETURN! *)
       | Ty.sReaN : code := Asm.opc_conv_r4; (* No check possible *)

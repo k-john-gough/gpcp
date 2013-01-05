@@ -45,7 +45,7 @@ MODULE ExprDesc;
     lessEq* = 45; lessT*  = 46; equal*  = 47; isOp*   = 48; inOp*   = 49;
     mult*   = 50; slash*  = 51; modOp*  = 52; divOp*  = 53; blNot*  = 54;
     blOr*   = 55; blAnd*  = 56; strCat* = 57; ashInt* = 58; rem0op* = 59;
-    div0op* = 60;
+    div0op* = 60; lshInt* = 61; rotInt* = 62;
 
   (* more unaries *)
     adrOf*  = 70; 
@@ -934,6 +934,8 @@ MODULE ExprDesc;
             END;
           END;
       (* ---------------------------- *)
+	  (* QUESTION: should this be extended to LONGINT? *)
+      (* ---------------------------- *)
       | Builtin.ashP :
           IF    act.tide < 2 THEN prc.ExprError(22);
           ELSIF act.tide > 2 THEN prc.ExprError(23);
@@ -953,6 +955,36 @@ MODULE ExprDesc;
               rslt := newBinaryX(ashInt, arg0, arg1);
             END;
             rslt.type := Builtin.intTp;
+          END;
+      (* ---------------------------- *)
+      | Builtin.lshP :
+          IF    act.tide < 2 THEN prc.ExprError(22);
+          ELSIF act.tide > 2 THEN prc.ExprError(23);
+          ELSE
+            IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
+            IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
+            IF arg0.type # Builtin.intTp THEN
+              arg0 := convert(arg0, Builtin.intTp);
+            END;
+            IF arg1.type # Builtin.intTp THEN
+              arg1 := convert(arg1, Builtin.intTp);
+            END;
+            rslt := newBinaryX(lshInt, arg0, arg1);
+            rslt.type := Builtin.intTp;
+          END;
+      (* ---------------------------- *)
+      | Builtin.rotP :
+          IF    act.tide < 2 THEN prc.ExprError(22);
+          ELSIF act.tide > 2 THEN prc.ExprError(23);
+          ELSE
+            IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
+            IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
+			(* Do not convert arg0 to intTp *)
+            IF arg1.type # Builtin.intTp THEN
+              arg1 := convert(arg1, Builtin.intTp);
+            END;
+            rslt := newBinaryX(rotInt, arg0, arg1);
+            rslt.type := arg0.type;
           END;
       (* ---------------------------- *)
       | Builtin.bitsP :
@@ -1951,6 +1983,7 @@ MODULE ExprDesc;
     *  perhaps as a result of a call of checkCall()
     *)
     IF (kind = index) OR (kind = ashInt) OR
+       (kind = lshInt) OR (kind = rotInt) OR 
        (kind = lenOf) OR (kind = minOf) OR (kind = maxOf) THEN RETURN i END;
    (*
     *  First, attribute the subtrees.
@@ -3093,6 +3126,8 @@ MODULE ExprDesc;
     | blAnd  : Console.WriteString("'&'    ");
     | strCat : Console.WriteString("strCat ");
     | ashInt : Console.WriteString("ASH    ");
+    | lshInt : Console.WriteString("LSH    ");
+    | rotInt : Console.WriteString("ROT    ");
     END;
     PType(s.type);
     Console.WriteLn;

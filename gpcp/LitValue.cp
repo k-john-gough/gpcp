@@ -217,7 +217,9 @@ MODULE LitValue;
 (* -------------------------------------------- *)
 
   PROCEDURE ResetCharOpenSeq*(VAR seq : CharOpenSeq);
+    VAR index : INTEGER;
   BEGIN
+    FOR index := 0 TO seq.tide - 1 DO seq.a[index] := NIL END;
     seq.tide := 0;
   END ResetCharOpenSeq;
 
@@ -365,6 +367,32 @@ MODULE LitValue;
     ret[k] := 0X;
     RETURN ret;
   END arrayCat;
+
+(* -------------------------------------------- *)
+
+  PROCEDURE vectorCat*(vec : VECTOR OF CharOpen) : CharOpen;
+    VAR i,j,k : INTEGER;
+	len : INTEGER;
+	chO : CharOpen;
+	ret : CharOpen;
+	chr : CHAR;
+  BEGIN
+    len := 1;
+    FOR i := 0 TO LEN(vec) - 1 DO INC(len, LEN(vec[i]) - 1) END;
+    NEW(ret, len);
+    k := 0;
+    FOR i := 0 TO LEN(vec) - 1 DO 
+      chO := vec[i];
+      j := 0;
+      WHILE (j < LEN(chO)-1) & (chO[j] # 0X) DO 
+        ret[k] := chO[j]; INC(k); INC(j);
+      END;
+    END;
+    ret[k] := 0X;
+    RETURN ret;
+  END vectorCat;
+
+
 
 (* ============================================================ *)
 (* 		     Safe Operations on Values			*)

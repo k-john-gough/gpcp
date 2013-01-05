@@ -46,13 +46,20 @@ MODULE GPCPcopyright;
      (* VERSION    = "1.3.12 of 17 November 2011"; *)
      (* VERSION    = "1.3.13 of 24 July 2012"; *)
      (* VERSION    = "1.3.14 of 05 September 2012"; *)
-        VERSION    = "1.3.15 of 04 October 2012"; 
+     (* VERSION    = "1.3.15 of 04 October 2012"; *)
+        VERSION    = "1.3.16 of 01 January 2013"; 
 	verStr*    = " version " + VERSION;
 
   CONST	prefix     = "#gpcp: ";
 	millis     = "mSec";
 
 (* ==================================================================== *)
+
+  PROCEDURE V*() : POINTER TO ARRAY OF CHAR;
+  BEGIN 
+    RETURN BOX(VERSION) 
+  END V; 
+
   PROCEDURE W(IN s : ARRAY OF CHAR);
   BEGIN Console.WriteString(s); Console.WriteLn END W;
 
@@ -61,8 +68,8 @@ MODULE GPCPcopyright;
     W("GARDENS POINT COMPONENT PASCAL");
     W("The files which import this module constitute a compiler");
     W("for the programming language Component Pascal.");
-    W("Copyright (c) 1998 -- 2012 K John Gough.");
-    W("Copyright (c) 2000 -- 2012 Queensland University of Technology.");
+    W("Copyright (c) 1998 -- 2013 K John Gough.");
+    W("Copyright (c) 2000 -- 2013 Queensland University of Technology.");
     Console.WriteLn;
 
     W("This program is free software; you can redistribute it and/or modify");
