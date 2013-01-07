@@ -934,7 +934,7 @@ MODULE ExprDesc;
             END;
           END;
       (* ---------------------------- *)
-	  (* QUESTION: should this be extended to LONGINT? *)
+      (* Extended to LONGINT (1:01:2013) *)
       (* ---------------------------- *)
       | Builtin.ashP :
           IF    act.tide < 2 THEN prc.ExprError(22);
@@ -942,19 +942,26 @@ MODULE ExprDesc;
           ELSE
             IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
             IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
+	   (* NO FOLDING IN THIS VERSION *)
             IF (arg0.kind = numLt) & (arg1.kind = numLt) THEN
               rslt := mkNumLt(ASH(arg0(LeafX).value.int(),
                 arg1(LeafX).value.int()));
             ELSE
-              IF arg0.type # Builtin.intTp THEN
+	   *)
+	      IF arg0.type = Builtin.lIntTp THEN
+                dstT := Builtin.lIntTp;
+              ELSIF arg0.type # Builtin.intTp THEN
                 arg0 := convert(arg0, Builtin.intTp);
+		dstT := Builtin.intTp;
               END;
               IF arg1.type # Builtin.intTp THEN
                 arg1 := convert(arg1, Builtin.intTp);
               END;
               rslt := newBinaryX(ashInt, arg0, arg1);
+	   (*
             END;
-            rslt.type := Builtin.intTp;
+            *)
+            rslt.type := dstT;
           END;
       (* ---------------------------- *)
       | Builtin.lshP :
@@ -963,14 +970,18 @@ MODULE ExprDesc;
           ELSE
             IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
             IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
-            IF arg0.type # Builtin.intTp THEN
+			(* FIXME, no folding yet ... *)
+			IF arg0.type = Builtin.lIntTp THEN
+			  dstT := Builtin.lIntTp;
+            ELSIF arg0.type # Builtin.intTp THEN
               arg0 := convert(arg0, Builtin.intTp);
+			  dstT := Builtin.intTp;
             END;
             IF arg1.type # Builtin.intTp THEN
               arg1 := convert(arg1, Builtin.intTp);
             END;
             rslt := newBinaryX(lshInt, arg0, arg1);
-            rslt.type := Builtin.intTp;
+            rslt.type := dstT;
           END;
       (* ---------------------------- *)
       | Builtin.rotP :

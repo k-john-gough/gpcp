@@ -1738,6 +1738,7 @@ MODULE MsilMaker;
         ELSE
           tpLb := out.newLabel();
           exLb := out.newLabel();
+	      long := dst(Ty.Base).tpOrd = Ty.lIntN;
          (*
           *  This is a variable shift. Do it the hard way.
           *  First, check the sign of the right hand op.
@@ -1746,6 +1747,11 @@ MODULE MsilMaker;
           out.Code(Asm.opc_dup);
           out.PushInt(0);
           out.CodeLb(Asm.opc_blt, tpLb);
+		 (*
+		  *  Trim the shift index
+		  *)
+		  IF long THEN out.PushInt(63) ELSE out.PushInt(31) END;
+		  out.Code(Asm.opc_and);
          (*
           *  Positive selector ==> shift left;
           *)
@@ -1756,6 +1762,11 @@ MODULE MsilMaker;
           *)
           out.DefLab(tpLb);
           out.Code(Asm.opc_neg);
+		 (*
+		  *  Trim the shift index
+		  *)
+		  IF long THEN out.PushInt(63) ELSE out.PushInt(31) END;
+		  out.Code(Asm.opc_and);
 		  IF exp.kind = Xp.ashInt THEN
             out.Code(Asm.opc_shr);
 		  ELSE (* ==> exp.kind = lshInt *)
