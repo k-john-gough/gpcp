@@ -1344,20 +1344,10 @@ MODULE JavaMaker;
         IF exp.lKid.type IS Ty.Vector THEN
           e.PushVecElemHandle(lOp, rOp);
           out.GetVecElement(dst);                 (* load the element   *)
-(* 
- *        vTp := lOp.type(Ty.Vector);
- *        e.PushValue(lOp, lOp.type);             (* push array designator*)
- *        out.GetVecArr(vTp.elemTp);
- *        e.PushValue(rOp, rOp.type);             (* push index value   *)
- *        out.GetVecElement(vTp.elemTp);          (* load the element   *)
- *)
         ELSE
 		  IF rOp.type = NIL THEN rOp.type := Bi.intTp END;
           e.PushValue(lOp, lOp.type);             (* push arr. desig.   *)
           e.PushValue(rOp, rOp.type);             (* push index value   *)
-(*
- *        out.GetElement(dst);                    (* load the element   *)
- *)
           out.GetElement(lOp.type(Ty.Array).elemTp);  (* load the element   *)
           IF dst = Bi.uBytTp THEN e.UbyteClear() END;
         END;
@@ -1652,52 +1642,70 @@ MODULE JavaMaker;
 		END;
     (* -------------------------------- *)
     | Xp.ashInt, Xp.lshInt :
-(* FIXME: What about long types (here but not for .NET???) *)
         e.PushValue(lOp, lOp.type);
+		long := dst.isLongType();
         IF rOp.kind = Xp.numLt THEN
           indx := intValue(rOp);
           IF indx = 0 THEN  (* skip *)
-          ELSIF indx < 0 THEN
+          ELSIF indx < 0 THEN (* right shift *)
             out.PushInt(-indx);
-           (*
-            *  A literal, negative ASH might be
-            *  a long operation from a folded DIV.
-            *)
-            IF dst.isLongType() THEN 
-			  out.Code(Jvm.opc_lshr);
-            ELSIF exp.kind = Xp.ashInt THEN
-			  out.Code(Jvm.opc_ishr);
-            ELSE
-			  out.Code(Jvm.opc_iushr);
-            END;
-          ELSE
-            out.PushInt(indx);
-            out.Code(Jvm.opc_ishl);
-          END;
-        ELSE
+            IF long THEN
+			  IF exp.kind = Xp.ashInt THEN (* arith shift *)
+			    out.Code(Jvm.opc_lshr);
+			  ELSE (* logical shift *)
+			    out.Code(Jvm.opc_lushr);
+			  END;
+			ELSE (* integer sized *)
+			  IF exp.kind = Xp.ashInt THEN (* arith shift *)
+			    out.Code(Jvm.opc_ishr);
+			  ELSE (* logical shift *)
+			    out.Code(Jvm.opc_iushr);
+			  END;
+			END;
+		  ELSE (* a left shift *)
+		    out.PushInt(indx);
+		    IF long THEN
+              out.Code(Jvm.opc_lshl);
+			ELSE (* integer sized *)
+              out.Code(Jvm.opc_ishl);
+			END;
+		  END;
+        ELSE  (* variable sized shift *)
           tpLb := out.newLabel();
           exLb := out.newLabel();
          (*
           *  This is a variable shift. Do it the hard way.
           *  First, check the sign of the right hand op.
           *)
-          e.PushValue(rOp, rOp.type);
+          e.PushValue(rOp, Bi.intTp);
           out.Code(Jvm.opc_dup);
           out.CodeLb(Jvm.opc_iflt, tpLb);
          (*
           *  Positive selector ==> shift left;
           *)
-          out.Code(Jvm.opc_ishl);
+		  IF long THEN
+            out.Code(Jvm.opc_lshl);
+		  ELSE
+            out.Code(Jvm.opc_ishl);
+		  END;
           out.CodeLb(Jvm.opc_goto, exLb);
          (*
           *  Negative selector ==> shift right;
           *)
           out.DefLab(tpLb);
           out.Code(Jvm.opc_ineg);
-		  IF exp.kind = Xp.ashInt THEN
-            out.Code(Jvm.opc_ishr);
-		  ELSE
-            out.Code(Jvm.opc_iushr);
+		  IF long THEN
+		    IF exp.kind = Xp.ashInt THEN
+              out.Code(Jvm.opc_lshr);
+		    ELSE
+              out.Code(Jvm.opc_lushr);
+		    END;
+	      ELSE
+		    IF exp.kind = Xp.ashInt THEN
+              out.Code(Jvm.opc_ishr);
+		    ELSE
+              out.Code(Jvm.opc_iushr);
+			END;
 		  END;
           out.DefLab(exLb);
         END;
