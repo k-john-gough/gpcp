@@ -942,7 +942,7 @@ MODULE ExprDesc;
           ELSE
             IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
             IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
-	   (* NO FOLDING IN THIS VERSION *)
+	   (* NO FOLDING IN THIS VERSION 
             IF (arg0.kind = numLt) & (arg1.kind = numLt) THEN
               rslt := mkNumLt(ASH(arg0(LeafX).value.int(),
                 arg1(LeafX).value.int()));
