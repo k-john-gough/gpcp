@@ -1179,6 +1179,182 @@ MODULE JavaMaker;
 (* ============================================================ *)
 
   (* Assert: lOp is already pushed. *)
+  PROCEDURE ShiftInt(kind : INTEGER; e : JavaEmitter; lOp : Sy.Expr; rOp : Sy.Expr);
+    VAR indx : INTEGER;
+	    out  : Ju.JavaFile;
+	    shrLab, fixLab, s31Lab, exitLb : Ju.Label; 
+  BEGIN
+    out := e.outF;
+    IF rOp.kind = Xp.numLt THEN
+      indx := intValue(rOp);
+      IF indx = 0 THEN  (* skip *)
+      ELSIF indx < -31 THEN (* right shift out *)
+	    IF kind = Xp.ashInt THEN
+		  out.PushInt(31);
+		  out.Code(Jvm.opc_ishr);
+		ELSE
+		  out.Code(Jvm.opc_pop);
+		  out.PushInt(0);
+		END;
+	  ELSIF indx < 0 THEN (* right shift *)
+        out.PushInt(-indx);
+		IF kind = Xp.ashInt THEN (* arith shift *)
+		  out.Code(Jvm.opc_ishr);
+		ELSE (* logical shift *)
+		  out.Code(Jvm.opc_iushr);
+		END;
+	  ELSIF indx > 31 THEN (* result is zero *)
+		out.Code(Jvm.opc_pop);
+		out.PushInt(0);	    
+	  ELSE (* a left shift *)
+		out.PushInt(indx);
+        out.Code(Jvm.opc_ishl);
+	  END;
+    ELSE  (* variable sized shift *)
+      shrLab := out.newLabel();
+	  fixLab := out.newLabel();
+	  s31Lab := out.newLabel();
+      exitLb := out.newLabel();
+     (*
+      *  This is a variable shift. Do it the hard way.
+      *  First, check the sign of the right hand op.
+      *)
+      e.PushValue(rOp, Bi.intTp);              (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_dup);                   (* TOS: rOp, rOp, lOp, ...      *)
+      out.CodeLb(Jvm.opc_iflt, shrLab);        (* TOS: rOp, lOp, ...           *)
+     (*
+      *  Positive selector ==> shift left;
+	  *  But first: a range check ...
+      *)
+      out.Code(Jvm.opc_dup);                   (* TOS: rOp, rOp, lOp, ...      *)
+	  out.PushInt(31);                         (* TOS: 31, rOp, rOp, lOp, ...  *)
+      out.CodeLb(Jvm.opc_if_icmpgt, fixLab);   (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_ishl);                  (* TOS: rslt, ...               *)
+      out.CodeLb(Jvm.opc_goto, exitLb);
+	 (*
+	  *  Out of range shift, set result to zero.
+	  *)
+	  out.DefLab(fixLab);                      (* TOS: rOp, lOp, ...           *)
+	  out.Code(Jvm.opc_pop2);                  (* TOS:  ...                    *)
+	  out.PushInt(0);	                       (* TOS: 0, ...                  *)
+      out.CodeLb(Jvm.opc_goto, exitLb);
+	 (*
+	  *  Out of range, rslt = rOp >> 31.
+	  *)
+	  out.DefLab(s31Lab);                      (* TOS: rOp, lOp, ...           *)
+	  out.Code(Jvm.opc_pop);                   (* TOS: lOp, ...                *)
+	  out.PushInt(31);	                       (* TOS: 31, lOp, ...            *)
+	  out.Code(Jvm.opc_ishr);
+      out.CodeLb(Jvm.opc_goto, exitLb);
+     (*
+      *  Negative selector ==> shift right;
+      *)
+      out.DefLab(shrLab);                      (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_ineg);                  (* TOS: -rOp, lOp, ...          *)
+      out.Code(Jvm.opc_dup);                   (* TOS: -rOp, -rOp, lOp, ...    *)
+	  out.PushInt(31);                         (* TOS: 31, -rOp, -rOp, lOp, ...*)
+	  IF kind = Xp.lshInt THEN (* LSH *)
+	    out.CodeLb(Jvm.opc_if_icmpgt, fixLab); (* TOS: -rOp, lOp, ...          *)
+		out.Code(Jvm.opc_iushr);               (* TOS: rslt, ...               *)
+	  ELSE (* ASH *)                           (* TOS: 31, rOp, rOp, lOp, ...  *)
+	    out.CodeLb(Jvm.opc_if_icmpgt, s31Lab); (* TOS: rOp, lOp, ...           *)
+		out.Code(Jvm.opc_ishr);                (* TOS: rslt, ...               *)
+	  END;
+      out.DefLab(exitLb);
+    END;
+  END ShiftInt;
+
+(* ============================================================ *)
+
+  (* Assert: lOp is already pushed. *)
+  PROCEDURE ShiftLong(kind : INTEGER; e : JavaEmitter; lOp : Sy.Expr; rOp : Sy.Expr);
+    VAR indx : INTEGER;
+	    out  : Ju.JavaFile;
+	    shrLab, fixLab, s63Lab, exitLb : Ju.Label; 
+  BEGIN
+    out := e.outF;
+    IF rOp.kind = Xp.numLt THEN
+      indx := intValue(rOp);
+      IF indx = 0 THEN  (* skip *)
+      ELSIF indx < -63 THEN (* right shift out *)
+	    IF kind = Xp.ashInt THEN
+		  out.PushInt(63);
+		  out.Code(Jvm.opc_lshr);
+		ELSE
+		  out.Code(Jvm.opc_pop2);
+		  out.PushLong(0);
+		END;
+	  ELSIF indx < 0 THEN (* right shift *)
+        out.PushInt(-indx);
+		IF kind = Xp.ashInt THEN (* arith shift *)
+		  out.Code(Jvm.opc_lshr);
+		ELSE (* logical shift *)
+		  out.Code(Jvm.opc_lushr);
+		END;
+	  ELSIF indx > 63 THEN (* result is zero *)
+		out.Code(Jvm.opc_pop2);
+		out.PushLong(0);	    
+	  ELSE (* a left shift *)
+		out.PushInt(indx);
+        out.Code(Jvm.opc_lshl);
+	  END;
+    ELSE  (* variable sized shift *)
+      shrLab := out.newLabel();
+	  fixLab := out.newLabel();
+	  s63Lab := out.newLabel();
+      exitLb := out.newLabel();
+     (*
+      *  This is a variable shift. Do it the hard way.
+      *  First, check the sign of the right hand op.
+      *)
+      e.PushValue(rOp, Bi.intTp);              (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_dup);                   (* TOS: rOp, rOp, lOp, ...      *)
+      out.CodeLb(Jvm.opc_iflt, shrLab);        (* TOS: rOp, lOp, ...           *)
+     (*
+      *  Positive selector ==> shift left;
+	  *  But first: a range check ...
+      *)
+      out.Code(Jvm.opc_dup);                   (* TOS: rOp, rOp, lOp, ...      *)
+	  out.PushInt(63);                         (* TOS: 63, rOp, rOp, lOp, ...  *)
+      out.CodeLb(Jvm.opc_if_icmpgt, fixLab);   (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_lshl);                  (* TOS: rslt, ...               *)
+      out.CodeLb(Jvm.opc_goto, exitLb);
+	 (*
+	  *  Out of range shift, set result to zero.
+	  *)
+	  out.DefLab(fixLab);                      (* TOS: rOp, lOp, ...           *)
+	  out.Code(Jvm.opc_pop);                   (* TOS: lOp, ...                *)
+	  out.Code(Jvm.opc_pop2);                  (* TOS:  ...                    *)
+	  out.PushLong(0);	                       (* TOS: 0, ...                  *)
+      out.CodeLb(Jvm.opc_goto, exitLb);
+	 (*
+	  *  Out of range, rslt = rOp >> 63.
+	  *)
+	  out.DefLab(s63Lab);                      (* TOS: rOp, lOp, ...           *)
+	  out.Code(Jvm.opc_pop);                   (* TOS: lOp, ...                *)
+	  out.PushInt(63);	                       (* TOS: 63, lOp, ...            *)
+	  out.Code(Jvm.opc_lshr);
+      out.CodeLb(Jvm.opc_goto, exitLb);
+     (*
+      *  Negative selector ==> shift right;
+      *)
+      out.DefLab(shrLab);                      (* TOS: rOp, lOp, ...           *)
+      out.Code(Jvm.opc_ineg);                  (* TOS: -rOp, lOp, ...          *)
+      out.Code(Jvm.opc_dup);                   (* TOS: -rOp, -rOp, lOp, ...    *)
+	  out.PushInt(63);                         (* TOS: 63, -rOp, -rOp, lOp, ...*)
+	  IF kind = Xp.lshInt THEN (* LSH *)
+	    out.CodeLb(Jvm.opc_if_icmpgt, fixLab); (* TOS: -rOp, lOp, ...          *)
+		out.Code(Jvm.opc_lushr);               (* TOS: rslt, ...               *)
+	  ELSE (* ASH *)                           (* TOS: 31, rOp, rOp, lOp, ...  *)
+	    out.CodeLb(Jvm.opc_if_icmpgt, s63Lab); (* TOS: rOp, lOp, ...           *)
+		out.Code(Jvm.opc_lshr);                (* TOS: rslt, ...               *)
+	  END;
+      out.DefLab(exitLb);
+    END;
+  END ShiftLong;
+
+(* ============================================================ *)
+  (* Assert: lOp is already pushed. *)
   PROCEDURE RotateInt(e : JavaEmitter; lOp : Sy.Expr; rOp : Sy.Expr);
     VAR
       temp, ixSv : INTEGER; (* local vars    *)
@@ -1642,8 +1818,14 @@ MODULE JavaMaker;
 		END;
     (* -------------------------------- *)
     | Xp.ashInt, Xp.lshInt :
-        e.PushValue(lOp, lOp.type);
 		long := dst.isLongType();
+	    e.PushValue(lOp, lOp.type);
+		IF long THEN
+		  ShiftLong(exp.kind, e, lOp, rOp);
+		ELSE
+		  ShiftInt(exp.kind, e, lOp, rOp);
+		END;
+	  (*
         IF rOp.kind = Xp.numLt THEN
           indx := intValue(rOp);
           IF indx = 0 THEN  (* skip *)
@@ -1709,6 +1891,7 @@ MODULE JavaMaker;
 		  END;
           out.DefLab(exLb);
         END;
+	  *)
     (* -------------------------------- *)
     | Xp.strCat :
         e.PushValue(lOp, lOp.type);

@@ -1412,6 +1412,317 @@ MODULE MsilMaker;
 
 (* ============================================================ *)
 
+  PROCEDURE Rotate(e : MsilEmitter; lOp, rOp : Sy.Expr);
+    VAR out  : Mu.MsilFile;
+	    rtSz : INTEGER;  (* rotate size in bits *)
+		hstT : Sy.Type;  (* host type on stack  *)
+		indx : INTEGER;  (* literal rOp value   *)
+        temp : INTEGER;  (* local to save lOp   *)
+		ixSv : INTEGER;  (* local for left rslt *)
+  BEGIN
+    out := e.outF;
+    e.PushValue(lOp, lOp.type);
+
+   (* Convert TOS value to unsigned *)
+	hstT := Bi.intTp;
+	IF (lOp.type = Bi.sIntTp) THEN 
+		  rtSz := 16;
+		  out.Code(Asm.opc_conv_u2);
+	ELSIF (lOp.type = Bi.byteTp) OR (lOp.type = Bi.uBytTp) THEN
+		  rtSz := 8;
+		  out.Code(Asm.opc_conv_u1);
+	ELSIF lOp.type = Bi.lIntTp THEN
+		  rtSz := 64;
+		  hstT := Bi.lIntTp;
+	ELSE
+		  rtSz := 32;
+		  (* out.Code(Asm.opc_conv_u4); *)
+	END;		
+    IF rOp.kind = Xp.numLt THEN
+		  indx := intValue(rOp) MOD rtSz;
+          IF indx = 0 THEN  (* skip *)
+		  ELSE (* 
+		    *  Rotation is achieved by means of the identity
+			*  Forall 0 <= n < rtSz: 
+			*    ROT(a, n) = LSH(a,n) bitwiseOR LSH(a,n-rtSz);
+			*)
+			temp := out.proc.newLocal(hstT);
+			out.Code(Asm.opc_dup);
+			out.PushInt(indx);
+			out.Code(Asm.opc_shl);
+			out.StoreLocal(temp);
+			out.PushInt(rtSz - indx);
+			out.Code(Asm.opc_shr_un);
+			out.PushLocal(temp);
+			out.Code(Asm.opc_or);
+			out.proc.ReleaseLocal(temp);
+          END;
+		  out.ConvertDn(hstT, lOp.type, FALSE);
+	ELSE
+         (*
+          *  This is a variable rotate.
+		  *
+		  *  Note that in the case of a short left operand the value
+		  *  on the stack has been converted to unsigned.  The value is
+		  *  saved as a int (rather than a shorter type) so that the 
+		  *  value does not get sign extended on each new load, 
+		  *  necessitating a new conversion each time.
+          *)
+		  temp := out.proc.newLocal(hstT);
+		  ixSv := out.proc.newLocal(Bi.intTp);
+		  out.Code(Asm.opc_dup);         (* TOS: lOp, lOp, ...               *)
+		  out.StoreLocal(temp);          (* TOS: lOp, ...                    *)
+          e.PushValue(rOp, rOp.type);    (* TOS: rOp, lOp, ...               *)
+		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
+          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_dup);         (* TOS: rOp', rOp', lOp, ...        *)
+		  out.StoreLocal(ixSv);          (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_shl);         (* TOS: lRz, ...    (left fragment) *)
+		  out.PushLocal(temp);           (* TOS: lOp, lRz, ...               *)
+		  out.PushInt(rtSz);             (* TOS: 32, lOp, lRz, ...           *)
+		  out.PushLocal(ixSv);           (* TOS: rOp', 32, lOp, lRz, ...     *)
+		  out.Code(Asm.opc_sub);         (* TOS: rOp'', lOp, lRz, ...        *)
+	     (* mask the shift amount in case idx = 0 *)
+		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
+          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
+		  out.Code(Asm.opc_shr_un);      (* TOS: rRz, lRz, ...               *)
+		  out.Code(Asm.opc_or);          (* TOS: ROT(lOp,rOp), ...           *)
+		  out.proc.ReleaseLocal(ixSv);
+		  out.proc.ReleaseLocal(temp);
+		  out.ConvertDn(hstT, lOp.type, FALSE);
+    END;
+  END Rotate;
+
+(* ============================================================ *)
+(*
+  PROCEDURE Shift(e : MsilEmitter; lOp, rOp : Sy.Expr; kind : INTEGER);
+    VAR out  : Mu.MsilFile;
+		long : BOOLEAN;
+		indx : INTEGER;      (* literal rOp value   *)
+        temp : INTEGER;      (* local to save lOp   *)
+		maskSz : INTEGER;    (* size of index mask  *)
+        exitLb : Mu.Label;
+        rshLab : Mu.Label;
+	(* --------------------------- *)
+	PROCEDURE ReplaceWithZero(i64 : BOOLEAN; f : Mu.MsilFile);
+	BEGIN
+	  f.Code(Asm.opc_pop);
+	  IF i64 THEN f.PushLong(0) ELSE f.PushInt(0) END;
+	END ReplaceWithZero;
+	(* --------------------------- *)
+  BEGIN
+    out := e.outF;
+    e.PushValue(lOp, lOp.type);
+    long := lOp.type = Bi.lIntTp;
+	IF long THEN maskSz := 63 ELSE maskSz := 31 END;
+   (*
+    *  Deal with shift by literal sizes 
+	*)
+    IF rOp.kind = Xp.numLt THEN
+      indx := intValue(rOp);
+      IF indx = 0 THEN (* skip *)
+	  ELSIF indx > maskSz THEN
+	    ReplaceWithZero(long, out);
+	  ELSIF indx > 0 THEN
+        out.PushInt(indx);
+        out.Code(Asm.opc_shl);
+      ELSIF kind = Xp.ashInt THEN
+        out.PushInt(MIN(-indx, 31)); 
+        out.Code(Asm.opc_shr);
+	  ELSIF indx < -maskSz THEN (* LSHR > wordsize () *)
+	    ReplaceWithZero(long, out);
+	  ELSE (* ==> kind = lshInt *)
+        out.PushInt(-indx);
+        out.Code(Asm.opc_shr_un);
+	  END;
+    ELSE
+      rshLab := out.newLabel();
+      exitLb := out.newLabel();
+	  temp := out.proc.newLocal(Bi.intTp);
+     (*
+      *  This is a variable shift. Do it the hard way.
+      *  First, check the sign of the right hand op.
+      *)
+      e.PushValue(rOp, rOp.type);       (* TOS: rOp, lOp, ...            *)
+      out.Code(Asm.opc_dup);            (* TOS: rOp, rOp, lOp, ...       *)
+      out.PushInt(0);
+      out.CodeLb(Asm.opc_blt, rshLab);  (* TOS: rOp, lOp, ...            *)
+     (*
+      *  Positive selector ==> shift left;
+	  *  Do range limitation on shift index
+      *)
+	  out.Code(Asm.opc_dup);            (* TOS: rOp, rOp, lOp, ...       *)
+	  out.StoreLocal(temp);             (* TOS: rOp, lOp, ...            *)
+	  out.PushInt(maskSz+1);            (* TOS: 32, rOp, lOp, ...        *)
+	  out.Code(Asm.opc_clt);            (* TOS: 0/1, lOp, ...            *)
+      out.Code(Asm.opc_neg);
+	  IF long THEN out.Code(Asm.opc_conv_i8) END;
+	  out.Code(Asm.opc_and);
+	  out.PushLocal(temp);
+	 (*
+	  *  Now do the shift
+	  *)
+      out.Code(Asm.opc_shl);
+      out.CodeLb(Asm.opc_br, exitLb);
+     (*
+      *  Negative selector ==> shift right;
+      *)
+      out.DefLab(rshLab);
+      out.Code(Asm.opc_neg);
+	  IF kind = Xp.ashInt THEN
+	    out.Code(Asm.opc_dup);             (* TOS: -rOp, -rOp, lOp, ...     *)
+	    out.PushInt(maskSz);               (* TOS: 31, -rOp, -rOp, lOp, ... *)
+	    out.Code(Asm.opc_cgt);             (* TOS: 0/1, -rOp, lOp, ...      *)
+	    out.PushInt(maskSz);               (* TOS: 31, 0/1, rOp, lOp, ...   *)
+	    out.Code(Asm.opc_mul);             (* TOS: 0/31, -rOp, lOp, ...     *)
+	    out.Code(Asm.opc_or);              (* TOS: MIN(-rOp,31), lOp, ...   *)
+	   (*
+	    *  Now do the shift
+	    *)
+        out.Code(Asm.opc_shr);
+	  ELSE (* ==> kind = lshInt *)
+	  (* FIXME *)
+	    out.Code(Asm.opc_dup);            (* TOS: rOp, rOp, lOp, ...       *)
+	    out.StoreLocal(temp);             (* TOS: rOp, lOp, ...            *)
+	    out.PushInt(maskSz+1);            (* TOS: 32, rOp, lOp, ...        *)
+	    out.Code(Asm.opc_clt);            (* TOS: 0/1, lOp, ...            *)
+        out.Code(Asm.opc_neg);
+	    IF long THEN out.Code(Asm.opc_conv_i8) END;
+	    out.Code(Asm.opc_and);
+	    out.PushLocal(temp);
+	   (*
+	    *  Now do the shift
+	    *)
+        out.Code(Asm.opc_shr_un);
+	  END;
+      out.DefLab(exitLb);
+	  out.proc.ReleaseLocal(temp);
+    END;
+  END Shift;
+ *)
+(* ============================================================ *)
+
+  PROCEDURE Shift2(e : MsilEmitter; lOp, rOp : Sy.Expr; kind : INTEGER);
+    VAR out  : Mu.MsilFile;
+		long : BOOLEAN;
+		indx : INTEGER;      (* literal rOp value   *)
+        temp : INTEGER;      (* local to save lOp   *)
+		maskSz : INTEGER;    (* size of index mask  *)
+        rshLab : Mu.Label;
+        exitLb : Mu.Label;
+        entryL : Mu.Label;
+        zeroLb : Mu.Label;
+	(* --------------------------- *)
+	PROCEDURE ReplaceWithZero(i64 : BOOLEAN; f : Mu.MsilFile);
+	BEGIN
+	  f.Code(Asm.opc_pop);
+	  IF i64 THEN f.PushLong(0) ELSE f.PushInt(0) END;
+	END ReplaceWithZero;
+	(* --------------------------- *)
+  BEGIN
+    out := e.outF;
+    e.PushValue(lOp, lOp.type);
+    long := lOp.type = Bi.lIntTp;
+	IF long THEN maskSz := 63 ELSE maskSz := 31 END;
+   (*
+    *  Deal with shift by literal sizes 
+	*)
+    IF rOp.kind = Xp.numLt THEN
+      indx := intValue(rOp);
+      IF indx = 0 THEN (* skip *)
+	  ELSIF indx > maskSz THEN
+	    ReplaceWithZero(long, out);
+	  ELSIF indx > 0 THEN
+        out.PushInt(indx);
+        out.Code(Asm.opc_shl);
+      ELSIF kind = Xp.ashInt THEN
+        out.PushInt(MIN(-indx, 31)); 
+        out.Code(Asm.opc_shr);
+	  ELSIF indx < -maskSz THEN (* LSHR > wordsize () *)
+	    ReplaceWithZero(long, out);
+	  ELSE (* ==> kind = lshInt *)
+        out.PushInt(-indx);
+        out.Code(Asm.opc_shr_un);
+	  END;
+    ELSE
+      entryL := out.newLabel();
+      rshLab := out.newLabel();
+      zeroLb := out.newLabel();
+      exitLb := out.newLabel();
+	  temp := out.proc.newLocal(Bi.intTp);
+	  e.PushValue(rOp, rOp.type);           (* TOS: rOp, lOp, ...            *)
+	  out.Code(Asm.opc_dup);                (* TOS: rOp, rOp, lOp, ...       *)
+	  out.StoreLocal(temp);                 (* TOS: rOp, lOp, ...            *)
+	  IF kind = Xp.lshInt THEN (* logical shift *)
+		out.PushInt(maskSz);                (* TOS: 31, rOp, lOp, ...        *)
+		out.Code(Asm.opc_add);              (* TOS: rOp*, lOp, ...           *)
+		out.PushInt(maskSz * 2);            (* TOS: 62, rOp*, lOp, ...       *)
+		out.CodeLb(Asm.opc_ble_un, entryL); (* TOS: lOp, ...                 *)
+		ReplaceWithZero(long, out);         (* TOS: rslt, ...                *)
+		out.CodeLb(Asm.opc_br, exitLb);     (* Jump directly to exit label   *)
+	   (* 
+	    *  Normal, in-range control flow.
+		*)
+		out.DefLab(entryL);
+		out.PushLocal(temp);              (* TOS: rOp, lOp, ...            *)
+        out.PushInt(0);                   (* TOS: 0, rOp, lOp, ...         *)
+        out.CodeLb(Asm.opc_blt, rshLab);  (* TOS: lOp, ...                 *)
+	   (* 
+	    *  Positive shift ==> left shift
+		*)
+		out.PushLocal(temp);              (* TOS: rOp, lOp, ...            *)
+	    out.Code(Asm.opc_shl);            (* TOS: rslt, ...                *)
+		out.CodeLb(Asm.opc_br, exitLb);   (* Jump directly to exit label   *)
+       (*
+        *  Negative selector ==> shift right;
+        *)
+        out.DefLab(rshLab);
+		out.PushLocal(temp);              (* TOS: rOp, lOp, ...            *)
+        out.Code(Asm.opc_neg);            (* TOS: -rOp, lOp, ...           *)
+		out.Code(Asm.opc_shr_un);         (* And fall through to exitLb    *)
+      ELSE (* kind = ashInt ==> Arithmetic Shift *)
+		out.PushInt(maskSz);              (* TOS: 31, rOp, lOp, ...        *)
+		out.CodeLb(Asm.opc_bgt, zeroLb);  (* TOS: lOp, ...                 *) 
+	    out.PushLocal(temp);              (* TOS: rOp, lOp, ...            *)
+		out.PushInt(-maskSz);             (* TOS: -31, rOp, lOp, ...       *)
+		out.CodeLb(Asm.opc_bgt, entryL);  (* TOS:  lop, ...                *)
+	   (*
+	    *  Negative shift is out of range.
+		*)
+		out.PushInt(-maskSz);
+		out.StoreLocal(temp); (* overwrite temp! *)
+		out.CodeLb(Asm.opc_br, rshLab);   (* TOS:  lop, ...                *)
+		out.DefLab(zeroLb);
+		ReplaceWithZero(long, out);
+		out.CodeLb(Asm.opc_br, exitLb);   (* Jump directly to exit label   *)
+	   (* 
+	    *  Normal, in-range control flow.
+		*)
+		out.DefLab(entryL);
+		out.PushLocal(temp);              (* TOS: rOp, lop, ...            *)
+        out.PushInt(0);
+        out.CodeLb(Asm.opc_blt, rshLab);  (* TOS: lOp, ...                 *)
+	   (* 
+	    *  Positive shift ==> left shift
+		*)
+		out.PushLocal(temp);              (* TOS: rOp, lop, ...            *)
+	    out.Code(Asm.opc_shl);
+		out.CodeLb(Asm.opc_br, exitLb);   (* Jump directly to exit label   *)
+       (*
+        *  Negative selector ==> shift right;
+        *)
+        out.DefLab(rshLab);
+		out.PushLocal(temp);              (* TOS: rOp, lop, ...            *)
+		out.Code(Asm.opc_neg);            (* TOS: -rOp, lop, ...           *)
+		out.Code(Asm.opc_shr);            (* And fall through to exitLb    *)
+	  END;
+      out.DefLab(exitLb);
+	  out.proc.ReleaseLocal(temp);
+    END;
+  END Shift2;
+
+(* ============================================================ *)
+
   PROCEDURE (e : MsilEmitter)
       PushBinary(exp : Xp.BinaryX; dst : Sy.Type),NEW;
     VAR out  : Mu.MsilFile;
@@ -1439,6 +1750,12 @@ MODULE MsilMaker;
     rOp := exp.rKid;
     ovfl := out.proc.prId.ovfChk & dst.isIntType();
     CASE exp.kind OF
+    (* -------------------------------- *)
+    | Xp.rotInt: 
+	    Rotate(e, lOp, rOp);
+    (* -------------------------------- *)
+    | Xp.ashInt, Xp.lshInt:
+	    Shift2(e, lOp, rOp, exp.kind); 
     (* -------------------------------- *)
     | Xp.index :
         rasd := exp(Xp.BinaryX).lKid.type IS Ty.Vector;
@@ -1719,133 +2036,6 @@ MODULE MsilMaker;
         out.CodeT(Asm.opc_isinst, rOp(Xp.IdLeaf).ident.type);
         out.Code(Asm.opc_ldnull);
         out.Code(Asm.opc_cgt_un);
-    (* -------------------------------- *)
-    | Xp.ashInt, Xp.lshInt:
-        e.PushValue(lOp, lOp.type);
-        IF rOp.kind = Xp.numLt THEN
-          indx := intValue(rOp);
-          IF indx = 0 THEN (* skip *)
-		  ELSIF indx > 0 THEN
-            out.PushInt(indx);
-            out.Code(Asm.opc_shl);
-          ELSIF exp.kind = Xp.ashInt THEN
-            out.PushInt(-indx);
-            out.Code(Asm.opc_shr);
-		  ELSE (* ==> exp.kind = lshInt *)
-            out.PushInt(-indx);
-            out.Code(Asm.opc_shr_un);
-		  END;
-        ELSE
-          tpLb := out.newLabel();
-          exLb := out.newLabel();
-	      long := dst(Ty.Base).tpOrd = Ty.lIntN;
-         (*
-          *  This is a variable shift. Do it the hard way.
-          *  First, check the sign of the right hand op.
-          *)
-          e.PushValue(rOp, rOp.type);
-          out.Code(Asm.opc_dup);
-          out.PushInt(0);
-          out.CodeLb(Asm.opc_blt, tpLb);
-		 (*
-		  *  Trim the shift index
-		  *)
-		  IF long THEN out.PushInt(63) ELSE out.PushInt(31) END;
-		  out.Code(Asm.opc_and);
-         (*
-          *  Positive selector ==> shift left;
-          *)
-          out.Code(Asm.opc_shl);
-          out.CodeLb(Asm.opc_br, exLb);
-         (*
-          *  Negative selector ==> shift right;
-          *)
-          out.DefLab(tpLb);
-          out.Code(Asm.opc_neg);
-		 (*
-		  *  Trim the shift index
-		  *)
-		  IF long THEN out.PushInt(63) ELSE out.PushInt(31) END;
-		  out.Code(Asm.opc_and);
-		  IF exp.kind = Xp.ashInt THEN
-            out.Code(Asm.opc_shr);
-		  ELSE (* ==> exp.kind = lshInt *)
-            out.Code(Asm.opc_shr_un);
-		  END;
-          out.DefLab(exLb);
-        END;
-    (* -------------------------------- *)
-    | Xp.rotInt:
-        e.PushValue(lOp, lOp.type);
-	   (* Convert TOS value to unsigned *)
-	    hstT := Bi.intTp;
-		IF (lOp.type = Bi.sIntTp) THEN 
-		  rtSz := 16;
-		  out.Code(Asm.opc_conv_u2);
-		ELSIF (lOp.type = Bi.byteTp) OR (lOp.type = Bi.uBytTp) THEN
-		  rtSz := 8;
-		  out.Code(Asm.opc_conv_u1);
-		ELSIF lOp.type = Bi.lIntTp THEN
-		  rtSz := 64;
-		  hstT := Bi.lIntTp;
-		ELSE
-		  rtSz := 32;
-		  (* out.Code(Asm.opc_conv_u4); *)
-		END;
-		
-        IF rOp.kind = Xp.numLt THEN
-		  indx := intValue(rOp) MOD rtSz;
-          IF indx = 0 THEN  (* skip *)
-		  ELSE (* 
-		    *  Rotation is achieved by means of the identity
-			*  Forall 0 <= n < rtSz: 
-			*    ROT(a, n) = LSH(a,n) bitwiseOR LSH(a,n-rtSz);
-			*)
-			temp := out.proc.newLocal(hstT);
-			out.Code(Asm.opc_dup);
-			out.PushInt(indx);
-			out.Code(Asm.opc_shl);
-			out.StoreLocal(temp);
-			out.PushInt(rtSz - indx);
-			out.Code(Asm.opc_shr_un);
-			out.PushLocal(temp);
-			out.Code(Asm.opc_or);
-			out.proc.ReleaseLocal(temp);
-          END;
-		  out.ConvertDn(hstT, lOp.type, FALSE);
-		ELSE
-         (*
-          *  This is a variable rotate.
-		  *
-		  *  Note that in the case of a short left operand the value
-		  *  on the stack has been converted to unsigned.  The value is
-		  *  saved as a int (rather than a shorter type) so that the 
-		  *  value does not get sign extended on each new load, 
-		  *  necessitating a new conversion each time.
-          *)
-		  temp := out.proc.newLocal(hstT);
-		  ixSv := out.proc.newLocal(Bi.intTp);
-		  out.Code(Asm.opc_dup);         (* TOS: lOp, lOp, ...               *)
-		  out.StoreLocal(temp);          (* TOS: lOp, ...                    *)
-          e.PushValue(rOp, rOp.type);    (* TOS: rOp, lOp, ...               *)
-		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
-          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
-		  out.Code(Asm.opc_dup);         (* TOS: rOp', rOp', lOp, ...        *)
-		  out.StoreLocal(ixSv);          (* TOS: rOp', lOp, ...              *)
-		  out.Code(Asm.opc_shl);         (* TOS: lRz, ...    (left fragment) *)
-		  out.PushLocal(temp);           (* TOS: lOp, lRz, ...               *)
-		  out.PushInt(rtSz);             (* TOS: 32, lOp, lRz, ...           *)
-		  out.PushLocal(ixSv);           (* TOS: rOp', 32, lOp, lRz, ...     *)
-		  out.Code(Asm.opc_sub);         (* TOS: rOp'', lOp, lRz, ...        *)
-	     (* mask the shift amount in case idx = 0 *)
-		  out.PushInt(rtSz-1);           (* TOS: 31, rOp, lOp, ...           *)
-          out.Code(Asm.opc_and);         (* TOS: rOp', lOp, ...              *)
-		  out.Code(Asm.opc_shr_un);      (* TOS: rRz, lRz, ...               *)
-		  out.Code(Asm.opc_or);          (* TOS: ROT(lOp,rOp), ...           *)
-		  out.proc.ReleaseLocal(ixSv);
-		  out.proc.ReleaseLocal(temp);
-		  out.ConvertDn(hstT, lOp.type, FALSE);
-        END;
     (* -------------------------------- *)
     | Xp.strCat :
         e.PushValue(lOp, lOp.type);
