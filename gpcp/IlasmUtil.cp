@@ -47,7 +47,7 @@ MODULE IlasmUtil;
 (* ============================================================ *)
 (* ============================================================ *)
 
-  TYPE IlasmFile* = POINTER TO RECORD (MsilUtil.MsilFile)
+  TYPE IlasmFile* = POINTER TO RECORD (Mu.MsilFile)
                  (* Fields inherited from MsilFile *
                   *   srcS* : Lv.CharOpen; (* source file name   *)
                   *   outN* : Lv.CharOpen;

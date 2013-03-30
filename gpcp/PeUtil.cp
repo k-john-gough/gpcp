@@ -2457,7 +2457,7 @@ MODULE PeUtil;
     VAR xtn : ANYPTR;
   BEGIN (* returns Api.Type descriptor for this type *)
     IF tTy.tgXtn = NIL THEN Mu.MkTypeName(tTy, os) END;
-    IF (tTy IS TypeDesc.Opaque) & (tTy.tgXtn = NIL) THEN os.RescueOpaque(tTy(TypeDesc.Opaque)) END;
+    IF (tTy IS Ty.Opaque) & (tTy.tgXtn = NIL) THEN os.RescueOpaque(tTy(Ty.Opaque)) END;
     xtn := tTy.tgXtn;
     IF xtn = NIL THEN
       IF tTy.xName # NIL THEN tTy.TypeErrStr(236, tTy.xName);

@@ -76,7 +76,7 @@ MODULE CPascal;
     BEGIN
       IF CPascalErrors.forVisualStudio OR
          CPascalErrors.xmlErrors THEN RETURN END;
-      b := "<" + CompState.modNam + ">";
+      b := "<" + CSt.modNam + ">";
       IF Scnr.errors = 0 THEN
         b := (b + " No errors");
       ELSIF Scnr.errors = 1 THEN

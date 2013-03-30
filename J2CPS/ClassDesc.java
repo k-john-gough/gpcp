@@ -53,8 +53,9 @@ public class ClassDesc extends TypeDesc  {
     public static ClassDesc GetClassDesc(String name, PackageDesc pack) {
     if (name.indexOf(jSepCh) != -1) { name = name.replace(jSepCh,qSepCh); }
     ClassDesc aClass = (ClassDesc)classList.get(name);
-    if (aClass == null) 
-        aClass = ClassDesc.MakeNewClassDesc(name,pack); 
+    if (aClass == null) {
+            aClass = ClassDesc.MakeNewClassDesc(name,pack);
+        } 
     return aClass;
   }
 
@@ -68,10 +69,12 @@ public class ClassDesc extends TypeDesc  {
   private ClassDesc(String thisName, PackageDesc pack) {
     typeOrd = TypeDesc.classT;
     qualName = thisName;
-    if (pack == null)
-        packageDesc = PackageDesc.getClassPackage(qualName);
-    else 
-        packageDesc = pack; 
+    if (pack == null) {
+          packageDesc = PackageDesc.getClassPackage(qualName);
+      }
+    else {
+          packageDesc = pack;
+      } 
   }
 
   public ClassDesc(int inNum) {
@@ -180,12 +183,15 @@ public class ClassDesc extends TypeDesc  {
   }
   
   public void TryImport(TypeDesc type){
-      if (type instanceof ClassDesc)
+      if (type instanceof ClassDesc) {
           this.AddImport((ClassDesc)type);
-      else if (type instanceof ArrayDesc)
+      }
+      else if (type instanceof ArrayDesc) {
           this.TryImport(((ArrayDesc)type).elemType);
-      else if (type instanceof PtrDesc)
+      }
+      else if (type instanceof PtrDesc) {
           ((PtrDesc)type).AddImport(this);
+      }
       
   }
 

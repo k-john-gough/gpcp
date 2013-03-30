@@ -276,6 +276,7 @@ MODULE IdDesc;
               * locals*  : IdSeq;       (* varId sequence *)
               * scopeNm* : L.CharOpen   (* external name  *)
               * ----------------------------------------- *)
+			    aliasMod* : BlkId;
                 modBody*  : D.Stmt;     (* mod init-stmts *)
                 modClose* : D.Stmt;     (* mod finaliz'n  *)
                 impOrd*   : INTEGER;    (* implement ord. *)
@@ -1203,7 +1204,7 @@ MODULE IdDesc;
        ~(D.rtsMd IN b.xAttr) &
        (b.symTb.lookup(b.hash) # NIL) THEN
       dName := D.getName.ChPtr(b);
-      b.scopeNm := LitValue.strToCharOpen("[" + dName^ + "]" + dName^);
+      b.scopeNm := L.strToCharOpen("[" + dName^ + "]" + dName^);
       b.hash := N.enterStr("__" + dName^);
       S.SemError.RepSt1(308, D.getName.ChPtr(b), b.token.lin, b.token.col);
     END;

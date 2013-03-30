@@ -98,7 +98,7 @@ MODULE JavaMaker;
 (* ------------------------------------ *)
 
   VAR
-        asmList : LitValue.CharOpenSeq;
+        asmList : L.CharOpenSeq;
         currentLoopLabel : Ju.Label;
 
 (* ============================================================ *)
@@ -122,7 +122,7 @@ MODULE JavaMaker;
   PROCEDURE newJavaEmitter*(mod : Id.BlkId) : JavaWorkList;
     VAR emitter : JavaWorkList;
         modEmit : JavaModEmitter;
-        modName : LitValue.CharOpen;
+        modName : L.CharOpen;
   BEGIN
     modName := Sy.getName.ChPtr(mod);
    (*
@@ -154,7 +154,7 @@ MODULE JavaMaker;
     VAR asm : JavaAssembler;
   BEGIN
     NEW(asm);
-    LitValue.ResetCharOpenSeq(asmList);
+    L.ResetCharOpenSeq(asmList);
     RETURN asm;
   END newJavaAsm;
 
@@ -296,7 +296,7 @@ MODULE JavaMaker;
 	thePar.type := Cst.ntvObj;
 	thePar.varOrd := 1;
 	Id.AppendParam(prcSig.formals, thePar);
-    Bi.MkDummyMethodAndInsert("equals", prcSig, Cst.ntvObj, Cst.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
+    Bi.MkDummyMethodAndInsert("equals", prcSig, Cst.ntvObj, Cst.sysLib, Sy.pubMode, Sy.var, Id.extns);
   END ObjectFeatures;
 
 (* ============================================================ *)
@@ -632,7 +632,7 @@ MODULE JavaMaker;
      (*
       *   Add this file to the list to assemble
       *)
-      LitValue.AppendCharOpen(asmList, LitValue.strToCharOpen(fileName));
+      L.AppendCharOpen(asmList, L.strToCharOpen(fileName));
     END;
     IF this.outF = NIL THEN
       CPascalS.SemError.Report(177, 0, 0);
@@ -1825,73 +1825,6 @@ MODULE JavaMaker;
 		ELSE
 		  ShiftInt(exp.kind, e, lOp, rOp);
 		END;
-	  (*
-        IF rOp.kind = Xp.numLt THEN
-          indx := intValue(rOp);
-          IF indx = 0 THEN  (* skip *)
-          ELSIF indx < 0 THEN (* right shift *)
-            out.PushInt(-indx);
-            IF long THEN
-			  IF exp.kind = Xp.ashInt THEN (* arith shift *)
-			    out.Code(Jvm.opc_lshr);
-			  ELSE (* logical shift *)
-			    out.Code(Jvm.opc_lushr);
-			  END;
-			ELSE (* integer sized *)
-			  IF exp.kind = Xp.ashInt THEN (* arith shift *)
-			    out.Code(Jvm.opc_ishr);
-			  ELSE (* logical shift *)
-			    out.Code(Jvm.opc_iushr);
-			  END;
-			END;
-		  ELSE (* a left shift *)
-		    out.PushInt(indx);
-		    IF long THEN
-              out.Code(Jvm.opc_lshl);
-			ELSE (* integer sized *)
-              out.Code(Jvm.opc_ishl);
-			END;
-		  END;
-        ELSE  (* variable sized shift *)
-          tpLb := out.newLabel();
-          exLb := out.newLabel();
-         (*
-          *  This is a variable shift. Do it the hard way.
-          *  First, check the sign of the right hand op.
-          *)
-          e.PushValue(rOp, Bi.intTp);
-          out.Code(Jvm.opc_dup);
-          out.CodeLb(Jvm.opc_iflt, tpLb);
-         (*
-          *  Positive selector ==> shift left;
-          *)
-		  IF long THEN
-            out.Code(Jvm.opc_lshl);
-		  ELSE
-            out.Code(Jvm.opc_ishl);
-		  END;
-          out.CodeLb(Jvm.opc_goto, exLb);
-         (*
-          *  Negative selector ==> shift right;
-          *)
-          out.DefLab(tpLb);
-          out.Code(Jvm.opc_ineg);
-		  IF long THEN
-		    IF exp.kind = Xp.ashInt THEN
-              out.Code(Jvm.opc_lshr);
-		    ELSE
-              out.Code(Jvm.opc_lushr);
-		    END;
-	      ELSE
-		    IF exp.kind = Xp.ashInt THEN
-              out.Code(Jvm.opc_ishr);
-		    ELSE
-              out.Code(Jvm.opc_iushr);
-			END;
-		  END;
-          out.DefLab(exLb);
-        END;
-	  *)
     (* -------------------------------- *)
     | Xp.strCat :
         e.PushValue(lOp, lOp.type);
@@ -2592,10 +2525,10 @@ MODULE JavaMaker;
         *)
         IF argN > 1 THEN
           numL := intValue(callX.actuals.a[1]);
-          out.Trap(fMsg + LitValue.intToCharOpen(numL)^);
+          out.Trap(fMsg + L.intToCharOpen(numL)^);
         ELSE
           numL := callX.token.lin;
-          out.Trap(fMsg + Cst.srcNam +":"+ LitValue.intToCharOpen(numL)^);
+          out.Trap(fMsg + Cst.srcNam +":"+ L.intToCharOpen(numL)^);
         END;
         out.DefLab(okLb);
    (* --------------------------- *)

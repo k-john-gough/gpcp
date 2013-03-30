@@ -559,17 +559,17 @@ MODULE StatDesc;
   (* ---------------------------------- *)
 
   PROCEDURE (s : Return)StmtAttr*(scope : D.Scope);
-    VAR prId : IdDesc.Procs;
+    VAR prId : I.Procs;
         rTyp : D.Type;
         xTyp : D.Type;
         rExp : D.Expr;
   BEGIN
-    IF scope.kind = IdDesc.modId THEN
+    IF scope.kind = I.modId THEN
       s.StmtError(73);
     ELSE
-      prId := scope(IdDesc.Procs);
+      prId := scope(I.Procs);
       s.prId := prId;
-      rTyp := prId.type(TypeDesc.Procedure).retType;
+      rTyp := prId.type(T.Procedure).retType;
       IF rTyp = NIL THEN
         IF s.retX # NIL THEN s.retX.ExprError(74) END;
       ELSE
@@ -590,7 +590,7 @@ MODULE StatDesc;
                 rExp.type := rTyp;
               END;
             END;
-            IF scope.kind = IdDesc.ctorP THEN
+            IF scope.kind = I.ctorP THEN
               WITH rExp : E.IdLeaf DO
                 IF rExp.ident.hash # B.selfBk THEN rExp.ExprError(225) END;
               ELSE rExp.ExprError(225);

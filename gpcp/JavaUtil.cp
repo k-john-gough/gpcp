@@ -1017,7 +1017,7 @@ MODULE JavaUtil;
     L.ResetCharOpenSeq(fmArray);
     L.AppendCharOpen(fmArray, lPar);
     IF pIdn.lxDepth > 0 THEN
-      LitValue.AppendCharOpen(fmArray, xhrMk); INC(count);
+      L.AppendCharOpen(fmArray, xhrMk); INC(count);
     END;
     FOR index := 0 TO pTyp.formals.tide-1 DO
       parId := pTyp.formals.a[index];
