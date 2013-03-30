@@ -19,7 +19,7 @@ MODULE CPascalP;
         C := Console,
         T := CPascalG,
         S := CPascalS,
-        G := CompState,
+        Cs := CompState,
         Sy := Symbols,
         Id := IdDesc,
         Ty := TypeDesc,
@@ -217,48 +217,48 @@ VAR
   BEGIN
     Expect(T.MODULESym);
     Expect(T.identSym);
-    G.thisMod.hash := NameHash.enterSubStr(token.pos, token.len);
-    G.thisMod.token := token;
-    Sy.getName.Of(G.thisMod, G.modNam);
+    Cs.thisMod.hash := NameHash.enterSubStr(token.pos, token.len);
+    Cs.thisMod.token := token;
+    Sy.getName.Of(Cs.thisMod, Cs.modNam);
    (* Manual addition 15-June-2000. *)
     IF nextT.sym = T.lbrackSym THEN
       Get;
-      IF G.strict THEN SemError(221); END;
+      IF Cs.strict THEN SemError(221); END;
       Expect(T.stringSym);
       name := LitValue.subStrToCharOpen(token.pos+1, token.len-2);
-      G.thisMod.scopeNm := name;
+      Cs.thisMod.scopeNm := name;
       Expect(T.rbrackSym);
-      IF G.verbose THEN G.Message('external modName "' + name^ + '"') END;
+      IF Cs.verbose THEN Cs.Message('external modName "' + name^ + '"') END;
     END;
    (* End addition 15-June-2000 kjg *)
     Expect(T.semicolonSym);
     IF (nextT.sym = T.IMPORTSym) THEN
-      ImportList(G.thisMod);
+      ImportList(Cs.thisMod);
     ELSE
-      Sy.ResetScpSeq(G.impSeq);
+      Sy.ResetScpSeq(Cs.impSeq);
     END;
-    DeclarationSequence(G.thisMod);
+    DeclarationSequence(Cs.thisMod);
     IF (nextT.sym = T.BEGINSym) THEN
-      G.thisMod.begTok := nextT;
+      Cs.thisMod.begTok := nextT;
       Get;
      (*
       *     "BEGIN" [ '[' "UNCHECKED_ARITHMETIC" ']' ] ...
       *)
       IF nextT.sym = T.lbrackSym THEN
         Get;
-        IF G.strict THEN SemError(221); END;
+        IF Cs.strict THEN SemError(221); END;
         Expect(T.identSym);
         IF NameHash.enterSubStr(token.pos, token.len) = Bi.noChkB THEN
-          G.thisMod.ovfChk := FALSE;
+          Cs.thisMod.ovfChk := FALSE;
         ELSE
           SemError(194);
         END;
         Expect(T.rbrackSym);
       END;
-      G.thisMod.modBody := statementSequence(NIL, G.thisMod);
+      Cs.thisMod.modBody := statementSequence(NIL, Cs.thisMod);
       IF (nextT.sym = T.CLOSESym) THEN
         Get;
-        G.thisMod.modClose := statementSequence(NIL, G.thisMod);
+        Cs.thisMod.modClose := statementSequence(NIL, Cs.thisMod);
       END;
     END;
   END CPmodule;
@@ -270,24 +270,24 @@ VAR
   BEGIN
     Expect(T.MODULESym);
     Expect(T.identSym);
-    G.thisMod.hash := NameHash.enterSubStr(token.pos, token.len);
-    G.thisMod.token := token;
-    Sy.getName.Of(G.thisMod, G.modNam);
+    Cs.thisMod.hash := NameHash.enterSubStr(token.pos, token.len);
+    Cs.thisMod.token := token;
+    Sy.getName.Of(Cs.thisMod, Cs.modNam);
     IF nextT.sym = T.lbrackSym THEN
       Get;
       Expect(T.stringSym);
       name := LitValue.subStrToCharOpen(token.pos+1, token.len-2);
-      G.thisMod.scopeNm := name;
+      Cs.thisMod.scopeNm := name;
       Expect(T.rbrackSym);
-      IF G.verbose THEN G.Message('external modName "' + name^ + '"') END;
+      IF Cs.verbose THEN Cs.Message('external modName "' + name^ + '"') END;
     END;
     Expect(T.semicolonSym);
     IF (nextT.sym = T.IMPORTSym) THEN
-      ImportList(G.thisMod);
+      ImportList(Cs.thisMod);
     ELSE
-      Sy.ResetScpSeq(G.impSeq);
+      Sy.ResetScpSeq(Cs.impSeq);
     END;
-    DeclarationSequence(G.thisMod);
+    DeclarationSequence(Cs.thisMod);
   END ForeignMod;
 
 (* ==================================================================== *)
@@ -308,7 +308,7 @@ VAR
       alias := Id.newAlias();
       alias.hash  := NameHash.enterSubStr(token.pos, token.len);
       IF Sy.refused(alias, modScope) THEN SemError(4) END;
-      Get; (* Read past colon symbol *)
+      Get; (* Read past colonequals symbol *)
      (*
       *          the place to put
       *  Here is ^ the experimental processing for the option
@@ -322,10 +322,12 @@ VAR
         ForeignName.ParseModuleString(strng, impNm);
         alias.token := token;  (* fake the name for err-msg use *)
         idHsh := NameHash.enterStr(impNm);
-        IF G.strict THEN Error(221) END;
+        IF Cs.strict THEN Error(221) END;
       ELSE
         Expect(T.identSym);
         alias.token := token;  (* fake the name for err-msg use *)
+		ident.aliasMod := alias;
+		IF Cs.verbose THEN alias.SetNameFromHash(alias.hash) END;
         idHsh := NameHash.enterSubStr(token.pos, token.len);
       END;
     ELSE
@@ -335,13 +337,13 @@ VAR
     ident.dfScp := ident;
     ident.hash  := idHsh;
 
-	IF G.verbose THEN ident.SetNameFromHash(idHsh) END;
+	IF Cs.verbose THEN ident.SetNameFromHash(idHsh) END;
 
     IF ident.hash = Bi.sysBkt THEN
-      dummy := CompState.thisMod.symTb.enter(Bi.sysBkt, CompState.sysMod);
-      IF G.verbose THEN G.Message("imports unsafe SYSTEM module") END;
-      IF ~CompState.unsafe THEN SemError(227);
-      ELSIF ~CompState.targetIsNET() THEN SemError(228);
+      dummy := Cs.thisMod.symTb.enter(Bi.sysBkt, Cs.sysMod);
+      IF Cs.verbose THEN Cs.Message("imports unsafe SYSTEM module") END;
+      IF ~Cs.unsafe THEN SemError(227);
+      ELSIF ~Cs.targetIsNET() THEN SemError(228);
       END;
     ELSE
       INCL(ident.xAttr, Sy.weak);
@@ -358,42 +360,62 @@ VAR
       *  there are already references to it in the structure.
       *)
       clash.token := ident.token;   (* to help error reports  *)
-	  IF G.verbose THEN clash.SetNameFromHash(clash.hash) END;
+	  IF Cs.verbose THEN clash.SetNameFromHash(clash.hash) END;
       ident := clash(Id.BlkId);
-      IF ~ident.isWeak() & 
-         (ident.hash # Bi.sysBkt) THEN SemError(170) END; (* imported twice  *)
+	 (*
+	  *  If this is the explicit import of a module that
+	  *  has an alias, then all is ok, make import usable.
+	  *)
+	  IF ident.aliasMod # NIL THEN
+	    EXCL(ident.xAttr, Sy.anon);
+		IF alias # NIL THEN (* multiple aliases for same module *)
+		  SemErrorS1(240, Sy.getName.ChPtr(ident.aliasMod));
+		END;
+	 (*
+	  *  If ident is the target of an alias then the 
+	  *  target is also made visible in the module.
+	  *)
+	  ELSIF alias # NIL THEN
+	    ident.aliasMod := alias;	    
+     (*
+	  *  Else this really is an error.
+	  *)
+      ELSIF ~ident.isWeak() & 
+         (ident.hash # Bi.sysBkt) THEN SemError(170); (* imported twice  *)
+	  END;
     ELSE
       SemError(4);
     END;
 
     IF ident.hash = NameHash.mainBkt THEN
       modScope.main := TRUE;      (* the import is "CPmain" *)
-      IF G.verbose THEN G.Message("contains CPmain entry point") END;
+      IF Cs.verbose THEN Cs.Message("contains CPmain entry point") END;
       INCL(modScope.xAttr, Sy.cMain); (* Console Main *)
     ELSIF ident.hash = NameHash.winMain THEN
       modScope.main := TRUE;      (* the import is "WinMain" *)
       INCL(modScope.xAttr, Sy.wMain); (* Windows Main *)
-      IF G.verbose THEN G.Message("contains WinMain entry point") END;
+      IF Cs.verbose THEN Cs.Message("contains WinMain entry point") END;
     ELSIF ident.hash = NameHash.staBkt THEN
       INCL(modScope.xAttr, Sy.sta);
-      IF G.verbose THEN G.Message("sets Single Thread Apartment") END;
+      IF Cs.verbose THEN Cs.Message("sets Single Thread Apartment") END;
     END;
 
     IF Sy.weak IN ident.xAttr THEN
      (*
+	  *  Module ident is a newly declared import.
       *  List the file, for importation later  ...
       *)
       Sy.AppendScope(impSeq, ident);
-     (*
-      *  Alias (if any) must appear after ImpId
-      *)
-      IF alias # NIL THEN
-        alias.dfScp  := ident;    (* AFTER clash resolved. *)
-        Sy.AppendScope(impSeq, alias);
-      END;
-      
+      IF alias # NIL THEN INCL(ident.xAttr, Sy.anon) END;	        
       EXCL(ident.xAttr, Sy.weak); (* ==> directly imported *)
       INCL(ident.xAttr, Sy.need); (* ==> needed in symfile *)
+	END;
+   (*
+    *  Alias (if any) must appear after ImpId
+    *)
+	IF alias # NIL THEN
+	  alias.dfScp := ident;
+	  Sy.AppendScope(impSeq, alias);
     END;
   END Import;
   
@@ -418,11 +440,11 @@ VAR
     VAR index  : INTEGER;
   BEGIN
     Get;
-    Sy.ResetScpSeq(G.impSeq);
-    Import(modScope, G.impSeq);
+    Sy.ResetScpSeq(Cs.impSeq);
+    Import(modScope, Cs.impSeq);
     WHILE (nextT.sym = T.commaSym) DO
       Get;
-      Import(modScope, G.impSeq);
+      Import(modScope, Cs.impSeq);
     END;
     Expect(T.semicolonSym);
 	(*
@@ -430,7 +452,7 @@ VAR
 	 *)
 	IF Sy.sta IN modScope.xAttr THEN
       IF Sy.trgtNET THEN
-        ImportThreading(modScope, G.impSeq);
+        ImportThreading(modScope, Cs.impSeq);
        ELSE
          SemError(238);
       END;
@@ -440,13 +462,13 @@ VAR
       END;	  
     END;
     
-    G.import1 := RTS.GetMillis();
-IF G.legacy THEN
-    OldSymFileRW.WalkImports(G.impSeq, modScope);
+    Cs.import1 := RTS.GetMillis();
+IF Cs.legacy THEN
+    OldSymFileRW.WalkImports(Cs.impSeq, modScope);
 ELSE
-    NewSymFileRW.WalkImports(G.impSeq, modScope);
+    NewSymFileRW.WalkImports(Cs.impSeq, modScope);
 END;
-    G.import2 := RTS.GetMillis();
+    Cs.import2 := RTS.GetMillis();
   END ImportList;
 
 (* ==================================================================== *)
@@ -514,7 +536,7 @@ END;
     tokn := nextT;
     tpDx := type(defScp, Sy.prvMode);
     IF tpDx # NIL THEN
-      pTst := ~G.special & (thisP # NIL) & (thisP.vMod = Sy.pubMode);
+      pTst := ~Cs.special & (thisP # NIL) & (thisP.vMod = Sy.pubMode);
 
       CheckFormalType(pTst, tokn, tpDx);
 
@@ -632,7 +654,7 @@ END;
     Expect(T.lparenSym);
     excp := identDef(pInhr, Id.varId)(Id.LocId);
     excp.SetKind(Id.conId);     (* mark immutable *)
-    excp.type := G.ntvExc;
+    excp.type := Cs.ntvExc;
     excp.varOrd := pInhr.locals.tide;
     IF Sy.refused(excp, pInhr) THEN
       excp.IdError(4);
@@ -668,7 +690,7 @@ END;
     END;
     IF nextT.sym = T.RESCUESym THEN
       Get;
-      IF G.strict THEN SemError(221); END;
+      IF Cs.strict THEN SemError(221); END;
       ExceptBody(pInhr);
     END;
     Expect(T.ENDSym);
@@ -708,13 +730,13 @@ END;
       END;
     END;
     IF nextT.sym = T.lbrackSym THEN
-      IF ~G.special THEN SemError(144) END;
+      IF ~Cs.special THEN SemError(144) END;
       Get;
       Expect(T.stringSym);
       name := LitValue.subStrToCharOpen(token.pos+1, token.len-2);
       prcD.prcNm := name;
       Expect(T.rbrackSym);
-      IF G.verbose THEN G.Message('external procName "' + name^ + '"') END;
+      IF Cs.verbose THEN Cs.Message('external procName "' + name^ + '"') END;
     END;
     prcT := Ty.newPrcTp();
     prcT.idnt := prcD;
@@ -747,8 +769,8 @@ END;
     ELSE
       desc.lxDepth := 0;
     END;
-    Id.AppendProc(G.thisMod.procs, desc);
-    IF ~desc.isEmpty() & ~G.isForeign() THEN
+    Id.AppendProc(Cs.thisMod.procs, desc);
+    IF ~desc.isEmpty() & ~Cs.isForeign() THEN
       Expect(T.semicolonSym);
       ProcedureBody(desc);
       desc.endSpan := S.mkSpanTT(token, nextT);
@@ -781,7 +803,7 @@ END;
     ELSIF desc.kind = Id.conPrc THEN
       desc.setPrcKind(Id.fwdPrc);
     END;
-    Id.AppendProc(G.thisMod.procs, desc);
+    Id.AppendProc(Cs.thisMod.procs, desc);
   END ForwardStuff;
 
 (* ==================================================================== *)
@@ -929,7 +951,7 @@ END;
       RETURN synthS;
     ELSIF nextT.sym = T.barSym THEN
       Get;
-      IF G.strict THEN SemError(221); END;
+      IF Cs.strict THEN SemError(221); END;
     END;
     IF nextT.sym # T.ELSESym THEN
       predXp := guard(scope);
@@ -1968,7 +1990,7 @@ END;
       hash := NameHash.enterSubStr(nextT.pos, nextT.len);
       IF (hash = Bi.constB) OR (hash = Bi.basBkt) THEN 
         Get;
-        IF G.strict THEN SemError(221); END;
+        IF Cs.strict THEN SemError(221); END;
         NEW(pDesc.basCll);
         IF hash = Bi.basBkt THEN 
           pDesc.basCll.empty := FALSE;
@@ -2181,7 +2203,7 @@ END;
       IF ~xpIn.hasDynamicType() THEN xpIn.ExprError(17); RETURN NIL END;
       IF dstT.kind = Ty.recTp THEN xpIn := implicitDerefOf(xpIn) END;
      (* Check #3 : Check that manifest type is a base of asserted type  *)
-      IF G.extras THEN
+      IF Cs.extras THEN
         IF ~xpIn.type.isBaseOf(dstT) &
            ~xpIn.type.isInterfaceType() &
            ~dstT.isInterfaceType() &
@@ -2194,7 +2216,7 @@ END;
            ~dstT.isInterfaceType() &
            ~dstT.isEventType() &
            ~Ty.isBoxedStruct(xpIn.type, dstT) THEN SemError(15); RETURN NIL END;
-      END; (* IF G.extras *)
+      END; (* IF Cs.extras *)
      (* Geez, it seems to be ok! *)
       xpIn := Xp.newUnaryX(Xp.tCheck, xpIn);
       xpIn.type := dstT;
@@ -2406,7 +2428,7 @@ END;
       iSyn.SetMode(mode);
       tTyp.idnt := iSyn;
       iSyn.type := tTyp;
-      ASSERT(CompState.thisMod.symTb.enter(iSyn.hash, iSyn));
+      ASSERT(Cs.thisMod.symTb.enter(iSyn.hash, iSyn));
     END;
   END FixAnon;
 
@@ -2504,7 +2526,7 @@ END;
       tokn := nextT;
       tpRt := type(scp, Sy.prvMode);
       typ.retType := tpRt;
-      test := ~G.special & (prc # NIL) & (prc.vMod = Sy.pubMode);
+      test := ~Cs.special & (prc # NIL) & (prc.vMod = Sy.pubMode);
       CheckRetType(test, tokn, tpRt);
     END ReturnType;
    (* --------------------------- *)
@@ -2629,13 +2651,13 @@ END;
       prcD.SetKind(Id.conPrc);
       prcD.bndType := rec;
       IF nextT.sym = T.lbrackSym THEN
-        IF ~G.special THEN SemError(144) END;
+        IF ~Cs.special THEN SemError(144) END;
         Get;
         Expect(T.stringSym);
         name := LitValue.subStrToCharOpen(token.pos+1, token.len-2);
         prcD.prcNm := name;
         Expect(T.rbrackSym);
-        IF G.verbose THEN G.Message('external procName "' + name^ + '"') END;
+        IF Cs.verbose THEN Cs.Message('external procName "' + name^ + '"') END;
       END;
       prcT := Ty.newPrcTp();
       prcT.idnt := prcD;
@@ -2651,7 +2673,7 @@ END;
         *  Put this header on the procedure list,
         *  so that it gets various semantic checks.
         *)
-        Id.AppendProc(G.thisMod.procs, prcD);
+        Id.AppendProc(Cs.thisMod.procs, prcD);
       ELSE
         prcD.IdError(6);
       END;
@@ -2810,8 +2832,8 @@ END;
   PROCEDURE  EventType(eTyp : Ty.Procedure; defScp : Sy.Scope; vMod : INTEGER);
   BEGIN
     Expect(T.EVENTSym);
-    IF ~G.targetIsNET() THEN SemError(208);
-    ELSIF G.strict THEN SemError(221); 
+    IF ~Cs.targetIsNET() THEN SemError(208);
+    ELSIF Cs.strict THEN SemError(221); 
     END;
     IF ~(defScp IS Id.BlkId) THEN SemError(212) END;
     IF (nextT.sym = T.lparenSym) THEN
@@ -2831,7 +2853,7 @@ END;
     VAR tpId : Id.TypId;
   BEGIN
     Expect(T.RECORDSym);
-    IF Sy.frnMd IN G.thisMod.xAttr THEN
+    IF Sy.frnMd IN Cs.thisMod.xAttr THEN
       INCL(rTyp.xAttr, Sy.isFn);         (* must be foreign *)
     END;
     IF (nextT.sym = T.lparenSym) THEN
@@ -2846,7 +2868,7 @@ END;
      (* interfaces ... *)
       WHILE (nextT.sym = T.plusSym) DO
         Get;
-        IF G.strict & (nextT.sym = T.plusSym) THEN SemError(221); END;
+        IF Cs.strict & (nextT.sym = T.plusSym) THEN SemError(221); END;
         tpId := typeQualid(defScp);
         IF tpId # NIL THEN Sy.AppendType(rTyp.interfaces, tpId.type) END;
       END;
@@ -2855,7 +2877,7 @@ END;
     FieldListSequence(rTyp, defScp, vMod);
     IF nextT.sym = T.STATICSym THEN
       Get;
-      IF ~G.special THEN SemError(185) END;
+      IF ~Cs.special THEN SemError(185) END;
       INCL(rTyp.xAttr, Sy.isFn);         (* must be foreign *)
       StaticStuff(rTyp, defScp, vMod);
     END;
@@ -2869,7 +2891,7 @@ END;
     *  Enum --> ENUM RECORD StatDef { ';' StatDef } END .
     *)
   BEGIN
-    IF ~G.special THEN SemError(185) END;
+    IF ~Cs.special THEN SemError(185) END;
     Get;      (* read past ENUM *)
     (* Expect(T.RECORDSym); *)
     EnumConst(enum, defScp, vMod);
@@ -2896,7 +2918,7 @@ END;
       rTyp.recAtt := Ty.limit;
     ELSIF nextT.sym = T.INTERFACESym THEN
       Get;
-      IF G.strict THEN SemError(221); END;
+      IF Cs.strict THEN SemError(221); END;
       rTyp.recAtt := Ty.iFace;
     ELSE Error(87);
     END;
@@ -2937,7 +2959,7 @@ END;
     Expect(T.OFSym);
     aTyp.elemTp := type(defScp, vMod);
     IF vMod # Sy.prvMode THEN FixAnon(defScp, aTyp.elemTp, vMod) END;
-    IF G.strict THEN SemError(221) END;
+    IF Cs.strict THEN SemError(221) END;
   END VectorType;
 
 (* ==================================================================== *)
@@ -3036,7 +3058,7 @@ END;
     IF (nextT.sym = T.identSym) THEN
       tpId := typeQualid(defScp);
       IF tpId = NIL THEN RETURN NIL END;
-      IF ~G.extras THEN RETURN tpId.type END;
+      IF ~Cs.extras THEN RETURN tpId.type END;
       (* Compound type parsing... look for comma *)
       IF nextT.sym # T.commaSym THEN RETURN tpId.type
       ELSE RETURN CompoundType(defScp, tpId) END;
@@ -3186,7 +3208,8 @@ END;
         locl : Id.LocId;
         tpId : Id.TypId;
         tpTp : Sy.Type;
-        modS : Sy.Scope;
+       (*  modS : Sy.Scope; *)
+        modS : Id.BlkId;
         hash : INTEGER;
         eNum : INTEGER;
   BEGIN
@@ -3212,7 +3235,7 @@ END;
           WITH locl : Id.ParId DO
             IF (locl.parMod # Sy.val) &
                (locl.type # NIL) & 
-                ~G.targetIsJVM() &
+                ~Cs.targetIsJVM() &
                 ~locl.type.isRefSurrogate() THEN
               eNum := 310;
               INCL(locl.locAtt, Id.cpVarP);
@@ -3223,29 +3246,13 @@ END;
           INCL(idnt.dfScp(Id.Procs).pAttr, Id.hasXHR);
           INCL(locl.locAtt, Id.uplevA); (* uplevel Any *)
         END;
-(*
- *     (*
- *      *  As of version 1.06 uplevel addressing is
- *      *  ok, except for reference params in .NET.
- *      *  This needs to be fixed by 
- *      *     (1) producing unverifiable code
- *      *     (2) adopting inexact semantics in this case.
- *      *  To be determined later ...
- *      *)
- *      WITH locl : Id.ParId DO
- *        IF (locl.parMod # Sy.val) &
- *           (locl.type # NIL) & 
- *            ~G.targetIsJVM() &
- *            ~locl.type.isRefSurrogate() THEN
- *           S.SemError.RepSt1(189, Sy.getName.ChPtr(idnt), token.lin, 0);
- *        END;
- *      ELSE (* skip *)
- *      END;
- *)
       END;
       RETURN idnt;
     ELSE
-      modS := idnt(Sy.Scope);
+      modS := idnt(Id.BlkId);
+	  IF Sy.anon IN modS.xAttr THEN 
+	    SemErrorS1(239, Sy.getName.ChPtr(modS.aliasMod));
+	  END;
     END;
     Expect(T.pointSym);
     Expect(T.identSym);
@@ -3273,7 +3280,7 @@ END;
     VAR idnt : Sy.Idnt;
         tpId : Id.TypId;
         tpTp : Sy.Type;
-        modS : Sy.Scope;
+        modS : Id.BlkId;
         hash : INTEGER;
   BEGIN
     Expect(T.identSym);
@@ -3301,7 +3308,10 @@ END;
     ELSIF idnt.kind = Id.typId THEN
       RETURN idnt(Id.TypId);
     ELSIF (idnt.kind = Id.impId) OR (idnt.kind = Id.alias) THEN
-      modS := idnt(Sy.Scope);
+      modS := idnt(Id.BlkId);
+	  IF Sy.anon IN modS.xAttr THEN 
+	    SemErrorS1(239, Sy.getName.ChPtr(modS.aliasMod));
+	  END;
     ELSE
       SemError(5);
       IF nextT.sym # T.pointSym THEN RETURN NIL END;
@@ -3354,12 +3364,12 @@ END;
                     iSyn := Id.newLocId();
                   END;
     END;
-    IF iSyn IS Sy.Scope THEN iSyn(Sy.Scope).ovfChk := G.ovfCheck END;
+    IF iSyn IS Sy.Scope THEN iSyn(Sy.Scope).ovfChk := Cs.ovfCheck END;
     iSyn.token := nextT;
     iSyn.hash  := NameHash.enterSubStr(nextT.pos, nextT.len);
-    IF G.verbose THEN iSyn.SetNameFromHash(iSyn.hash) END;
+    IF Cs.verbose THEN iSyn.SetNameFromHash(iSyn.hash) END;
     iSyn.dfScp := inhScp;
-    IF nextT.dlr & ~G.special THEN SemErrorT(186, nextT) END;
+    IF nextT.dlr & ~Cs.special THEN SemErrorT(186, nextT) END;
     Expect(T.identSym);
     IF (nextT.sym = T.starSym) OR
        (nextT.sym = T.bangSym) OR
@@ -3373,10 +3383,10 @@ END;
       ELSE
         Get;
         iSyn.SetMode(Sy.protect);
-        IF ~G.special THEN SemError(161) END;
+        IF ~Cs.special THEN SemError(161) END;
       END;
     END;
-    IF  (iSyn.vMod # Sy.prvMode) & (inhScp # G.thisMod) THEN
+    IF  (iSyn.vMod # Sy.prvMode) & (inhScp # Cs.thisMod) THEN
       SemError(128);
     END;
     RETURN iSyn;
@@ -3394,28 +3404,28 @@ END;
       hsh := NameHash.enterSubStr(nextT.pos, nextT.len);
       IF hsh = Bi.sysBkt THEN
         Get;
-        INCL(G.thisMod.xAttr, Sy.rtsMd);
-        IF G.verbose THEN G.Message("Compiling a SYSTEM Module") END;
-        IF ~G.special THEN SemError(144) END;
+        INCL(Cs.thisMod.xAttr, Sy.rtsMd);
+        IF Cs.verbose THEN Cs.Message("Compiling a SYSTEM Module") END;
+        IF ~Cs.special THEN SemError(144) END;
       ELSIF hsh = Bi.frnBkt THEN
         Get;
-        INCL(G.thisMod.xAttr, Sy.frnMd);
-        IF G.verbose THEN G.Message("Compiling a FOREIGN Module") END;
-        IF ~G.special THEN SemError(144) END;
+        INCL(Cs.thisMod.xAttr, Sy.frnMd);
+        IF Cs.verbose THEN Cs.Message("Compiling a FOREIGN Module") END;
+        IF ~Cs.special THEN SemError(144) END;
       END;
       ForeignMod;
     ELSIF nextT.sym = T.MODULESym THEN
       (*  Except for empty bodies this next will be overwritten later *)
-      G.thisMod.begTok := nextT;
+      Cs.thisMod.begTok := nextT;
       CPmodule;
     END;
-    G.thisMod.endTok := nextT;
+    Cs.thisMod.endTok := nextT;
     Expect(T.ENDSym);
     Expect(T.identSym);
     S.GetString(token.pos, token.len, nam);
-    IF nam # G.modNam THEN
+    IF nam # Cs.modNam THEN
       IF token.sym = T.identSym THEN err := 1 ELSE err := 0 END;
-      SemErrorS1(err, G.modNam$);
+      SemErrorS1(err, Cs.modNam$);
     END;
     Expect(T.pointSym);
   END Module;
@@ -3426,7 +3436,7 @@ END;
   BEGIN
     NEW(nextT); (* so that token is not even NIL initially *)
     S.Reset; Get;
-    G.parseS := RTS.GetMillis();
+    Cs.parseS := RTS.GetMillis();
     Module;
   END Parse;
   
@@ -3435,23 +3445,23 @@ END;
   PROCEDURE parseTextAsStatement*(text : ARRAY OF LitValue.CharOpen; encScp : Sy.Scope) : Sy.Stmt;
     VAR result : Sy.Stmt;
   BEGIN
-    G.SetQuiet;
+    Cs.SetQuiet;
     NEW(nextT);
     S.NewReadBuffer(text); Get;
     result := statementSequence(NIL, encScp);
     S.RestoreFileBuffer();
-    G.RestoreQuiet;
+    Cs.RestoreQuiet;
     RETURN result;
   END parseTextAsStatement;
 
   PROCEDURE ParseDeclarationText*(text : ARRAY OF LitValue.CharOpen; encScp : Sy.Scope);
   BEGIN
-    G.SetQuiet;
+    Cs.SetQuiet;
     NEW(nextT);
     S.NewReadBuffer(text); Get;
     DeclarationSequence(encScp);
     S.RestoreFileBuffer();
-    G.RestoreQuiet;
+    Cs.RestoreQuiet;
   END ParseDeclarationText;
 
 (* ==================================================================== *)

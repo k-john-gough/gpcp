@@ -20,7 +20,7 @@ MODULE CPascalErrors;
 
   CONST
     consoleWidth = 80;
-    listingWidth = 256;
+    listingWidth = 128;
     listingMax   = listingWidth-1;
 
   TYPE
@@ -509,6 +509,8 @@ MODULE CPascalErrors;
     | 236: str := "Cannot resolve CLR name of this type";
     | 237: str := "Invalid hex escape sequence in this string";
     | 238: str := "STA is illegal unless target is NET";
+    | 239: str := "This module can only be accessed via an alias";
+    | 240: str := "This module already has an alias";
 
     | 298: str := "ILASM failed to assemble IL file";
     | 299: str := "Compiler raised an internal exception";
@@ -624,6 +626,9 @@ MODULE CPascalErrors;
 		       "Binding scope of feature is record type <" + s1 + ">");
     | 236: msg := LitValue.strToCharOpen(
                        "Cannot resolve CLR name of type : " + s1);
+    | 239, 
+	  240: msg := LitValue.strToCharOpen(
+	                   'This module has alias name "' + s1 + '"');
     | 299: msg := LitValue.strToCharOpen("Exception: " + s1);
     | 308: msg := LitValue.strToCharOpen(
                        "Renaming static class to <" + s1 + ">");

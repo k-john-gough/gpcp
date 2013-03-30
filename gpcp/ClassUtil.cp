@@ -202,7 +202,7 @@ MODULE ClassUtil;
                      END;
                       
   TYPE ClassFile* = POINTER TO RECORD (J.JavaFile)
-                      file* : GPBinFiles.FILE;
+                      file* : F.FILE;
                       meth*  : MethodInfo;
                       nxtLb : INTEGER;
                       access : INTEGER;
@@ -597,11 +597,11 @@ MODULE ClassUtil;
  *  srcFileName := L.strToCharOpen(CSt.srcNam); 
  *  NEW(f);
  *
- *  f.file := GPBinFiles.createPath(fileName);
+ *  f.file := F.createPath(fileName);
  *)
     srcFileName := BOX(CSt.srcNam$); 
     NEW(fil);
-    fil.file := GPBinFiles.createPath(ptr);
+    fil.file := F.createPath(ptr);
 
     IF fil.file = NIL THEN RETURN NIL; END;
 (*
@@ -2236,7 +2236,7 @@ MODULE ClassUtil;
     u2(cf.file,cf.srcFileAttIx); 
     u4(cf.file,2);  (* length of source file attribute *) 
     u2(cf.file,cf.srcFileIx); 
-    GPBinFiles.CloseFile(cf.file);
+    F.CloseFile(cf.file);
   END Dump;
 
 (* ============================================================ *)

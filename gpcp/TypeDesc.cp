@@ -12,7 +12,7 @@ MODULE TypeDesc;
 
   IMPORT
         GPCPcopyright,
-        Con := Console,
+        Console,
         GPText,
         VarSets,
         NameHash,
@@ -28,7 +28,7 @@ MODULE TypeDesc;
 (* ============================================================ *)
 
   CONST (* type-kinds *)
-    basTp* = Symbols.standard;
+    basTp* = Sy.standard;
     tmpTp* = 1;  namTp* = 2; arrTp* = 3;
     recTp* = 4;  ptrTp* = 5; prcTp* = 6;
     enuTp* = 7;  evtTp* = 8; ovlTp* = 9;
@@ -2700,10 +2700,10 @@ MODULE TypeDesc;
     s.SuperDiag(i);
     IF s.resolved # NIL THEN
       name := s.resolved.name();
-      H.Indent(i+2); Con.WriteString("alias of " + name^);
+      H.Indent(i+2); Console.WriteString("alias of " + name^);
       s.resolved.SuperDiag(i+2);
     ELSE
-      H.Indent(i+2); Con.WriteString("opaque not resolved"); Con.WriteLn;
+      H.Indent(i+2); Console.WriteString("opaque not resolved"); Console.WriteLn;
     END;
   END Diagnose;
 
@@ -2712,12 +2712,12 @@ MODULE TypeDesc;
   PROCEDURE (s : Array)Diagnose*(i : INTEGER);
   BEGIN
     s.SuperDiag(i);
-    H.Indent(i+2); Con.WriteString("Element type");
+    H.Indent(i+2); Console.WriteString("Element type");
     IF s.elemTp # NIL THEN
-      Con.WriteLn;
+      Console.WriteLn;
       s.elemTp.Diagnose(i+2);
     ELSE
-      Con.WriteString(" NIL"); Con.WriteLn;
+      Console.WriteString(" NIL"); Console.WriteLn;
     END;
   END Diagnose;
 
@@ -2785,12 +2785,12 @@ MODULE TypeDesc;
   PROCEDURE (s : Pointer)Diagnose*(i : INTEGER);
   BEGIN
     s.SuperDiag(i);
-    H.Indent(i+2); Con.WriteString("Bound type");
+    H.Indent(i+2); Console.WriteString("Bound type");
     IF s.boundTp # NIL THEN
-      Con.WriteLn;
+      Console.WriteLn;
       s.boundTp.Diagnose(i+2);
     ELSE
-      Con.WriteString(" NIL"); Con.WriteLn;
+      Console.WriteString(" NIL"); Console.WriteLn;
     END;
     Sy.DoXName(i, s.xName);
   END Diagnose;

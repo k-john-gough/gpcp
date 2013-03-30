@@ -1649,7 +1649,7 @@ MODULE ExprDesc;
       kid2 := kid1.kid;
       IF kid2.kind = deref THEN kid2 := kid2(UnaryX).kid END;
       WITH kid2 : IdLeaf DO
-        WITH s : IdDesc.MthId DO
+        WITH s : I.MthId DO
           IF kid2.ident # s.rcvFrm THEN c.ExprError(166) END;
         ELSE
           c.ExprError(166);

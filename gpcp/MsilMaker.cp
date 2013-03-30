@@ -134,33 +134,33 @@ MODULE MsilMaker;
    (*
     *  Create import descriptor for [mscorlib]System
     *)
-    Builtin.MkDummyImport("mscorlib_System", "[mscorlib]System", blk);
+    Bi.MkDummyImport("mscorlib_System", "[mscorlib]System", blk);
 	CSt.SetSysLib(blk);
    (*
     *  Create various classes.
     *)
-    Builtin.MkDummyClass("Object", blk, Ty.isAbs, obj);
+    Bi.MkDummyClass("Object", blk, Ty.isAbs, obj);
     CSt.ntvObj := obj.type;
-    Builtin.MkDummyClass("String", blk, Ty.noAtt, str);
-    Builtin.SetPtrBase(str, obj);
+    Bi.MkDummyClass("String", blk, Ty.noAtt, str);
+    Bi.SetPtrBase(str, obj);
     CSt.ntvStr := str.type;
-    Builtin.MkDummyClass("Exception", blk, Ty.extns, exc);
-    Builtin.SetPtrBase(exc, obj);
+    Bi.MkDummyClass("Exception", blk, Ty.extns, exc);
+    Bi.SetPtrBase(exc, obj);
     CSt.ntvExc := exc.type;
-    Builtin.MkDummyClass("Type", blk, Ty.isAbs, typ);
-    Builtin.SetPtrBase(typ, obj);
+    Bi.MkDummyClass("Type", blk, Ty.isAbs, typ);
+    Bi.SetPtrBase(typ, obj);
     CSt.ntvTyp := typ.type;
 
-    Builtin.MkDummyClass("Delegate", blk, Ty.extns, del);
-    Builtin.SetPtrBase(del, obj);
-    Builtin.MkDummyClass("MulticastDelegate", blk, Ty.extns, evt);
-    Builtin.SetPtrBase(evt, del);
+    Bi.MkDummyClass("Delegate", blk, Ty.extns, del);
+    Bi.SetPtrBase(del, obj);
+    Bi.MkDummyClass("MulticastDelegate", blk, Ty.extns, evt);
+    Bi.SetPtrBase(evt, del);
     CSt.ntvEvt := evt.type;
 
     (* NEED SOME WORK HERE?? *)
 
-    Builtin.MkDummyClass("ValueType", blk, Ty.extns, del);
-    Builtin.SetPtrBase(del, obj);
+    Bi.MkDummyClass("ValueType", blk, Ty.extns, del);
+    Bi.SetPtrBase(del, obj);
     CSt.ntvVal := del.type.boundRecTp();
 
     Mu.SetNativeNames();
@@ -168,32 +168,32 @@ MODULE MsilMaker;
    (*
     *  Create import descriptor for [RTS]RTS
     *)
-    Builtin.MkDummyImport("RTS", "[RTS]", blk);
-    Builtin.MkDummyAlias("NativeType", blk, typ.type, CSt.clsId);
-    Builtin.MkDummyAlias("NativeObject", blk, obj.type, CSt.objId);
-    Builtin.MkDummyAlias("NativeString", blk, str.type, CSt.strId);
-    Builtin.MkDummyAlias("NativeException", blk, exc.type, CSt.excId);
+    Bi.MkDummyImport("RTS", "[RTS]", blk);
+    Bi.MkDummyAlias("NativeType", blk, typ.type, CSt.clsId);
+    Bi.MkDummyAlias("NativeObject", blk, obj.type, CSt.objId);
+    Bi.MkDummyAlias("NativeString", blk, str.type, CSt.strId);
+    Bi.MkDummyAlias("NativeException", blk, exc.type, CSt.excId);
     INCL(blk.xAttr, Sy.need);
     CSt.rtsBlk := blk;
    (*
     *  Uplevel addressing stuff. This is part of RTS assembly.
     *)
-    Builtin.MkDummyClass("XHR", blk, Ty.isAbs, typ);
+    Bi.MkDummyClass("XHR", blk, Ty.isAbs, typ);
     CSt.rtsXHR := typ.type;
     CSt.xhrId.recTyp := CSt.rtsXHR.boundRecTp();
     CSt.xhrId.type   := CSt.rtsXHR;
    (*
     *  Access to [RTS]RTS::dblPosInfinity, etc.
     *)
-    Builtin.MkDummyVar("dblPosInfinity", blk, Bi.realTp, CSt.dblInf);
-    Builtin.MkDummyVar("dblNegInfinity", blk, Bi.realTp, CSt.dblNInf);
-    Builtin.MkDummyVar("fltPosInfinity", blk, Bi.sReaTp, CSt.fltInf);
-    Builtin.MkDummyVar("fltNegInfinity", blk, Bi.sReaTp, CSt.fltNInf);
+    Bi.MkDummyVar("dblPosInfinity", blk, Bi.realTp, CSt.dblInf);
+    Bi.MkDummyVar("dblNegInfinity", blk, Bi.realTp, CSt.dblNInf);
+    Bi.MkDummyVar("fltPosInfinity", blk, Bi.sReaTp, CSt.fltInf);
+    Bi.MkDummyVar("fltNegInfinity", blk, Bi.sReaTp, CSt.fltNInf);
    (*
     *  Access to [RTS]ProgArgs::argList
     *)
-    Builtin.MkDummyImport("ProgArgs", "", blk);
-    Builtin.MkDummyVar("argList", blk, Ty.mkArrayOf(CSt.ntvStr), CSt.argLst);
+    Bi.MkDummyImport("ProgArgs", "", blk);
+    Bi.MkDummyVar("argList", blk, Ty.mkArrayOf(CSt.ntvStr), CSt.argLst);
     INCL(blk.xAttr, Sy.rtsMd);
     CSt.prgArg := blk;
   END Init;
@@ -227,7 +227,7 @@ MODULE MsilMaker;
 	thePar.type := CSt.ntvObj;
 	thePar.varOrd := 1;
 	Id.AppendParam(prcSig.formals, thePar);
-    Builtin.MkDummyMethodAndInsert("Equals", prcSig, CSt.ntvObj, CSt.sysLib, Sy.pubMode, Sy.var, IdDesc.extns);
+    Bi.MkDummyMethodAndInsert("Equals", prcSig, CSt.ntvObj, CSt.sysLib, Sy.pubMode, Sy.var, Id.extns);
   END ObjectFeatures;
 
 (* ============================================================ *)

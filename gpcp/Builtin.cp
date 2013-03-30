@@ -148,12 +148,12 @@ MODULE Builtin;
 			      blk : IdDesc.BlkId;
 			      att : INTEGER;
 			  OUT tId : IdDesc.TypId);
-    VAR ptr : TypeDesc.Pointer;
-	rec : TypeDesc.Record;
+    VAR ptr : Typ.Pointer;
+	rec : Typ.Record;
 	jnk : BOOLEAN;
   BEGIN
-    ptr := TypeDesc.newPtrTp(); 
-    rec := TypeDesc.newRecTp(); 
+    ptr := Typ.newPtrTp(); 
+    rec := Typ.newRecTp(); 
     tId := IdDesc.newTypId(ptr);
     ptr.idnt    := tId;
     ptr.boundTp := rec;
@@ -171,19 +171,19 @@ MODULE Builtin;
 (* ------------------------------------------------------------	*)
 
   PROCEDURE MkDummyMethodAndInsert*(IN namStr : ARRAY OF CHAR;
-                                       prcTyp : TypeDesc.Procedure;
+                                       prcTyp : Typ.Procedure;
                                        hostTp : Symbols.Type;
                                        scope  : IdDesc.BlkId;
                                        access : INTEGER;
                                        rcvFrm : INTEGER;
                                        mthAtt : SET);
     VAR mthD : IdDesc.MthId;
-        recT : TypeDesc.Record;
+        recT : Typ.Record;
         rcvD : IdDesc.ParId;
        	oldD : IdDesc.OvlId;
         junk : BOOLEAN;
   BEGIN
-    recT := hostTp.boundRecTp()(TypeDesc.Record);
+    recT := hostTp.boundRecTp()(Typ.Record);
     prcTyp.receiver := hostTp;
 
     mthD := IdDesc.newMthId();
@@ -204,7 +204,7 @@ MODULE Builtin;
 	rcvD.dfScp := mthD;
 
     mthD.rcvFrm := rcvD;
-    TypeDesc.InsertInRec(mthD, recT, TRUE, oldD, junk);
+    Typ.InsertInRec(mthD, recT, TRUE, oldD, junk);
     Symbols.AppendIdnt(recT.methods, mthD);
   END MkDummyMethodAndInsert;
 
@@ -243,25 +243,25 @@ MODULE Builtin;
 (* ------------------------------------------------------------	*)
 
   PROCEDURE SetPtrBase*(cls, bas : IdDesc.TypId);
-    VAR ptrC : TypeDesc.Pointer;
-	recC : TypeDesc.Record;
-    VAR ptrB : TypeDesc.Pointer;
-	recB : TypeDesc.Record;
+    VAR ptrC : Typ.Pointer;
+	recC : Typ.Record;
+    VAR ptrB : Typ.Pointer;
+	recB : Typ.Record;
   BEGIN
-    ptrC := cls.type(TypeDesc.Pointer); 
-    recC := ptrC.boundTp(TypeDesc.Record);
-    ptrB := bas.type(TypeDesc.Pointer); 
-    recB := ptrB.boundTp(TypeDesc.Record);
+    ptrC := cls.type(Typ.Pointer); 
+    recC := ptrC.boundTp(Typ.Record);
+    ptrB := bas.type(Typ.Pointer); 
+    recB := ptrB.boundTp(Typ.Record);
     recC.baseTp := recB;
   END SetPtrBase;
 
 (* ============================================================ *)
 
   PROCEDURE InitAnyRec(ord : INTEGER);
-    VAR base : TypeDesc.Base;
+    VAR base : Typ.Base;
         tpId : IdDesc.TypId;
   BEGIN
-    base := TypeDesc.anyRecTp;
+    base := Typ.anyRecTp;
     tpId := IdDesc.newTypId(base);
     anyRec := base;
     anyTpId := tpId;
@@ -272,10 +272,10 @@ MODULE Builtin;
   END InitAnyRec;
 
   PROCEDURE InitAnyPtr(ord : INTEGER);
-    VAR base : TypeDesc.Base;
+    VAR base : Typ.Base;
 	tpId : IdDesc.TypId;
   BEGIN
-    base := TypeDesc.anyPtrTp;
+    base := Typ.anyPtrTp;
     tpId := IdDesc.newTypId(base);
     anyPtr := base;
     base.idnt  := tpId;
@@ -287,10 +287,10 @@ MODULE Builtin;
 (* -------------------------------------------- *)
 
   PROCEDURE StdType(ord : INTEGER; OUT var : Symbols.Type);
-    VAR base : TypeDesc.Base;
+    VAR base : Typ.Base;
 	tpId : IdDesc.TypId;
   BEGIN
-    base := TypeDesc.newBasTp();
+    base := Typ.newBasTp();
     tpId := IdDesc.newTypId(base);
     base.idnt  := tpId;
     base.tpOrd := ord;
