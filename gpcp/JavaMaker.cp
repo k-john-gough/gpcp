@@ -1920,7 +1920,7 @@ MODULE JavaMaker;
               out.PushSReal(exp.value.real());
             END;
         | Xp.strLt  :
-            IF typ = Bi.charTp THEN
+            IF (typ = Bi.charTp) OR (typ = Bi.sChrTp) THEN
               out.PushInt(ORD(exp.value.chr0()));
             ELSE
               out.PushStr(exp.value.chOpen());
