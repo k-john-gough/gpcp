@@ -2323,7 +2323,7 @@ BEGIN
                                "(Ljava/lang/String;)Ljava/lang/Class;");
 
   typeArr[ Ty.boolN] := 4;
-  typeArr[ Ty.sChrN] := 8;
+  typeArr[ Ty.sChrN] := 5;
   typeArr[ Ty.charN] := 5;
   typeArr[ Ty.byteN] := 8;
   typeArr[ Ty.uBytN] := 8;

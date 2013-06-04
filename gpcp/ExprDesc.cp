@@ -2688,15 +2688,24 @@ MODULE ExprDesc;
   (* Make permitted base-type coercions explicit in the AST *)
     VAR rslt : D.Expr;
         expT : D.Type;
+		valu : INTEGER;
   BEGIN
     expT := expr.type;
     IF  (expT = dstT) OR
         (dstT.kind # T.basTp) OR
         (dstT = Builtin.anyPtr) THEN
       RETURN expr;
-    ELSIF (dstT = Builtin.charTp) & (expT = Builtin.strTp) THEN
+    ELSIF (dstT = Builtin.charTp) & (expT = Builtin.strTp) THEN	  
       expr.type := dstT;
-      RETURN expr;
+	  RETURN expr;
+    ELSIF (dstT = Builtin.sChrTp) & (expT = Builtin.strTp) THEN
+      valu := ORD(expr(LeafX).value.chr0());
+	  IF (valu < 255) THEN  
+        expr.type := dstT;
+		RETURN expr;
+      ELSE
+        expr.type := Builtin.charTp;
+      END;
     END;
     IF dstT.includes(expr.type) THEN
       rslt := newIdentX(cvrtUp, dstT.idnt, expr);

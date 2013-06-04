@@ -1613,24 +1613,29 @@ MODULE JavaUtil;
 	ELSE  RETURN;				(* PREMATURE RETURN! *)
         END;
     | Ty.sIntN :
-	jf.ConvertDn(inT, Blt.intTp);
-	(* jf.RangeCheck(...); STILL TO DO *)
-	code := Jvm.opc_i2s;
+        jf.ConvertDn(inT, Blt.intTp);
+        (* jf.RangeCheck(...); STILL TO DO *)
+        code := Jvm.opc_i2s;
     | Ty.uBytN :
-	jf.ConvertDn(inT, Blt.intTp);
-	(* jf.RangeCheck(...); STILL TO DO *)
+         jf.ConvertDn(inT, Blt.intTp);
+        (* jf.RangeCheck(...); STILL TO DO *)
         jf.PushInt(255);
-	code := Jvm.opc_iand;
+        code := Jvm.opc_iand;
     | Ty.byteN :
 	jf.ConvertDn(inT, Blt.intTp);
 	(* jf.RangeCheck(...); STILL TO DO *)
 	code := Jvm.opc_i2b;
     | Ty.setN  : 
 	jf.ConvertDn(inT, Blt.intTp); RETURN;	(* PREMATURE RETURN! *)
-    | Ty.charN, Ty.sChrN  : 
-	jf.ConvertDn(inT, Blt.intTp);
-	(* jf.RangeCheck(...); STILL TO DO *)
-	code := Jvm.opc_i2c;
+    | Ty.charN  : 
+        jf.ConvertDn(inT, Blt.intTp);
+        (* jf.RangeCheck(...); STILL TO DO *)
+        code := Jvm.opc_i2c;
+    | Ty.sChrN  : 
+        jf.ConvertDn(inT, Blt.intTp);
+        (* jf.RangeCheck(...); STILL TO DO *)
+        jf.PushInt(255);
+        code := Jvm.opc_iand;
     END;
     jf.Code(code);
   END ConvertDn;
