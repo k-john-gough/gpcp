@@ -997,7 +997,7 @@ MODULE JavaUtil;
       | typ : Ty.Opaque DO
 	  IF typ.xName = NIL THEN MkAliasName(typ) END;
 	  L.AppendCharOpen(lst, typ.scopeNm);
-	  | typ : Ty.Procedure DO
+      | typ : Ty.Procedure DO
 	  IF typ.xName = NIL THEN MkProcTypeName(typ) END;
 	  L.AppendCharOpen(lst, typ.hostClass.scopeNm);
       END;
