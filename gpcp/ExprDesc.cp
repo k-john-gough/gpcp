@@ -2813,7 +2813,7 @@ MODULE ExprDesc;
 
         IF frmTyp IS T.Procedure THEN
           formal.IdError(301);
-          IF G.targetIsJVM() THEN formal.IdError(213);
+          IF G.targetIsJVM() THEN formal.IdError(320);
           ELSIF (frmTyp # actTyp) &
              ~actual.isProcLit() THEN formal.IdError(191) END;
         END;
