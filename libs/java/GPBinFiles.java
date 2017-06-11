@@ -9,6 +9,7 @@ package CP.GPBinFiles;
 import java.io.*;
 import CP.CPJ.CPJ;
 import CP.GPFiles.GPFiles.*;
+import CP.ProgArgs.ProgArgs.*;
 
 public class GPBinFiles {
 
@@ -40,6 +41,10 @@ public class GPBinFiles {
 
     String nextDir;
     String thisPath = System.getProperty(pName);
+    if (thisPath == null)
+	    thisPath = System.getenv(pName);
+    if (thisPath == null)
+	    return null;
     GPBinFiles_FILE cpf = new GPBinFiles_FILE();
     boolean found = false; 
     boolean pathFinished = false;
@@ -122,7 +127,6 @@ public class GPBinFiles {
     //    cpf.length = cpf.rf.length();
     return cpf;
   } 
-
   public static boolean EOF(GPBinFiles_FILE cpf) throws IOException {
     return cpf.rf.getFilePointer() >= cpf.length;
   }

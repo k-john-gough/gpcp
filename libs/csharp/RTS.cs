@@ -781,7 +781,7 @@ public class ProgArgs
 
         public static void GetEnvVar(char[] name, char[] valu) {
             System.String nam = CP_rts.mkStr(name);
-            System.String val = System.Environment.GetEnvironmentVariable(nam);
+            System.String val = System.Environment.GetEnvironmentVariable(nam, System.EnvironmentVariableTarget.User);
             CP_rts.StrToChF(valu, val);
         }
 
@@ -891,16 +891,11 @@ public class CP_rts
 	// Known in ILASM as [RTS]CP_rts::chrArrLength
 	public static int chrArrLength(char[] src)
 	{
-	    int  ix = 0;
-	    char ch;
-	    do {
-		ch = src[ix];
-		ix++;
-	    } while (ch != '\0');
-// System.Console.Write(ix-1);
-// System.Console.Write(' ');
-// System.Console.WriteLine(src);
-	    return ix-1;
+        int len = src.Length;
+        for (int ix = 0; ix < len; ix++)
+            if (src[ix] == '\0')
+                return ix - 1;
+        return len;
 	}
 
 /* -------------------------------------------------------------------- */
