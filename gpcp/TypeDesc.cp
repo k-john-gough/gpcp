@@ -1444,19 +1444,19 @@ MODULE TypeDesc;
         *  - else this is an overload, and must be marked.
         *)
         WITH existingId : Id.FldId DO
-            ok := rec.symTb.enter(id.hash, id);
+            ok := rec.symTb.enter(id.hash, id); (* *)
         | existingId : Id.Procs DO
             IF existingId.type.sigsMatch(id.type) THEN
-              ok := rec.symTb.enter(id.hash, id);
+              ok := rec.symTb.enter(id.hash, id); (* *)
             ELSE
               oId := newOvlIdent(id,rec);
-              ok := rec.symTb.enter(oId.hash,oId);
+              ok := rec.symTb.enter(oId.hash,oId); (* *)
             END;
         | existingId : Id.OvlId DO
             oId := existingId;
-            AddToOvlIdent(id,existingId,doKindCheck,ok);
+            AddToOvlIdent(id,existingId,doKindCheck,ok); (* *)
         ELSE (* must be a field *)
-            ok := rec.symTb.enter(id.hash, id);
+            ok := rec.symTb.enter(id.hash, id); (* *)
         END;
       END;
     ELSIF ~rec.symTb.enter(id.hash, id) THEN

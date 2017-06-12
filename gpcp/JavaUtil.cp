@@ -14,7 +14,7 @@ MODULE JavaUtil;
 	Console,
 	JavaBase,
 	Hsh := NameHash,
-	Cst := CompState,
+	CSt := CompState,
 	Psr := CPascalP,
 	Jvm := JVMcodes,
 	Sym := Symbols,
@@ -22,6 +22,7 @@ MODULE JavaUtil;
 	Id  := IdDesc,
 	Xp  := ExprDesc,
 	Ty  := TypeDesc,
+        St  := StatDesc,
 	L   := LitValue;
 
 (* ============================================================ *)
@@ -55,14 +56,25 @@ MODULE JavaUtil;
 
 (* ============================================================ *)
 
+  CONST (* Label attributes *)
+        unfixed*     = 0; (* attr can be unfixed or posFixed     *)
+        posFixed*    = 1;
+        forceEmit*   = 2; (* label is emitted, even if ~jumpSeen *)
+        forceEmpty*  = 3; 
+        assertEmpty* = 4;
+        jumpSeen*    = 5;
+
+(* ============================================================ *)
+
   TYPE JavaFile* = POINTER TO ABSTRACT RECORD
 		     theP* : Id.Procs;
                    END;
 
 (* ============================================================ *)
 
-  TYPE Label* = POINTER TO RECORD
+  TYPE Label* = POINTER TO EXTENSIBLE RECORD
                   defIx* : INTEGER;
+                  attr*  : SET;
                 END;
 
 (* ============================================================ *)
@@ -85,10 +97,16 @@ MODULE JavaUtil;
   VAR   xhrIx : INTEGER;
         xhrDl : L.CharOpen;
         xhrMk : L.CharOpen;
+        xhrPtr : Sym.Type;   (* = CSt.rtsXHR          *)
+        xhrRec : Ty.Record;  (* = xhrPtr.boundRecTp() *)
 
   VAR   invokeHash : INTEGER;
-		ptvIx      : INTEGER;    (* Index number for procedure type literals *)
+        ptvIx      : INTEGER;    (* Index number for procedure type literals *)
         procLitPrefix : L.CharOpen;
+
+(* ============================================================ *)
+
+  VAR   boxTp : ARRAY Ty.metaN + 1 OF Sym.Type;
 
 (* ============================================================ *)
 
@@ -100,6 +118,11 @@ MODULE JavaUtil;
         vecExpnd  : ARRAY Ty.anyPtr+1 OF Id.MthId;
 
 (* ============================================================ *)
+  PROCEDURE (lb : Label)Str*() : L.CharOpen,NEW,EXTENSIBLE;
+  BEGIN RETURN BOX("?") END Str;
+
+  PROCEDURE (lb : Label)JumpSeen*() : BOOLEAN,NEW;
+  BEGIN RETURN jumpSeen IN lb.attr END JumpSeen;
 
   PROCEDURE (jf : JavaFile)StartModClass*(mod : Id.BlkId),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)StartRecClass*(rec : Ty.Record),NEW,ABSTRACT;
@@ -118,11 +141,21 @@ MODULE JavaUtil;
                                            dims : INTEGER),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)MkArrayCopy*(arrT : Ty.Array),NEW,ABSTRACT;
 
-  PROCEDURE (jf : JavaFile)newLocal*() : INTEGER,NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)ReleaseLocal*(i : INTEGER),NEW,ABSTRACT;
-  PROCEDURE (jf : JavaFile)ReleaseAll*(m : INTEGER),NEW,ABSTRACT;
+ (*
+  *  Managing temporary variable allocations.  As of version
+  *  1.4.01 release of locals is strictly first-in, first-out.
+  *  The new*Local methods return an integer, since the code
+  *  generator needs to refer to the local by index. However
+  *  the old ReleaseLocal( i ) method is replaced by no-arg Pop()
+  *)
+  PROCEDURE (jf : JavaFile)newLocal*( type : Sym.Type ) : INTEGER,NEW,ABSTRACT; 
+  PROCEDURE (jf : JavaFile)newLongLocal*( type : Sym.Type ) : INTEGER,NEW,ABSTRACT; 
+  PROCEDURE (jf : JavaFile)PopLocal*(),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)PopLongLocal*(),NEW,ABSTRACT;
 
+  PROCEDURE (jf : JavaFile)ReleaseAll*(m : INTEGER),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)markTop*() : INTEGER,NEW,ABSTRACT;
+
   PROCEDURE (jf : JavaFile)getDepth*() : INTEGER,NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)setDepth*(i : INTEGER),NEW,ABSTRACT;
 
@@ -130,7 +163,22 @@ MODULE JavaUtil;
   PROCEDURE (jf : JavaFile)getLabelRange*(VAR labs:ARRAY OF Label),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)AddSwitchLab*(lab : Label; 
                                          pos : INTEGER),NEW,ABSTRACT;
+ (*
+  *  Emitters which create stack frames can be simpler if it is
+  *  known that certain labels always have an empty eval stack.
+  *)
+  PROCEDURE (jf : JavaFile)newEmptystackLabel*() : Label,NEW,EXTENSIBLE;
+  BEGIN
+    RETURN jf.newLabel();
+  END newEmptystackLabel;
 
+  PROCEDURE (jf : JavaFile)newLoopheaderLabel*() : Label,NEW,EXTENSIBLE;
+  BEGIN
+    RETURN jf.newLabel();
+  END newLoopheaderLabel;
+
+  PROCEDURE (jf : JavaFile)LoadLocal*(ord : INTEGER; typ : Sym.Type),NEW,ABSTRACT;
+  PROCEDURE (jf : JavaFile)StoreLocal*(ord : INTEGER; typ : Sym.Type),NEW,ABSTRACT;
 
   PROCEDURE (jf : JavaFile)Comment*(IN msg : ARRAY OF CHAR),NEW,EMPTY;
   PROCEDURE (jf : JavaFile)Header*(IN str : ARRAY OF CHAR),NEW,EMPTY;
@@ -149,8 +197,12 @@ MODULE JavaUtil;
                                     IN c : ARRAY OF CHAR),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)CodeInc*(localIx,incVal : INTEGER),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)CodeT*(code : INTEGER; ty : Sym.Type),NEW,ABSTRACT;
+
   PROCEDURE (jf : JavaFile)CodeSwitch*(low,high : INTEGER; 
-                                       defLab : Label),NEW,ABSTRACT;
+                                           defLab : Label),NEW,ABSTRACT;
+
+  PROCEDURE (jf : JavaFile)CodeSwitchEnd*(low,high : INTEGER; 
+                                          defLab : Label),NEW,EMPTY;
 
   PROCEDURE (jf : JavaFile)PushStr*(IN str : L.CharOpen),NEW,ABSTRACT;
   PROCEDURE (jf : JavaFile)LoadConst*(num : INTEGER),NEW,ABSTRACT;
@@ -215,11 +267,62 @@ MODULE JavaUtil;
   PROCEDURE^ (jf : JavaFile)ConvertDn*(inT, outT : Sym.Type),NEW;
 
   PROCEDURE^ cat2*(i,j : L.CharOpen) : L.CharOpen;
+  PROCEDURE^ MkVecName*(typ : Ty.Vector);
+  PROCEDURE^ MkProcTypeName*(typ : Ty.Procedure);
   PROCEDURE^ MkRecName*(typ : Ty.Record);
   PROCEDURE^ MkProcName*(proc : Id.Procs);
   PROCEDURE^ NumberParams(pIdn : Id.Procs; pTyp : Ty.Procedure);
   PROCEDURE^ typeToChOpen(typ : Sym.Type) : L.CharOpen;
 
+
+(* ============================================================ *)
+
+  PROCEDURE i2CO*( i : INTEGER ) : L.CharOpen;
+    VAR cArr : ARRAY 16 OF CHAR;
+  BEGIN
+    RTS.IntToStr( i, cArr );
+    RETURN BOX(cArr);
+  END i2CO;
+
+  PROCEDURE b2CO*( i : BOOLEAN ) : L.CharOpen;
+    VAR cArr : ARRAY 16 OF CHAR;
+  BEGIN
+    IF i THEN RETURN BOX("TRUE") ELSE RETURN BOX("FALSE") END;
+  END b2CO;
+
+  PROCEDURE k2CO*( k : INTEGER ) : L.CharOpen;
+    VAR cArr : ARRAY 8 OF CHAR;
+  BEGIN
+    CASE k OF
+    | St.emptyS   : cArr := "Empty";
+    | St.assignS  : cArr := "Assign";
+    | St.procCall : cArr := "Call";
+    | St.ifStat   : cArr := "IF";
+    | St.caseS    : cArr := "CASE";
+    | St.whileS   : cArr := "WHILE";
+    | St.repeatS  : cArr := "REPEAT";
+    | St.forStat  : cArr := "FOR";
+    | St.loopS    : cArr := "LOOP";
+    | St.withS    : cArr := "WITH";
+    | St.exitS    : cArr := "EXIT";
+    | St.returnS  : cArr := "RETURN";
+    | St.blockS   : cArr := "Block";
+    END;
+    RETURN BOX( cArr );
+  END k2CO;
+
+(* ============================================================ *)
+
+  PROCEDURE (jf : JavaFile)AloadLocal*(ord : INTEGER;
+                                       typ : Sym.Type),NEW,EXTENSIBLE;
+  (* typ is only required for back-ends generating StackFrames *)
+  BEGIN
+    IF ord < 4 THEN
+      jf.Code( Jvm.opc_aload_0 + ord );
+    ELSE
+      jf.CodeI( Jvm.opc_aload, ord );
+    END;
+  END AloadLocal;
 
 (* ============================================================ *)
 
@@ -236,16 +339,22 @@ MODULE JavaUtil;
       ths := ths.dfScp(Id.Procs);
       IF Id.hasXHR IN ths.pAttr THEN INC(count) END;
     UNTIL (ths.lxDepth = 0) OR
-	  ((ths.lxDepth <= tgt.lxDepth) & (Id.hasXHR  IN ths.pAttr));
+	  ((ths.lxDepth <= tgt.lxDepth) & (Id.hasXHR IN ths.pAttr));
     RETURN count;
   END xhrCount;
 
+(* ============================================================ *)
+(*   Generate a new XHR record name, unique within this module  *)
+(* ============================================================ *)
   PROCEDURE newXHR() : L.CharOpen;
   BEGIN
     INC(xhrIx);
     RETURN cat2(xhrDl, L.intToCharOpen(xhrIx));
   END newXHR;
 
+(* ============================================================ *)
+(*   Generate XHR class for this proc, chained to uplevel XHRs  *)
+(* ============================================================ *)
   PROCEDURE MkXHR(scp : Id.Procs);
     VAR typId : Id.TypId;
 	recTp : Ty.Record;
@@ -253,11 +362,11 @@ MODULE JavaUtil;
 	locVr : Id.LocId;
 	fldVr : Id.FldId;
   BEGIN
-    Blt.MkDummyClass(newXHR(), Cst.thisMod, Ty.noAtt, typId);
+    Blt.MkDummyClass(newXHR(), CSt.thisMod, Ty.noAtt, typId);
     typId.SetMode(Sym.prvMode);
     scp.xhrType := typId.type;
     recTp := typId.type.boundRecTp()(Ty.Record);
-    recTp.baseTp := Cst.rtsXHR.boundRecTp();
+    recTp.baseTp := xhrRec;
     INCL(recTp.xAttr, Sym.noCpy);
 
     FOR index := 0 TO scp.locals.tide-1 DO
@@ -267,6 +376,7 @@ MODULE JavaUtil;
         fldVr.hash := locVr.hash;
         fldVr.type := locVr.type;
         fldVr.recTyp := recTp;
+        fldVr.fldNm := Sym.getName.ChPtr( locVr );
 	Sym.AppendIdnt(recTp.fields, fldVr);
       END;
     END;
@@ -276,6 +386,10 @@ MODULE JavaUtil;
 (*			Some vector utilities			*)
 (* ============================================================ *)
 
+  (* -------------------------------------------------- *)
+  (*  Map vector element type to host-ord, taking into  *)
+  (*  account the type erasure for all non-basic types. *)
+  (* -------------------------------------------------- *)
   PROCEDURE mapVecElTp(typ : Sym.Type) : INTEGER;
   BEGIN
     WITH typ : Ty.Base DO
@@ -289,6 +403,10 @@ MODULE JavaUtil;
     END;
   END mapVecElTp;
 
+  (* -------------------------------------------------- *)
+  (*          Map vector host-ord to host type,         *)
+  (*           pseudo-inverse of mapVecElTp()           *)
+  (* -------------------------------------------------- *)
   PROCEDURE mapOrdRepT(ord : INTEGER) : Sym.Type;
   BEGIN
     CASE ord OF
@@ -326,6 +444,7 @@ MODULE JavaUtil;
       *)
       vecTide := Id.newFldId();
       vecTide.hash := Hsh.enterStr("tide");
+      vecTide.fldNm := BOX("tide");
       vecTide.dfScp := vecBlkId;
       vecTide.recTyp := vecBase.type.boundRecTp();
       vecTide.type := Blt.intTp;
@@ -361,26 +480,27 @@ MODULE JavaUtil;
     RETURN vecClsTyId(ord).type.boundRecTp()(Ty.Record);
   END vecRecTyp;
 
-  PROCEDURE vecArrFlId(ord : INTEGER) : Id.FldId;
+  PROCEDURE vecArrFldId(ord : INTEGER) : Id.FldId;
     VAR fld : Id.FldId;
   BEGIN
     IF vecElms[ord] = NIL THEN
       fld := Id.newFldId();
-      fld.hash := Hsh.enterStr("elms");
+      fld.hash  := Hsh.enterStr("elms");
+      fld.fldNm := BOX("elms");
       fld.dfScp := vecModId();
       fld.recTyp := vecRecTyp(ord);
       fld.type := Ty.mkArrayOf(mapOrdRepT(ord));
       vecElms[ord] := fld;
     END;
     RETURN vecElms[ord];
-  END vecArrFlId;
+  END vecArrFldId;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (jf : JavaFile)MkVecRec*(eTp : Sym.Type),NEW;
+  PROCEDURE (jf : JavaFile)MkVecRec*(elTp : Sym.Type),NEW;
     VAR ord : INTEGER;
   BEGIN
-    ord := mapVecElTp(eTp);
+    ord := mapVecElTp(elTp);
     jf.MkNewRecord(vecRecTyp(ord));
   END MkVecRec;
 
@@ -392,7 +512,7 @@ MODULE JavaUtil;
   BEGIN
     ord := mapVecElTp(eTp);
     jf.Alloc1d(mapOrdRepT(ord));
-    jf.PutGetF(Jvm.opc_putfield, vecRecTyp(ord), vecArrFlId(ord));
+    jf.PutGetF(Jvm.opc_putfield, vecRecTyp(ord), vecArrFldId(ord));
   END MkVecArr;
 
 (* ------------------------------------------------------------ *)
@@ -402,7 +522,7 @@ MODULE JavaUtil;
         fId : Id.FldId;
   BEGIN
     ord := mapVecElTp(eTp);
-    fId := vecArrFlId(ord);
+    fId := vecArrFldId(ord);
     jf.PutGetF(Jvm.opc_getfield, fId.recTyp(Ty.Record), fId);
   END GetVecArr;
 
@@ -496,9 +616,48 @@ MODULE JavaUtil;
   (*   A parameter needs to be boxed if it has non-reference 	*)
   (*   representation in the JVM, and is OUT or VAR mode.	*)
   BEGIN
+   (* EXPERIMENTAL, 26-Oct-2016 *)
+    IF i.type IS Ty.Opaque THEN i.type := i.type(Ty.Opaque).resolved END;
     RETURN ((i.parMod = Sym.var) OR (i.parMod = Sym.out)) & 
 	   i.type.isScalarType();
   END needsBox;
+
+  PROCEDURE EnsureTypName( typ : Sym.Type );
+  BEGIN
+    IF typ.xName # NIL THEN RETURN END;
+    WITH typ : Ty.Record DO
+        MkRecName( typ );
+    | typ : Ty.Vector DO
+        MkVecName( typ );
+    | typ : Ty.Array DO
+        EnsureTypName( typ.elemTp );
+        typ.xName := cat2( brac, typ.elemTp.xName );
+    | typ : Ty.Pointer DO
+        EnsureTypName( typ.boundTp );
+        typ.xName := typ.boundTp.xName;
+    | typ : Ty.Procedure DO
+        MkProcTypeName( typ );
+    | typ : Ty.Opaque DO
+        typ.xName := typ.resolved.xName;
+    ELSE
+      THROW( "Can't make TypName" );
+    END;
+  END EnsureTypName;
+
+  PROCEDURE TypeOfBox*(t : Sym.Type) : Sym.Type;
+  BEGIN
+    WITH t : Ty.Base DO
+        RETURN boxTp[ t.tpOrd ];
+    | t : Ty.Pointer DO
+       (* could memoize these values ... in t.tgXtn? *)
+        RETURN Ty.mkArrayOf( t );
+    | t : Ty.Opaque DO
+        RETURN TypeOfBox(t.resolved);
+    ELSE
+      EnsureTypName( t );
+      THROW ( "TypeOfBox of non-base type: " + t.xName^ );
+    END;
+  END TypeOfBox;
 
 (* ============================================================ *)
 
@@ -541,13 +700,18 @@ MODULE JavaUtil;
     ELSE
       mod.scopeNm := cat3(prfx, slsh, mNm); (* "CP/<modname>" *)
     END;
-    IF ~Cst.doCode         (* Only doing Jasmin output       *)
-        OR Cst.doJsmn      (* Forcing assembly via Jasmin    *)
+    IF ~CSt.doCode         (* Only doing Jasmin output       *)
+        OR CSt.doJsmn      (* Forcing assembly via Jasmin    *)
         OR (mod.scopeNm[0] = 0X) (* Explicitly forcing no package! *) THEN
       mod.xName   := mNm;
     ELSE (* default case *)
       mod.xName := cat3(mod.scopeNm, slsh, mNm);
     END;
+(*
+CSt.Message( "made scope name " + mod.scopeNm^ );
+CSt.Message( "made block name " + mod.xName^ );
+CSt.Message( "made mNm name " + mNm^ );
+ *)
   END MkBlkName;
 
 (* ------------------------------------------------------------ *)
@@ -556,7 +720,7 @@ MODULE JavaUtil;
   BEGIN
     WITH scp : Id.BlkId DO
         IF scp.xName = NIL THEN MkBlkName(scp) END;
-        IF Cst.doCode & ~Cst.doJsmn THEN
+        IF CSt.doCode & ~CSt.doJsmn THEN
           RETURN Sym.getName.ChPtr(scp);
         ELSE
           RETURN scp.xName; 
@@ -616,7 +780,7 @@ MODULE JavaUtil;
       END;
       tId := typ.idnt;
     END;
-    IF tId.dfScp = NIL THEN tId.dfScp := Cst.thisMod END;
+    IF tId.dfScp = NIL THEN tId.dfScp := CSt.thisMod END;
     rNm := Sym.getName.ChPtr(tId);
     mNm := scopeName(tId.dfScp);
     qNm := qualScopeName(tId.dfScp);
@@ -658,19 +822,20 @@ MODULE JavaUtil;
   PROCEDURE getProcWrapperInvoke*(typ : Ty.Record) : Id.MthId;
     VAR idnt : Sym.Idnt;
   BEGIN 
-   (*  We could get the method descriptor more cheaply by
+   (*
+    *  We could get the method descriptor more cheaply by
     *  indexing into the symbol table, but this would be
-	*  very fragile against future code changes.
-	*)
+    *  very fragile against future code changes.
+    *)
     idnt := typ.symTb.lookup(invokeHash);
-	RETURN idnt(Id.MthId);
+    RETURN idnt(Id.MthId);
   END getProcWrapperInvoke;
 
   PROCEDURE getProcVarInvoke*(typ : Ty.Procedure) : Id.MthId;
   BEGIN
     IF (typ = NIL) OR (typ.hostClass = NIL) THEN RETURN NIL;
-	ELSE RETURN getProcWrapperInvoke(typ.hostClass);
-	END;
+    ELSE RETURN getProcWrapperInvoke(typ.hostClass);
+    END;
   END getProcVarInvoke;
 
 (* ------------------------------------------------------------ *)
@@ -683,25 +848,25 @@ MODULE JavaUtil;
   *  names, generate synthetic names for the formals.
   *)
   PROCEDURE RescopeFormals(template : Ty.Procedure; scp : Id.MthId);
-	VAR param : Id.ParId;
-	    index : INTEGER;
-		synthH : INTEGER;
-		newTyp : Ty.Procedure;
+    VAR param : Id.ParId;
+        index : INTEGER;
+        synthH : INTEGER;
+        newTyp : Ty.Procedure;
   BEGIN
-	newTyp := scp.type(Ty.Procedure);
-	newTyp.retType := template.retType;
-	FOR index := 0 TO template.formals.tide -1 DO
-	  param := Id.cloneParInScope(template.formals.a[index], scp);
-	  IF param.hash = 0 THEN 
-	    synthH := Hsh.enterStr("p" + L.intToCharOpen(index)^);
-		template.formals.a[index].hash := synthH;
-		param.hash := synthH;
-	  END;
-      IF ~Sym.refused(param, scp) THEN
-	    Id.AppendParam(newTyp.formals, param);
-	    Sym.AppendIdnt(scp.locals, param);
+    newTyp := scp.type(Ty.Procedure);
+    newTyp.retType := template.retType;
+    FOR index := 0 TO template.formals.tide -1 DO
+      param := Id.cloneParInScope(template.formals.a[index], scp);
+      IF param.hash = 0 THEN 
+        synthH := Hsh.enterStr("p" + L.intToCharOpen(index)^);
+        template.formals.a[index].hash := synthH;
+        param.hash := synthH;
       END;
-	END;
+      IF ~Sym.refused(param, scp) THEN
+        Id.AppendParam(newTyp.formals, param);
+        Sym.AppendIdnt(scp.locals, param);
+      END;
+    END;
   END RescopeFormals;
 
 (* ------------------------------------------------------------ *)
@@ -710,9 +875,9 @@ MODULE JavaUtil;
 (* ------------------------------------------------------------ *)
   PROCEDURE MkProcTypeName*(typ : Ty.Procedure);
     VAR tIdent : Sym.Idnt;
-	    hostTp : Ty.Record;
-		(*invoke : Id.MthId;*)
-	    rNm, mNm, qNm : L.CharOpen;
+        hostTp : Ty.Record;
+     (* invoke : Id.MthId; *)
+        rNm, mNm, qNm : L.CharOpen;
   BEGIN
    (* ###################################### *)
     IF typ.xName # NIL THEN RETURN END;
@@ -721,34 +886,38 @@ MODULE JavaUtil;
       typ.idnt := Id.newAnonId(typ.serial);
       typ.idnt.type := typ;
     END;
-	tIdent := typ.idnt;
-    IF tIdent.dfScp = NIL THEN tIdent.dfScp := Cst.thisMod END;
-	NEW(hostTp);
-	rNm := Sym.getName.ChPtr(tIdent);
-	mNm := scopeName(tIdent.dfScp);
-	qNm := qualScopeName(tIdent.dfScp);
+    tIdent := typ.idnt;
+    IF tIdent.dfScp = NIL THEN tIdent.dfScp := CSt.thisMod END;
+(*
+ *  if we want to select on kind, we 
+ *  must ALWAYS use the newXxxTp calls
+ *)   
+    hostTp := Ty.newRecTp();
+    rNm := Sym.getName.ChPtr(tIdent);
+    mNm := scopeName(tIdent.dfScp);
+    qNm := qualScopeName(tIdent.dfScp);
    (*
     *  At this point:
-    *	    rNm holds the simple record name
-    *	    mNm holds the qualifying module name
-    *	    qNm holds the qualifying scope name
+    *        rNm holds the simple record name
+    *        mNm holds the qualifying module name
+    *        qNm holds the qualifying scope name
     *  At exit we want:
-    *	    xName to hold the fully qualified name
+    *        xName to hold the fully qualified name
     *)
-	hostTp.extrnNm := cat3(mNm, lowL, rNm);
+    hostTp.extrnNm := cat3(mNm, lowL, rNm);
     hostTp.xName := cat3(qNm, slsh, hostTp.extrnNm);
     hostTp.scopeNm := cat3(lCap, hostTp.xName, semi);
-	typ.hostClass := hostTp;
-	Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostTp, Cst.thisMod, Sym.pubMode, Sym.var, Id.isAbs);
-	RescopeFormals(typ, getProcVarInvoke(typ));
-	typ.xName := hostTp.xName;
+    typ.hostClass := hostTp;
+    Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostTp, CSt.thisMod, Sym.pubMode, Sym.var, Id.isAbs);
+    RescopeFormals(typ, getProcVarInvoke(typ));
+    typ.xName := hostTp.xName;
    (*
     *   It is at this point that we link records into the
     *   class-emission worklist.
     *)
-	IF tIdent.dfScp.kind # Id.impId THEN
-	  JavaBase.worklist.AddNewProcTypeEmitter(typ);
-	END;
+    IF tIdent.dfScp.kind # Id.impId THEN
+      JavaBase.worklist.AddNewProcTypeEmitter(typ);
+    END;
   END MkProcTypeName;
 
 (* ------------------------------------------------------------ *)
@@ -757,34 +926,34 @@ MODULE JavaUtil;
 (* ------------------------------------------------------------ *)
   PROCEDURE procLitBodyStatement(targetId : Sym.Idnt; thisMth : Id.MthId) : Sym.Stmt;
     VAR text  : L.CharOpenSeq;
-	    mthTp : Ty.Procedure;
-	    param : Id.ParId;
-	    index : INTEGER;
+        mthTp : Ty.Procedure;
+        param : Id.ParId;
+        index : INTEGER;
    (* ###################################### *)
-	PROCEDURE textName(trgt : Sym.Idnt) : L.CharOpen;
-	  VAR simple : L.CharOpen;
-	BEGIN
-	  simple := trgt.name();
-	  IF trgt.dfScp = Cst.thisMod THEN
-	    RETURN simple;
-	  ELSE
-	    RETURN BOX(trgt.dfScp.name()^ + '.' + simple^);
-	  END;
-	END textName;
+    PROCEDURE textName(trgt : Sym.Idnt) : L.CharOpen;
+      VAR simple : L.CharOpen;
+    BEGIN
+      simple := trgt.name();
+      IF trgt.dfScp = CSt.thisMod THEN
+        RETURN simple;
+      ELSE
+        RETURN BOX(trgt.dfScp.name()^ + '.' + simple^);
+      END;
+    END textName;
    (* ###################################### *)
- BEGIN
+  BEGIN
     mthTp := thisMth.type(Ty.Procedure);
     IF mthTp.retType # NIL THEN L.AppendCharOpen(text, BOX("RETURN ")) END;
-	L.AppendCharOpen(text, textName(targetId));
-	L.AppendCharOpen(text, lPar);
+    L.AppendCharOpen(text, textName(targetId));
+    L.AppendCharOpen(text, lPar);
     FOR index := 0 TO mthTp.formals.tide - 1 DO
-	  IF index # 0 THEN L.AppendCharOpen(text, comma) END;
-	  param := mthTp.formals.a[index];
-	  L.AppendCharOpen(text, param.name());
-	END;
-	L.AppendCharOpen(text, rPar);
-	L.AppendCharOpen(text, BOX("END"));
-	RETURN Psr.parseTextAsStatement(text.a, thisMth);
+      IF index # 0 THEN L.AppendCharOpen(text, comma) END;
+        param := mthTp.formals.a[index];
+        L.AppendCharOpen(text, param.name());
+      END;
+    L.AppendCharOpen(text, rPar);
+    L.AppendCharOpen(text, BOX("END"));
+    RETURN Psr.parseTextAsStatement(text.a, thisMth);
   END procLitBodyStatement;
 
 (* ------------------------------------------------------------ *)
@@ -793,31 +962,39 @@ MODULE JavaUtil;
 (* ------------------------------------------------------------ *)
   PROCEDURE newProcLitWrapperClass(exp : Sym.Expr; typ : Ty.Procedure) : Ty.Record;
     VAR singleton : Id.TypId;
-	    hostClass : Ty.Record;
-		newInvoke : Id.MthId;
+        hostClass : Ty.Record;
+        newInvoke : Id.MthId;
   BEGIN
     ASSERT(exp IS Xp.IdLeaf);
-	Blt.MkDummyClass(newAnonLit(), Cst.thisMod, Ty.noAtt, singleton);
-	hostClass := singleton.type.boundRecTp()(Ty.Record);
-	Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostClass, Cst.thisMod, Sym.pubMode, Sym.var, {});
-	MkRecName(hostClass); (* Add this class to the emission work-list *)
-	newInvoke := getProcWrapperInvoke(hostClass);
-	RescopeFormals(typ, newInvoke);
-	newInvoke.body := procLitBodyStatement(exp(Xp.IdLeaf).ident, newInvoke);
-	RETURN hostClass;
+    Blt.MkDummyClass(newAnonLit(), CSt.thisMod, Ty.noAtt, singleton);
+    hostClass := singleton.type.boundRecTp()(Ty.Record);
+    Blt.MkDummyMethodAndInsert("Invoke", Ty.newPrcTp(), hostClass, CSt.thisMod, Sym.pubMode, Sym.var, {});
+    MkRecName(hostClass); (* Add this class to the emission work-list *)
+    newInvoke := getProcWrapperInvoke(hostClass);
+    RescopeFormals(typ, newInvoke);
+    newInvoke.body := procLitBodyStatement(exp(Xp.IdLeaf).ident, newInvoke);
+    RETURN hostClass;
   END newProcLitWrapperClass;
 
 (* ------------------------------------------------------------ *)
 (* ------------------------------------------------------------ *)
 
+  PROCEDURE getHostRecTp*( typ : Ty.Vector ) : Ty.Record;
+  BEGIN
+    RETURN vecRecTyp( mapVecElTp( typ.elemTp ) );
+  END getHostRecTp;
+
   PROCEDURE MkVecName*(typ : Ty.Vector);
     VAR ord : INTEGER;
         rTp : Ty.Record;
   BEGIN
+    rTp := getHostRecTp( typ );
+(*
     ord := mapVecElTp(typ.elemTp);
     rTp := vecRecTyp(ord);
+ *)
     IF rTp.xName = NIL THEN MkRecName(rTp) END;
-    typ.xName := rTp.scopeNm;
+    typ.xName := rTp.scopeNm; (* signature of typ *)
   END MkVecName;
 
 (* ------------------------------------------------------------ *)
@@ -830,7 +1007,7 @@ MODULE JavaUtil;
   (* -------------------------------------------------- *)
     PROCEDURE clsNmFromRec(typ : Sym.Type) : L.CharOpen;
     BEGIN
-      IF Cst.doCode & ~Cst.doJsmn THEN
+      IF CSt.doCode & ~CSt.doJsmn THEN
         RETURN typ(Ty.Record).xName;
       ELSE
         RETURN typ(Ty.Record).extrnNm;
@@ -997,7 +1174,7 @@ MODULE JavaUtil;
       | typ : Ty.Opaque DO
 	  IF typ.xName = NIL THEN MkAliasName(typ) END;
 	  L.AppendCharOpen(lst, typ.scopeNm);
-      | typ : Ty.Procedure DO
+	  | typ : Ty.Procedure DO
 	  IF typ.xName = NIL THEN MkProcTypeName(typ) END;
 	  L.AppendCharOpen(lst, typ.hostClass.scopeNm);
       END;
@@ -1007,7 +1184,7 @@ MODULE JavaUtil;
    (*
     *  The parameter numbering scheme tries to use the return
     *  value for the first OUT or VAR parameter.  The variable
-    *  'hasRt' notes whether this possiblity has been used up. If
+    *  'hasRt' notes whether this possibility has been used up. If
     *  this is a value returning function hasRt is true at entry.
     *)
     count := pIdn.rtsFram;
@@ -1161,13 +1338,15 @@ MODULE JavaUtil;
     funcT := (frmTp.retType # NIL);
     WITH prcId : Id.MthId DO
       parId := prcId.rcvFrm;
-      parId.varOrd := 0;   prcId.rtsFram := 1;	(* count one for "this" *)
+      parId.varOrd := 0;   
+      prcId.rtsFram := 1;      (* count one for "this" *)
       ASSERT(~needsBox(parId));
 (*
  *  Receivers are never boxed in Component Pascal
  *
  *    IF needsBox(parId) THEN 
- *      parId.boxOrd := 1; prcId.rtsFram := 2;	(* count one for retbox *)
+ *      parId.boxOrd := 1; 
+ *      prcId.rtsFram := 2;	(* count one for retbox *)
  *    END;
  *)
     ELSE (* skip static procedures *)
@@ -1197,29 +1376,6 @@ MODULE JavaUtil;
   END MakeAndPushProcLitValue;
 
 (* ------------------------------------------------------------ *)
-
-  PROCEDURE (jf : JavaFile)LoadLocal*(ord : INTEGER; typ : Sym.Type),NEW;
-    VAR code : INTEGER;
-  BEGIN
-    IF (typ # NIL) & (typ IS Ty.Base) THEN 
-      code := typeLoad[typ(Ty.Base).tpOrd];
-    ELSE
-      code := Jvm.opc_aload;
-    END;
-    IF ord < 4 THEN
-      CASE code OF
-      | Jvm.opc_iload : code := Jvm.opc_iload_0 + ord;
-      | Jvm.opc_lload : code := Jvm.opc_lload_0 + ord;
-      | Jvm.opc_fload : code := Jvm.opc_fload_0 + ord;
-      | Jvm.opc_dload : code := Jvm.opc_dload_0 + ord;
-      | Jvm.opc_aload : code := Jvm.opc_aload_0 + ord;
-      END;
-      jf.Code(code);
-    ELSE
-      jf.CodeI(code, ord);
-    END;
-  END LoadLocal;
-
 (* ---------------------------------------------------- *)
 
   PROCEDURE (jf : JavaFile)GetLocal*(var : Id.LocId),NEW;
@@ -1231,7 +1387,7 @@ MODULE JavaUtil;
 
 (* ---------------------------------------------------- *)
 
-  PROCEDURE typeToChOpen(typ : Sym.Type) : L.CharOpen;
+  PROCEDURE typeToChOpen*(typ : Sym.Type) : L.CharOpen;
    (* --------------------------------------------- *)
     PROCEDURE slashToDot(a : L.CharOpen) : L.CharOpen;
       VAR nw : L.CharOpen; ix : INTEGER; ch : CHAR;
@@ -1321,29 +1477,6 @@ MODULE JavaUtil;
   END GetVar;
 
 (* ------------------------------------------------------------ *)
-
-  PROCEDURE (jf : JavaFile)StoreLocal*(ord : INTEGER; typ : Sym.Type),NEW;
-    VAR code : INTEGER;
-  BEGIN
-    IF (typ # NIL) & (typ IS Ty.Base) THEN 
-      code := typeStore[typ(Ty.Base).tpOrd];
-    ELSE
-      code := Jvm.opc_astore;
-    END;
-    IF ord < 4 THEN
-      CASE code OF
-      | Jvm.opc_istore : code := Jvm.opc_istore_0 + ord;
-      | Jvm.opc_lstore : code := Jvm.opc_lstore_0 + ord;
-      | Jvm.opc_fstore : code := Jvm.opc_fstore_0 + ord;
-      | Jvm.opc_dstore : code := Jvm.opc_dstore_0 + ord;
-      | Jvm.opc_astore : code := Jvm.opc_astore_0 + ord;
-      END;
-      jf.Code(code);
-    ELSE
-      jf.CodeI(code, ord);
-    END;
-  END StoreLocal;
-
 (* ---------------------------------------------------- *)
 
   PROCEDURE (jf : JavaFile)PutLocal*(var : Id.LocId),NEW;
@@ -1464,43 +1597,80 @@ MODULE JavaUtil;
   END PushSReal;
 
 (* ------------------------------------------------------------ *)
+(* ------------------------------------------------------------ *
+ *  A note on static links and the XHR system.
+ *
+ *
+ *
+ *
+ *
+ *
+ * ------------------------------------------------------------ *)
+(* ------------------------------------------------------------ *)
 
+(* ------------------------------------------------------------ *)
+(*    Pass the XHR reference as arg-0 to nested procedure tgt   *)
+(* ------------------------------------------------------------ *)
   PROCEDURE (jf : JavaFile)PushStaticLink*(tgt : Id.Procs),NEW;
     VAR lxDel : INTEGER;
 	clr   : Id.Procs;
 	pTp   : Ty.Procedure;
   BEGIN
-    clr   := jf.theP;
-    lxDel := tgt.lxDepth - clr.lxDepth;
-    pTp   := clr.type(Ty.Procedure);
+    clr   := jf.theP;                    (* calling procedure *)
+    lxDel := tgt.lxDepth - clr.lxDepth;  (* lex-level delta   *)
+    pTp   := clr.type(Ty.Procedure);     (* caller proc-type  *)
 
     CASE lxDel OF
-    | 0 : jf.Code(Jvm.opc_aload_0);
-    | 1 : IF Id.hasXHR IN clr.pAttr THEN
-            jf.LoadLocal(pTp.argN, NIL);
+    | 0 : (* 
+           *  tgt depth = clr depth, this case
+           *  arises, for example with a recursive call.
+           *  The incoming XHR ref must be chained on. 
+           *)
+          jf.AloadLocal( 0, xhrPtr );             
+    | 1 : (* 
+          *  If caller has uplevel-addressed locals,
+          *  then pass a reference to the XHR which
+          *  is held in local slot pTp.argN
+          *)
+          IF Id.hasXHR IN clr.pAttr THEN
+            jf.AloadLocal( pTp.argN, xhrPtr ); (* type is xhrPtr *)
+         (*
+          * Else if caller is at lexical level-0 then
+          * "locals" are static fields of the module.
+          *)
           ELSIF clr.lxDepth = 0 THEN
             jf.Code(Jvm.opc_aconst_null);
+         (*
+          * Else incoming XHR is in arg-0
+          *)
           ELSE
-            jf.Code(Jvm.opc_aload_0);
+            jf.AloadLocal( 0, xhrPtr ); 
           END;
-    ELSE
-      jf.Code(Jvm.opc_aload_0);
+    ELSE (* 
+      *  This case arises if the target procedure
+      *  is global relative to the caller. In this
+      *  case the chain of XHRs must be followed 
+      *  until the incoming XHR for tgt is found.
+      *)
+      jf.AloadLocal( 0, xhrPtr ); 
       REPEAT
         clr := clr.dfScp(Id.Procs);
         IF Id.hasXHR IN clr.pAttr THEN 
-	  jf.PutGetF(Jvm.opc_getfield, 
-		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
+          (* get XHR field "prev" *)
+	  jf.PutGetF(Jvm.opc_getfield, xhrRec, CSt.xhrId);
         END;
       UNTIL clr.lxDepth = tgt.lxDepth;
     END;
   END PushStaticLink;
 
 (* ------------------------------------------------------------ *)
-
+(*   Load the reference to record holding the datum requested   *)
+(* ------------------------------------------------------------ *)
   PROCEDURE (jf : JavaFile)GetXHR(var : Id.LocId),NEW;
     VAR scp : Id.Procs; (* the scope holding the datum *)
 	clr : Id.Procs; (* the scope making the call   *)
         pTp : Ty.Procedure;
+        xTp : Sym.Type;
 	del : INTEGER;
   BEGIN
     scp := var.dfScp(Id.Procs);
@@ -1510,19 +1680,20 @@ MODULE JavaUtil;
     *  Check if this is an own local
     *)
     IF scp = clr THEN
-      jf.LoadLocal(pTp.argN, NIL);
+      jf.AloadLocal( pTp.argN, xhrPtr );
     ELSE
       del := xhrCount(scp, clr);
      (*
       *  First, load the static link
       *)
-      jf.Code(Jvm.opc_aload_0);
+      jf.AloadLocal( 0, xhrPtr );
      (*
       *  Next, load the XHR pointer.
+      *  Step getfield "prev" of the XHR
+      *  until lexical level is bridged.
       *)
       WHILE del > 1 DO
-	jf.PutGetF(Jvm.opc_getfield, 
-		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
+	jf.PutGetF( Jvm.opc_getfield, xhrRec, CSt.xhrId );
         DEC(del);
       END;
      (*
@@ -1533,7 +1704,8 @@ MODULE JavaUtil;
   END GetXHR;
 
 (* ------------------------------------------------------------ *)
-
+(*      Get variable with local Id "var" after XHR is loaded    *)
+(* ------------------------------------------------------------ *)
   PROCEDURE (jf : JavaFile)PutGetX*(cde : INTEGER; var : Id.LocId),NEW;
     VAR pTyp : Sym.Type;
   BEGIN
@@ -1707,7 +1879,7 @@ MODULE JavaUtil;
    (*
     *   Load up the actual into boxVar[0];
     *)
-    jf.LoadLocal(par.boxOrd, NIL);
+    jf.LoadLocal( par.boxOrd, TypeOfBox( par.type ) ); 
     jf.Code(Jvm.opc_iconst_0);
    (* 
     *   The param might be an XHR field, so 
@@ -1845,7 +2017,7 @@ MODULE JavaUtil;
       ELSE
 	jf.PushInt(leng);
       END;
-      labl := jf.newLabel();
+      labl := jf.newLoopheaderLabel();
       jf.DefLabC(labl, "1-d init loop");
       jf.Code(Jvm.opc_iconst_1);
       jf.Code(Jvm.opc_isub);
@@ -1894,7 +2066,7 @@ MODULE JavaUtil;
     *		ifne loop	; (top) hi,ref...
     *		pop		; (top) ref...
     * ------------------------------------------------------ *)
-    labl := jf.newLabel();
+    labl := jf.newLoopheaderLabel();
     jf.Code(Jvm.opc_dup);
     jf.Code(Jvm.opc_arraylength);
     jf.DefLabC(labl, "Element init loop");
@@ -1941,9 +2113,9 @@ MODULE JavaUtil;
    (*
     *    Stack at entry is (top) srcRef, dstRef...
     *)
-    label := jf.newLabel();
-    local := jf.newLocal();
-    IF typ.length = 0 THEN (* open array, get length from source desc *)
+    label := jf.newLoopheaderLabel();
+    local := jf.newLocal( Blt.intTp ); 
+    IF typ.length = 0 THEN  (* open array, get length from source desc *)
       jf.Code(Jvm.opc_dup);
       jf.Code(Jvm.opc_arraylength);
     ELSE 
@@ -1963,7 +2135,7 @@ MODULE JavaUtil;
     *      ifne lab     ; (top) rr,lr...
     *      pop2		; (top) ...
     *)
-    jf.DefLab(label);
+    jf.DefLab(label);  (* *)
     jf.Code(Jvm.opc_dup2);
     jf.CodeInc(local, -1);
     jf.LoadLocal(local, Blt.intTp);
@@ -1975,11 +2147,11 @@ MODULE JavaUtil;
     jf.GetElement(elTyp);		(* (top) r[n],n,lr,rr,lr...	*)
     IF  (elTyp.kind = Ty.arrTp) OR
 	(elTyp.kind = Ty.recTp) THEN
-      sTemp := jf.newLocal();	(* must recurse in copy code	*)
+      sTemp := jf.newLocal( elTyp );  
       jf.StoreLocal(sTemp, elTyp);	(* (top) n,lr,rr,lr...		*)
       jf.GetElement(elTyp);		(* (top) l{n],rr,lr...		*)
       jf.LoadLocal(sTemp, elTyp);	(* (top) r[n],l[n],rr,lr...     *)
-      jf.ReleaseLocal(sTemp);
+      jf.PopLocal();
       WITH elTyp : Ty.Record DO
 	  jf.ValRecCopy(elTyp);
       | elTyp : Ty.Array DO
@@ -1994,7 +2166,7 @@ MODULE JavaUtil;
     jf.LoadLocal(local, Blt.intTp);
     jf.CodeLb(Jvm.opc_ifne, label);
     jf.Code(Jvm.opc_pop2);
-    jf.ReleaseLocal(local);
+    jf.PopLocal();
   END ValArrCopy;
 
 (* ============================================================ *)
@@ -2002,25 +2174,29 @@ MODULE JavaUtil;
   PROCEDURE (jf : JavaFile)InitVars*(scp : Sym.Scope),NEW;
     VAR index : INTEGER;
         xhrNo : INTEGER;
-	ident : Sym.Idnt;
         scalr : BOOLEAN;
+	ident : Sym.Idnt;
+        xhrTp : Sym.Type;
+        xhrRc : Ty.Record;
   BEGIN
     xhrNo := 0;
+    xhrTp := NIL; (* To shut up the default-warning *)
    (* 
     *  Create the explicit activation record, if needed.
     *)
     WITH scp : Id.Procs DO
       IF Id.hasXHR IN scp.pAttr THEN 
         xhrNo := scp.type(Ty.Procedure).argN;
+        xhrTp := scp.xhrType;
         jf.Comment("create XHR record");
-	jf.MkNewRecord(scp.xhrType.boundRecTp()(Ty.Record));
+	jf.MkNewRecord(xhrTp.boundRecTp()(Ty.Record));
 	IF scp.lxDepth > 0 THEN
+          xhrRc := xhrTp.boundRecTp()(Ty.Record);
           jf.Code(Jvm.opc_dup);
-          jf.Code(Jvm.opc_aload_0);
-          jf.PutGetF(Jvm.opc_putfield, 
-		Cst.rtsXHR.boundRecTp()(Ty.Record), Cst.xhrId);
+          jf.AloadLocal( 0, xhrTp ); 
+          jf.PutGetF( Jvm.opc_putfield, xhrRc, CSt.xhrId );
 	END;
-        jf.StoreLocal(xhrNo, NIL);
+        jf.StoreLocal(xhrNo, NIL); (* ==> use astore *)
       END;
     ELSE (* skip *)
     END;
@@ -2037,13 +2213,13 @@ MODULE JavaUtil;
           *   The test "varOrd < xhrNo" excludes out params.
           *)
           IF (Id.uplevA IN ident.locAtt) & (ident.varOrd < xhrNo) THEN 
-            jf.LoadLocal(xhrNo, NIL);
+            jf.LoadLocal(xhrNo, xhrTp);
             jf.LoadLocal(ident.varOrd, ident.type);
             jf.PutGetX(Jvm.opc_putfield, ident);
 	  END;
       | ident : Id.LocId DO
           IF ~scalr THEN
-            IF Id.uplevA IN ident.locAtt THEN jf.LoadLocal(xhrNo, NIL) END;
+            IF Id.uplevA IN ident.locAtt THEN jf.LoadLocal(xhrNo, xhrTp) END; 
             jf.VarInit(ident);
             jf.PutLocal(ident);
 	  END;
@@ -2142,6 +2318,23 @@ BEGIN
   typeGetE[Ty.anyRec] := Jvm.opc_aaload;
   typeGetE[ Ty.uBytN] := Jvm.opc_baload;
 
+  boxTp[ Ty.boolN ] := Ty.mkArrayOf( Blt.boolTp );
+  boxTp[ Ty.sChrN ] := Ty.mkArrayOf( Blt.charTp );
+  boxTp[ Ty.charN ] := boxTp[Ty.sChrN];
+  boxTp[ Ty.byteN ] := Ty.mkArrayOf( Blt.byteTp );
+  boxTp[ Ty.sIntN ] := Ty.mkArrayOf( Blt.sIntTp );
+  boxTp[ Ty.intN  ] := Ty.mkArrayOf( Blt.intTp );
+  boxTp[ Ty.lIntN ] := Ty.mkArrayOf( Blt.lIntTp );
+  boxTp[ Ty.sReaN ] := Ty.mkArrayOf( Blt.sReaTp );
+  boxTp[ Ty.realN ] := Ty.mkArrayOf( Blt.realTp );
+  boxTp[ Ty.setN  ] := boxTp[Ty.intN];
+  boxTp[ Ty.anyRec ] := NIL;
+  boxTp[ Ty.anyPtr ] := NIL;
+  boxTp[ Ty.strN  ] := NIL;
+  boxTp[ Ty.sStrN ] := NIL;
+  boxTp[ Ty.uBytN ] := Ty.mkArrayOf( Blt.uBytTp );
+  boxTp[ Ty.metaN ] := NIL;
+
   semi := L.strToCharOpen(";"); 
   comma := L.strToCharOpen(","); 
   colon := L.strToCharOpen(":"); 
@@ -2157,6 +2350,8 @@ BEGIN
   prfx := L.strToCharOpen(classPrefix); 
   xhrDl := L.strToCharOpen("XHR$");
   xhrMk := L.strToCharOpen("LCP/CPJrts/XHR;");
+  xhrPtr := CSt.rtsXHR;
+  xhrRec := xhrPtr.boundRecTp()(Ty.Record);
   procLitPrefix := L.strToCharOpen("Proc$Lit$");
 
   Blt.setTp.xName := L.strToCharOpen("I");

@@ -19,13 +19,15 @@ MODULE LitValue;
 
   TYPE
     CharOpen*    = POINTER TO ARRAY OF CHAR;
+    CharOpenArr*  = POINTER TO ARRAY OF CharOpen;
     CharOpenSeq* = RECORD
 		     high  : INTEGER;
 		     tide- : INTEGER;
-		     a-    : POINTER TO ARRAY OF CharOpen;
+		     a-    : CharOpenArr;
 		   END;
 
     CharVector*  = VECTOR OF CHAR;
+
 
 (* ============================================================ *)
 
@@ -339,6 +341,16 @@ MODULE LitValue;
 
 (* -------------------------------------------- *)
 
+  PROCEDURE charToCharOpen*(c : CHAR) : CharOpen;
+    VAR arr : CharOpen;
+  BEGIN
+    NEW( arr, 2 );
+    arr[0] := c;
+    RETURN arr;
+  END charToCharOpen;   
+
+(* -------------------------------------------- *)
+
   PROCEDURE ToStr*(in : CharOpen; OUT out : ARRAY OF CHAR);
   BEGIN
     IF in = NIL THEN out := "<NIL>" ELSE GPText.Assign(in^, out) END;
@@ -530,6 +542,22 @@ MODULE LitValue;
     END;
     RETURN 0;
   END strCmp;
+
+(* -------------------------------------------- *)
+ 
+  PROCEDURE SvConcat3*( a,b,c : CharOpen; sp : CHAR ) : CharOpen;
+    VAR nmArray : CharOpenSeq;
+        spacer : CharOpen;
+  BEGIN
+    spacer := charToCharOpen( sp );
+    InitCharOpenSeq(nmArray, 5); 
+    AppendCharOpen(nmArray, a);
+    AppendCharOpen(nmArray, spacer);
+    AppendCharOpen(nmArray, b);
+    AppendCharOpen(nmArray, spacer);
+    AppendCharOpen(nmArray, c);
+    RETURN arrayCat(nmArray);
+  END SvConcat3;
 
 (* -------------------------------------------- *)
 

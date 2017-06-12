@@ -24,3 +24,5 @@ javac -d . VecR32.java
 javac -d . VecR64.java
 javac -d . VecBase.java
 javac -d . VecRef.java
+pause
+

@@ -730,5 +730,6 @@ BEGIN
 	dl[opc_goto_w]		:= 0;
 	dl[opc_jsr_w]		:= 1;
 	dl[opc_breakpoint] 	:= 0;
+
 END JVMcodes.
 (* ============================================================ *)

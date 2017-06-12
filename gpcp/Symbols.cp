@@ -237,6 +237,11 @@ MODULE Symbols;
     t.namStr := MKSTR(NameHash.charOpenOfHash(hash)^);
   END SetNameFromHash;
 
+  PROCEDURE (t : Idnt)ClearName*(),NEW;
+  BEGIN
+    t.namStr := NIL;
+  END ClearName;
+
 (* ============================================================ *)
 (*  This diagnostic method is placed here to use when GPCP-CLR  *)
 (*  itself is being debugged. If ToString is present then       *)

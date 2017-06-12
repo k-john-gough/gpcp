@@ -42,7 +42,12 @@ public class ProgArgs
         public static void GetEnvVar(char[] ss, char[] ds) 
         {
             String path = CP.CPJ.CPJ.MkStr(ss);
+	    //
+	    //  getenv was deprecated between jave 1.1 and SE 5 (!)
+	    //
             String valu = System.getProperty(path);
+	    if (valu == null) // Try getenv instead
+		    valu = System.getenv(path);
             int i;
             for (i = 0; 
                  i < valu.length() && i < ds.length;

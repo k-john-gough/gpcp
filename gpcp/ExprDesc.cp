@@ -2187,7 +2187,7 @@ MODULE ExprDesc;
                                    lIn : V.VarSet) : V.VarSet;
   (* Assert: expression has been fully attributed.   *)
   BEGIN
-      (* Really: recurse over set elements *)
+   (* Really: recurse over set elements *)
     RETURN lIn;
   END checkLive;
 

@@ -113,6 +113,8 @@ public class CPJrts
 
 	public static char[] JavaStrToChrOpen(String input)
 	{
+            if (input == null) 
+                return null;
 	    int    len = input.length();
 	    char[] str = new char[len+1];
 	    input.getChars(0, len, str, 0);
@@ -133,7 +135,10 @@ public class CPJrts
 
 	public static String FixChToJavaStr(char[] arr)
 	{
+            if (arr == null) return null;
+	    //
             // This truncation makes semantics same as .NET version
+	    //
             int len = ChrArrLength(arr);
 	    return new String(arr, 0, len);
 	}
