@@ -47,6 +47,7 @@ MODULE CPascalErrors;
       eTide    : INTEGER;	(* Next index for insertion in buf *)
       prompt*  : BOOLEAN;	(* Emit error message immediately  *)
       nowarn*  : BOOLEAN;	(* Don't store warning messages    *)
+	  no239Err*: BOOLEAN;   (* Don't emit 239 while TRUE       *)
       srcNam   : FileNames.NameString;
       forVisualStudio* : BOOLEAN;
       xmlErrors* : BOOLEAN;
@@ -1001,6 +1002,7 @@ BEGIN
   NEW(eBuffer, 8); eBuffer[0] := NIL; eLimit := 7; eTide := 0;
   prompt := FALSE;
   nowarn := FALSE;
+  no239Err := FALSE;
   forVisualStudio := FALSE;
 END CPascalErrors.
 (* ============================================================ *)

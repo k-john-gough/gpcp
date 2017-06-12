@@ -100,12 +100,12 @@ VAR
 (* ======================== EXPORTS ========================= *)
 PROCEDURE (s : ErrorHandler)Report*(num : INTEGER; 
 				    lin : INTEGER;
-			            col : INTEGER) ,NEW,ABSTRACT;
+                    col : INTEGER) ,NEW,ABSTRACT;
 
 PROCEDURE (s : ErrorHandler)RepSt1*(num : INTEGER; 
 				 IN str : ARRAY OF CHAR;
 				    lin : INTEGER;
-			            col : INTEGER) ,NEW,ABSTRACT;
+                    col : INTEGER) ,NEW,ABSTRACT;
 
 PROCEDURE (s : ErrorHandler)RepSt2*(num : INTEGER; 
 				 IN st1 : ARRAY OF CHAR;

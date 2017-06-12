@@ -27,7 +27,6 @@ MODULE CPascal;
         Scnr := CPascalS,
         CPascalErrors,
         New := NewSymFileRW,
-        Old := OldSymFileRW,
         NameHash,
         Visitor,
         Builtin,
@@ -152,11 +151,7 @@ MODULE CPascal;
             IF Scnr.errors = 0 THEN
               IF CSt.doSym THEN
                 CondMsg("Emitting symbol file");
-                IF CSt.legacy THEN
-                  Old.EmitSymfile(CSt.thisMod);
-                ELSE
-                  New.EmitSymfile(CSt.thisMod);
-                END;
+                New.EmitSymfile(CSt.thisMod);
                 CSt.symEnd := RTS.GetMillis();
                 IF CSt.doAsm THEN
                   IF CSt.isForeign() THEN
@@ -178,6 +173,8 @@ MODULE CPascal;
         Finalize;
         IF CSt.doStats THEN CSt.Report END;
       END;
+(* ===================================================== *)
+(* Comment out the Rescue clause to get a stack unwind.
     RESCUE (sysX)
       retVal := 2;
       CSt.Message("<< COMPILER PANIC >>");
@@ -194,6 +191,8 @@ MODULE CPascal;
         FixListing;
       END;
       Finalize;
+ *)
+(* ===================================================== *)
     END Compile;
 
 (* ==================================================================== *)

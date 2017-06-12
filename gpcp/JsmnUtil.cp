@@ -14,9 +14,9 @@ MODULE JsmnUtil;
         FileNames,
 	GPTextFiles,
 	CompState,
-        J := JavaUtil,
-	D := Symbols,
-	G := Builtin,
+        J  := JavaUtil,
+	Sy := Symbols,
+	G  := Builtin,
 	Id := IdDesc,
 	Ty := TypeDesc,
 	Jvm := JVMcodes;
@@ -36,14 +36,8 @@ MODULE JsmnUtil;
 	objectInit* = "java/lang/Object/<init>()V";
 	mainStr*    = "main([Ljava/lang/String;)V";
 	jlExcept*   = "java/lang/Exception";
-(*
- *	jlError*    = "java/lang/Error";
- *)
 	jlError*    = jlExcept;
 	mkExcept*   = "java/lang/Exception/<init>(Ljava/lang/String;)V";
-(*
- *	mkError*    = "java/lang/Error/<init>(Ljava/lang/String;)V";
- *)
 	mkError*    = mkExcept;
 	putArgStr*  = "CP/CPmain/CPmain/PutArgs([Ljava/lang/String;)V";
 
@@ -51,7 +45,7 @@ MODULE JsmnUtil;
 (* ============================================================ *)
 
   TYPE ProcInfo*  = POINTER TO RECORD
-		      prId- : D.Scope;  (* mth., prc. or mod.	*)
+		      prId- : Sy.Scope;  (* mth., prc. or mod.	*)
 		      lMax  : INTEGER;	(* max locals for proc  *)
 		      lNum  : INTEGER;	(* current locals proc  *)
 		      dMax  : INTEGER;	(* max depth for proc.  *)
@@ -90,6 +84,7 @@ MODULE JsmnUtil;
     NEW(f);
     f.file := GPTextFiles.createFile(fileName);
     IF f.file = NIL THEN RETURN NIL; END;
+    CompState.emitNam := BOX("Jasmin");
     RETURN f;
   END newJsmnFile;
 
@@ -113,7 +108,7 @@ MODULE JsmnUtil;
 (*			ProcInfo Methods			*)
 (* ============================================================ *)
 
-  PROCEDURE newProcInfo*(proc : D.Scope) : ProcInfo;
+  PROCEDURE newProcInfo*(proc : Sy.Scope) : ProcInfo;
     VAR p : ProcInfo;
   BEGIN
     NEW(p);
@@ -140,7 +135,7 @@ MODULE JsmnUtil;
     procName : FileNames.NameString;
   BEGIN
     os.proc := newProcInfo(proc);
-    os.Comment("PROCEDURE " + D.getName.ChPtr(proc)^);
+    os.Comment("PROCEDURE " + Sy.getName.ChPtr(proc)^);
    (*
     *  Compute the method attributes
     *)
@@ -160,10 +155,10 @@ MODULE JsmnUtil;
  *  since the JVM places the "override method" in a different 
  *  slot! We must thus live with the insecurity of public mode.
  *
- *  IF proc.vMod = D.pubMode THEN	(* explicitly public *)
+ *  IF proc.vMod = Sy.pubMode THEN	(* explicitly public *)
  *)
-    IF (proc.vMod = D.pubMode) OR	(* explicitly public *)
-       (proc.vMod = D.rdoMode) THEN     (* "implement only"  *)
+    IF (proc.vMod = Sy.pubMode) OR	(* explicitly public *)
+       (proc.vMod = Sy.rdoMode) THEN     (* "implement only"  *)
       attr := attr + Jvm.att_public;
     ELSIF proc.dfScp IS Id.PrcId THEN	(* nested procedure  *)
       attr := attr + Jvm.att_private;
@@ -178,6 +173,8 @@ MODULE JsmnUtil;
   PROCEDURE^ (os : JsmnFile)Locals(),NEW;
   PROCEDURE^ (os : JsmnFile)Stack(),NEW;
   PROCEDURE^ (os : JsmnFile)Blank(),NEW;
+
+(* ------------------------------------------------------------ *)
 
   PROCEDURE (os : JsmnFile)EndProc*();
   BEGIN
@@ -198,14 +195,14 @@ MODULE JsmnUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (os : JsmnFile)getScope*() : D.Scope;
+  PROCEDURE (os : JsmnFile)getScope*() : Sy.Scope;
   BEGIN
     RETURN os.proc.prId; 
   END getScope;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (os : JsmnFile)newLocal*() : INTEGER;
+  PROCEDURE (os : JsmnFile)newLocal*( t : Sy.Type ) : INTEGER;
     VAR ord : INTEGER;
         info : ProcInfo;
   BEGIN
@@ -218,14 +215,78 @@ MODULE JsmnUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (os : JsmnFile)ReleaseLocal*(i : INTEGER);
+  PROCEDURE (os : JsmnFile)newLongLocal*( t : Sy.Type ) : INTEGER;
+    VAR ord : INTEGER;
+        info : ProcInfo;
   BEGIN
-   (*
-    *  If you try to release not in LIFO order, the 
-    *  location will not be made free again. This is safe!
-    *)
-    IF i+1 = os.proc.lNum THEN DEC(os.proc.lNum) END;
-  END ReleaseLocal;
+    info := os.proc; 
+    ord := info.lNum;
+    INC(info.lNum, 2);
+    IF info.lNum > info.lMax THEN info.lMax := info.lNum END;
+    RETURN ord;
+  END newLongLocal;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (jf : JsmnFile)LoadLocal*(ord : INTEGER; typ : Sy.Type);
+    VAR code : INTEGER;
+  BEGIN
+    IF (typ # NIL) & (typ IS Ty.Base) THEN 
+      code := J.typeLoad[typ(Ty.Base).tpOrd];
+    ELSE
+      code := Jvm.opc_aload; 
+    END;
+    IF ord < 4 THEN
+      CASE code OF
+      | Jvm.opc_iload : code := Jvm.opc_iload_0 + ord;
+      | Jvm.opc_lload : code := Jvm.opc_lload_0 + ord;
+      | Jvm.opc_fload : code := Jvm.opc_fload_0 + ord;
+      | Jvm.opc_dload : code := Jvm.opc_dload_0 + ord;
+      | Jvm.opc_aload : code := Jvm.opc_aload_0 + ord;
+      END;
+      jf.Code(code);
+    ELSE
+      jf.CodeI(code, ord);
+    END;
+  END LoadLocal;
+
+(* ---------------------------------------------------- *)
+
+  PROCEDURE (jf : JsmnFile)StoreLocal*(ord : INTEGER; typ : Sy.Type);
+    VAR code : INTEGER;
+  BEGIN
+    IF (typ # NIL) & (typ IS Ty.Base) THEN 
+      code := J.typeStore[typ(Ty.Base).tpOrd];
+    ELSE
+      code := Jvm.opc_astore;
+    END;
+    IF ord < 4 THEN
+      CASE code OF
+      | Jvm.opc_istore : code := Jvm.opc_istore_0 + ord;
+      | Jvm.opc_lstore : code := Jvm.opc_lstore_0 + ord;
+      | Jvm.opc_fstore : code := Jvm.opc_fstore_0 + ord;
+      | Jvm.opc_dstore : code := Jvm.opc_dstore_0 + ord;
+      | Jvm.opc_astore : code := Jvm.opc_astore_0 + ord;
+      END;
+      jf.Code(code);
+    ELSE
+      jf.CodeI(code, ord);
+    END;
+  END StoreLocal;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (os : JsmnFile)PopLocal*();
+  BEGIN
+    DEC(os.proc.lNum);
+  END PopLocal;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (os : JsmnFile)PopLongLocal*();
+  BEGIN
+    DEC(os.proc.lNum, 2);
+  END PopLongLocal;
 
 (* ------------------------------------------------------------ *)
 
@@ -321,11 +382,11 @@ MODULE JsmnUtil;
   BEGIN
     os.Blank();
     IF prc = NIL THEN
-      IF D.noNew IN rec.xAttr THEN 
+      IF Sy.noNew IN rec.xAttr THEN 
         os.Comment("There is no no-arg constructor for this class");
         os.Blank();
         RETURN;					(* PREMATURE RETURN HERE *)
-      ELSIF D.xCtor IN rec.xAttr THEN 
+      ELSIF Sy.xCtor IN rec.xAttr THEN 
         os.Comment("There is an explicit no-arg constructor for this class");
         os.Blank();
         RETURN;					(* PREMATURE RETURN HERE *)
@@ -360,7 +421,7 @@ MODULE JsmnUtil;
   PROCEDURE (os : JsmnFile)CallSuperCtor*(rec : Ty.Record;
                                           pTy : Ty.Procedure);
     VAR	idx : INTEGER;
-	fld : D.Idnt;
+	fld : Sy.Idnt;
 	pNm : INTEGER;
 	string2 : LitValue.CharOpen;
   BEGIN
@@ -535,14 +596,14 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)Idnt(idD : D.Idnt),NEW;
+  PROCEDURE (os : JsmnFile)Idnt(idD : Sy.Idnt),NEW;
   BEGIN
-    GPText.WriteString(os.file, D.getName.ChPtr(idD));
+    GPText.WriteString(os.file, Sy.getName.ChPtr(idD));
   END Idnt;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)Type(typ : D.Type),NEW;
+  PROCEDURE (os : JsmnFile)Type(typ : Sy.Type),NEW;
   BEGIN
     WITH typ : Ty.Base DO
 	GPText.WriteString(os.file, typ.xName);
@@ -570,7 +631,7 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)TypeTag(typ : D.Type),NEW;
+  PROCEDURE (os : JsmnFile)TypeTag(typ : Sy.Type),NEW;
   BEGIN
     WITH typ : Ty.Base DO
 	GPText.WriteString(os.file, typ.xName);
@@ -726,7 +787,7 @@ MODULE JsmnUtil;
 
 (* -------------------------------------------- *)
 
-  PROCEDURE (os : JsmnFile)CodeT*(code : INTEGER; type : D.Type);
+  PROCEDURE (os : JsmnFile)CodeT*(code : INTEGER; type : Sy.Type);
   BEGIN
     os.Prefix(code);
     GPTextFiles.WriteChar(os.file, ASCII.HT);
@@ -800,7 +861,8 @@ MODULE JsmnUtil;
 
 (* -------------------------------------------- *)
 
-  PROCEDURE (os : JsmnFile)CodeSwitch*(loIx,hiIx : INTEGER; dfLb : J.Label);
+  PROCEDURE (os : JsmnFile)CodeSwitch*(
+             loIx,hiIx : INTEGER; defLab : J.Label);
   BEGIN
     os.CodeII(Jvm.opc_tableswitch,loIx,hiIx);
   END CodeSwitch;
@@ -878,7 +940,7 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)MultiNew*(elT : D.Type;
+  PROCEDURE (os : JsmnFile)MultiNew*(elT : Sy.Type;
 				     dms : INTEGER),NEW;
    (* dsc is the array descriptor, dms the number of dimensions *)
     VAR i : INTEGER;
@@ -948,7 +1010,7 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)Alloc1d*(elTp : D.Type);
+  PROCEDURE (os : JsmnFile)Alloc1d*(elTp : Sy.Type);
   BEGIN
     WITH elTp : Ty.Base DO
       IF (elTp.tpOrd < Ty.anyRec) THEN
@@ -980,10 +1042,10 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)MkNewFixedArray*(topE : D.Type; len0 : INTEGER);
+  PROCEDURE (os : JsmnFile)MkNewFixedArray*(topE : Sy.Type; len0 : INTEGER);
     VAR dims : INTEGER;
 	arTp : Ty.Array;
-	elTp : D.Type;
+	elTp : Sy.Type;
   BEGIN
     (*
     //  Fixed-size, possibly multi-dimensional arrays.
@@ -1025,7 +1087,7 @@ MODULE JsmnUtil;
 (* ============================================================ *)
 
   PROCEDURE (os : JsmnFile)MkNewOpenArray*(arrT : Ty.Array; dims : INTEGER);
-    VAR elTp : D.Type;
+    VAR elTp : Sy.Type;
 	indx : INTEGER;
   BEGIN
    (* 
@@ -1072,7 +1134,7 @@ MODULE JsmnUtil;
 
   PROCEDURE (os : JsmnFile)MkArrayCopy*(arrT : Ty.Array);
     VAR dims : INTEGER;
-        elTp : D.Type;
+        elTp : Sy.Type;
   BEGIN
    (*
     *	Assert: we must find the lengths from the runtime 
@@ -1122,8 +1184,8 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)VarInit*(var : D.Idnt);
-    VAR typ : D.Type;
+  PROCEDURE (os : JsmnFile)VarInit*(var : Sy.Idnt);
+    VAR typ : Sy.Type;
   BEGIN
    (*
     *  Precondition: var is of a type that needs initialization
@@ -1194,7 +1256,7 @@ MODULE JsmnUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE (os : JsmnFile)WithTrap*(id : D.Idnt);
+  PROCEDURE (os : JsmnFile)WithTrap*(id : Sy.Idnt);
   BEGIN
     os.CodeS(Jvm.opc_new, jlError);
     os.Code(Jvm.opc_dup);
@@ -1221,10 +1283,10 @@ MODULE JsmnUtil;
  
   PROCEDURE (os : JsmnFile)StartRecClass*(rec : Ty.Record);
   VAR
-    baseT  : D.Type;
+    baseT  : Sy.Type;
     attSet : SET;
-    clsId  : D.Idnt;
-    impRec : D.Type;
+    clsId  : Sy.Idnt;
+    impRec : Sy.Type;
     index  : INTEGER;
   BEGIN
     os.Blank();
@@ -1250,9 +1312,9 @@ MODULE JsmnUtil;
     *   Account for the identifier visibility.
     *)
     IF clsId # NIL THEN
-      IF clsId.vMod = D.pubMode THEN
+      IF clsId.vMod = Sy.pubMode THEN
 	attSet := attSet + Jvm.att_public;
-      ELSIF clsId.vMod = D.prvMode THEN
+      ELSIF clsId.vMod = Sy.prvMode THEN
 	attSet := attSet + Jvm.att_private;
       END;
     END;
@@ -1303,7 +1365,7 @@ MODULE JsmnUtil;
   BEGIN
     IF id IS Id.FldId THEN att := Jvm.att_empty; 
     ELSE att := Jvm.att_static; END;
-    IF id.vMod # D.prvMode THEN (* any export ==> public in JVM *)
+    IF id.vMod # Sy.prvMode THEN (* any export ==> public in JVM *)
       att := att + Jvm.att_public;
     END;
     os.CatStr(Jvm.dirStr[Jvm.dot_field]);

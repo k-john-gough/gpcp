@@ -27,9 +27,16 @@ MODULE ClassMaker;
 
 (* ============================================================ *)
 
+ (* Emitter initialization *)
   PROCEDURE (maker : ClassEmitter)Init*(),NEW,EMPTY;
+
+ (* Define features of the type system base type *)
   PROCEDURE (maker : ClassEmitter)ObjectFeatures*(),NEW,EMPTY;
+
+ (* Emit the code for the Module *)
   PROCEDURE (maker : ClassEmitter)Emit*(),NEW,ABSTRACT;
+
+ (* Call the assembler, if necessary *)
   PROCEDURE (asmbl : Assembler)Assemble*(),NEW,EMPTY;
 
 (* ============================================================ *)

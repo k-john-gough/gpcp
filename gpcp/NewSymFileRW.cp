@@ -470,7 +470,7 @@ MODULE NewSymFileRW;
      (*
       *   Emit Optional Parameter name 
       *)
-      IF ~CSt.legacy & (parI.hash # 0) THEN
+      IF (parI.hash # 0) THEN
         f.WriteStringForName(Nh.charOpenOfHash(parI.hash));
       END;
     END;
@@ -575,7 +575,7 @@ MODULE NewSymFileRW;
     f.Write(id.rcvFrm.parMod);
     f.EmitTypeOrd(id.rcvFrm.type);
     IF id.prcNm # NIL THEN f.WriteStringForName(id.prcNm) END; 
-    IF ~CSt.legacy & (id.rcvFrm.hash # 0) THEN f.WriteNameForId(id.rcvFrm) END;
+    IF (id.rcvFrm.hash # 0) THEN f.WriteNameForId(id.rcvFrm) END;
     f.FormalType(id.type(Ty.Procedure));
   END EmitMethodId;
 
@@ -1516,8 +1516,9 @@ MODULE NewSymFileRW;
     WHILE f.sSym = namSy DO
       fldD := Id.newFldId();
       fldD.SetMode(f.iAtt);
-      fldD.hash := Nh.enterStr(f.strAtt);
-      fldD.type := f.typeOf(readOrd(f.file));
+      fldD.hash  := Nh.enterStr(f.strAtt);
+      fldD.fldNm := BOX(f.strAtt^);
+      fldD.type  := f.typeOf(readOrd(f.file));
       fldD.recTyp := rslt;
       f.GetSym();
       IF rslt.symTb.enter(fldD.hash, fldD) THEN 
