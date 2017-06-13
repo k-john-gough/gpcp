@@ -894,7 +894,7 @@ public class CP_rts
         int len = src.Length;
         for (int ix = 0; ix < len; ix++)
             if (src[ix] == '\0')
-                return ix - 1;
+                return ix;
         return len;
 	}
 

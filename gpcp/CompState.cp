@@ -418,16 +418,10 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
                ( asmVer[0] < '5') OR (asmVer[0] > '8') THEN 
               Unknown(opt);
             ELSE
-            (*
-              IF ~quiet THEN
-                Message( "ASM emitter, using jvm classfile version V1_" + asmVer$);
-              END;
-             *)
               doCode     := TRUE;
               doAsm5     := TRUE;
               expectedJvm := TRUE;
             END;
-           
           ELSE 
             Unknown(opt);
           END;
@@ -657,6 +651,17 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           expectedNet := FALSE;
         END;
       END;
+     (*
+      *  If gpcp is running on the CLR, then (currently) 
+      *  the asm5 emitter is not supported.
+      *)
+      IF (RTS.defaultTarget = "net") & doAsm5  THEN
+        Message
+          ("WARNING - gpcp-CLR does not support ASM5, using -legacy emitter"); 
+        doDWC      := TRUE;
+        doCode     := TRUE;
+        doAsm5     := FALSE;
+      END;
      (* 
       *  If debug is set, for this version, ILASM is used unless /perwapi is explicit
       *  If debug is clar, for this versin, PERWAPI is used unless /ilasm is explicit
@@ -744,7 +749,7 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     forcePerwapi := FALSE;
     doCode      := TRUE;
     doAsm       := TRUE;
-    doAsm5      := TRUE;
+    doAsm5      := (RTS.defaultTarget = "jvm");
     doDWC       := FALSE;
     special     := FALSE;
     strict      := FALSE;

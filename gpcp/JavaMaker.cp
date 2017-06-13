@@ -16,14 +16,13 @@ MODULE JavaMaker;
         CPascalS,
         FileNames,
         ClassMaker,
-        JavaUtil,
+        JavaTarget,
+        Ju := JavaUtil,
         JavaBase,
         ClassUtil,
-        AsmUtil,
         JsmnUtil,
         CSt := CompState,
         Jvm := JVMcodes,
-        Ju  := JavaUtil,
         Bi := Builtin,
         Sy := Symbols,
         Id := IdDesc,
@@ -630,7 +629,7 @@ MODULE JavaMaker;
   PROCEDURE (this : JavaEmitter)Emit*();
   (** Create the assembler for a class file for this module. *)
   VAR fileName  : FileNames.NameString;
-      cf : JavaUtil.JavaFile;
+      cf : Ju.JavaFile;
       jf : JsmnUtil.JsmnFile;
   BEGIN
    (*
@@ -650,13 +649,12 @@ MODULE JavaMaker;
           L.ToStr(this.prcT.xName, fileName);
       END;
       fileName := fileName + ".class";
-      IF CSt.doAsm5 THEN
-        cf := AsmUtil.newAsmEmitter(fileName);
-      ELSIF CSt.doDWC THEN
-        cf := ClassUtil.newClassFile(fileName);
-      ELSE
-        THROW( "no jvm emitter chosen" );
-      END;
+     (* 
+      *  Target will select a Java emitter
+      *  that depends on the gpcp options and
+      *  the platform on which gpcp is running.
+      *)
+      cf := JavaTarget.NewJavaEmitter(fileName);
       this.outF := cf;
     ELSE
       WITH this : JavaModEmitter DO

@@ -3,7 +3,7 @@
 (*  Copyright (c) John Gough 1999, 2000.			*)
 (* ============================================================ *)
 
-MODULE Target;
+MODULE Target; 
 
   IMPORT 
 	GPCPcopyright,

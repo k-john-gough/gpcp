@@ -525,7 +525,7 @@ MODULE StatDesc;
        (*
         * Third check: does the expression need type coercion.
         *)
-        IF (rTp # lTp) & (rTp IS T.Base) THEN
+        IF (s.rhsX.kind # E.nilLt) & (rTp # lTp) & (rTp IS T.Base) THEN
           s.rhsX := E.coerceUp(s.rhsX, lTp);
           rTp := lTp;
         END;
