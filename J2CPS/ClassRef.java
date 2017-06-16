@@ -1,9 +1,9 @@
 /*************************************************************************/
-/*                Class Reference class for J2CPS                        */
+/*                Class Reference class for j2cps                        */
 /* Represents the class references in the constant pool of a class file  */   
-/*                      (c) copyright QUT                                */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017       */ 
 /*************************************************************************/
-package J2CPS;
+package j2cps;
 
 public class ClassRef {
 

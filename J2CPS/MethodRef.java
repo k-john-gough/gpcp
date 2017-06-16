@@ -1,9 +1,9 @@
 /**********************************************************************/
-/*                Method Reference class for J2CPS                    */
+/*                Method Reference class for j2cps                    */
 /*                                                                    */   
-/*                      (c) copyright QUT                             */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017    */ 
 /**********************************************************************/
-package J2CPS;
+package j2cps;
 
 public class MethodRef extends Reference {
 

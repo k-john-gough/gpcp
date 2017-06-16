@@ -1,9 +1,9 @@
 /**********************************************************************/
-/*                 Type Descriptor class for J2CPS                    */
+/*                 Type Descriptor class for j2cps                    */
 /*                                                                    */   
-/*                      (c) copyright QUT                             */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017    */ 
 /**********************************************************************/
-package J2CPS;
+package j2cps;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -31,20 +31,47 @@ public class TypeDesc {
   public static final int arrT   = 17;
   public static final int classT = 18;
   public static final int arrPtr = 19;
+  
   public int typeFixUp = 0;
 
   private static final String[] typeStrArr = 
                               { "?","B","c","C","b","i","I","L","r","R",
                                 "?","?","?","?","?","?","?","a","O","?"};
+  
+  /**
+   *  Component Pascal version of java language name
+   */
   public String name;
+  
+  /**
+   *  If this boolean is true then the type is
+   *  dumped to the symbol file with full 
+   *  member information. If false just the 
+   *  name and type ordinal number is emitted.
+   */
   public boolean writeDetails = false;
-  public PackageDesc packageDesc = null;
+  
+  /**
+   *  This field holds the package descriptor
+   *  to which this type belongs.
+   */
+  public PackageDesc parentPkg = null;
+  
+    // ###########################
+    // Temporary code for finding rogue elements in imports lists.
+    // MethodInfo or FieldInfo that caused addition to import list.
+    Object blame = null;
+    // ###########################
+
 
   private static TypeDesc[] basicTypes = new TypeDesc[specT];
 
-  int inTypeNum=0, outTypeNum=0, inBaseTypeNum = 0;
-  int typeOrd = 0;
-  static ArrayList<TypeDesc> types = new ArrayList<TypeDesc>();
+  int   inTypeNum=0; 
+  int   outTypeNum=0; 
+  int   inBaseTypeNum = 0;
+  int   typeOrd = 0;
+  
+  static ArrayList<TypeDesc> types = new ArrayList<>();
 
   public TypeDesc() {
     inTypeNum = 0;
@@ -63,19 +90,21 @@ public class TypeDesc {
     return typeStrArr[typeOrd];
   }
 
+  
   public static TypeDesc GetBasicType(int index) {
     return basicTypes[index];
   }
 
   public static TypeDesc GetType(String sig,int start) {
     int tOrd = GetTypeOrd(sig,start);
-    if (tOrd == classT) {
-      return ClassDesc.GetClassDesc(GetClassName(sig,start),null);
-    } else if (tOrd == arrT) {
-      return ArrayDesc.GetArrayType(sig,start,true);
-    } else {
-      return basicTypes[tOrd]; 
-    }
+      switch (tOrd) {
+          case classT:
+              return ClassDesc.GetClassDesc(GetClassName(sig,start),null);
+          case arrT:
+              return ArrayDesc.GetArrayTypeFromSig(sig,start,true);
+          default:
+              return basicTypes[tOrd];
+      }
   }
   
   private static String GetClassName(String sig,int start) {
@@ -118,17 +147,28 @@ public class TypeDesc {
     int index = 1;
     while (sig.charAt(index) != ')') {
       if (sig.charAt(index) == '[') { 
-        types.add(ArrayDesc.GetArrayType(sig,index,false));  
+        types.add(ArrayDesc.GetArrayTypeFromSig(sig,index,false));  
       } else {
         types.add(GetType(sig,index));
       }
-      if (sig.charAt(index) == 'L') { 
-        index = sig.indexOf(';',index) + 1; 
-      } else if (sig.charAt(index) == '[') {
-        while (sig.charAt(index) == '[') { index++; }
-        if (sig.charAt(index) == 'L') { index = sig.indexOf(';',index) + 1;  
-        } else { index++; }
-      } else { index++; }
+        switch (sig.charAt(index)) {
+            case 'L':
+                index = sig.indexOf(';',index) + 1;
+                break;
+            case '[':
+                while (sig.charAt(index) == '[') { 
+                    index++; 
+                }
+                if (sig.charAt(index) == 'L') { 
+                    index = sig.indexOf(';',index) + 1;
+                } else { 
+                    index++; 
+                }
+                break;
+            default:
+                index++;
+                break;
+        }
     } 
     typeArr = new TypeDesc[types.size()]; 
     for (int i=0; i < types.size(); i++) {

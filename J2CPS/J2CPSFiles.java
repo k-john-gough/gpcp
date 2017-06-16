@@ -1,125 +1,157 @@
-/**********************************************************************/
-/*                  J2CPS Files class for J2CPS                       */
-/*                                                                    */   
-/*                      (c) copyright QUT                             */ 
-/**********************************************************************/
-package J2CPS;
+/*
+ * Copyright (c) John Gough 2016-2017
+ */
+package j2cpsfiles;
 
-import java.io.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.FileOutputStream;
+import java.io.DataOutputStream;
+import java.io.File;
 
-public class J2CPSFiles implements FilenameFilter {
+/**
+ *
+ * @author john
+ */
+public class j2cpsfiles /*implements FilenameFilter*/ {
 
-  private static final String classExt = ".class";
-  private static final String symExt = ".cps";
-  private static final String intExt = ".cp";
-  private static final String dbName = "index.dbi";
-  private static final String sepCh = System.getProperty("file.separator");
+  private static final String CLASSEXT = ".class";
+  private static final String SYMFILEXT = ".cps";
+  // private static final String CPEXT = ".cp";
+  // private static final String dbName = "index.dbi";
   private static final char EOF = '\0';
   private static final char CR  = '\r';
   private static final char LF  = '\n';
   private static final char SP  = ' ';
   private static final char TAB  = '\t';
-  private static String currDir = System.getProperty("user.dir");
-  private static String symDir;
+  private static final String CURRDIR = 
+          System.getProperty("user.dir");
+  private static final String FILESEP = 
+          System.getProperty("file.separator");
+  private static final String PATHSEPSTRING = 
+           System.getProperty("path.separator");
+  private static final char PATHSEP = 
+          PATHSEPSTRING.charAt(0);
+ 
+  /**
+   *  Destination directory for symbol files.
+   */
+  private static String dstDir = ".";
+  
+  /**
+   *  The installation root directory.
+   */
+  private static String rootName = ".";
+  
+  /**
+   *  The root of the package class-file tree.
+   */
+  private static File pkgRoot = new File(CURRDIR);
+  
   private static String[] classPath;
+  
+  /**
+   *  Locations to search for symbol files.
+   */
   private static String[] symPath;
-  private static final char pathSep = 
-                            System.getProperty("path.separator").charAt(0);
+  
+  private static boolean verbose = false;
+  private static boolean summary = false;
+ 
+  public static void SetVerbose( boolean v ) { verbose = v; }
+  public static void SetSummary( boolean v ) { summary = v; }
 
-
-/* 
- * Method for FilenameFilter
- */
-
-  @Override
-  public boolean accept (File dir, String name) {
-    return name.endsWith(classExt); 
-  }
-
-  public static void SetSymDir(String sDir) {
-    symDir = sDir;
-    if (symDir == null) {
-      symDir = symPath[0];
+    public static void SetDstDir(String sDir) {
+        if (!sDir.equals("."))
+            dstDir = "." + FILESEP + sDir;
     }
-  }
 
-  public static void GetPaths() {
-    classPath = GetPath("java.class.path");
-    symPath = GetPath("CPSYM");
-  }
+    public static void SetPackageRootDir(String rDir) {
+        rootName = "." + FILESEP + rDir;
+        pkgRoot = new File(CURRDIR, rDir);
+    }
+
+    /**
+     *  This method is called after all arguments have been parsed.
+     */
+    public static void GetPaths(boolean ignoreCpsym) {
+        if (summary) {
+            System.out.printf("Current directory \".\" is <%s>\n", CURRDIR);
+            if (!rootName.equals("."))
+                System.out.printf(
+                    "Using <%s> as package-root directory\n", rootName);
+            if (!dstDir.equals("."))
+                System.out.printf("Using <%s> as symbol destination directory\n", dstDir);
+        }      
+        classPath = GetPathArray("java.class.path");
+        if (ignoreCpsym) {
+            symPath = new String[] { dstDir };
+        } else {
+            String[] tmp = GetPathArray("CPSYM");
+            symPath = new String[tmp.length + 1];
+            symPath[0] = dstDir;
+            for (int i = 0; i < tmp.length; i++)
+                symPath[i+1] = tmp[i];
+        }
+    }
 
   private static String GetPathFromProperty(String str) {
-    String path = System.getProperty(str);
-    //if (path != null)
-    //  System.out.println("Property " + str + " = " + path); 
+    String path = System.getProperty(str); 
     return path;
   }
 
   private static String GetPathFromEnvVar(String str) {
     String path = System.getenv(str);
-    //if (path != null)
-    //  System.out.println("Env. variable " + str + " = " + path); 
     return path;
   }
 
-  private static String[] GetPath(String prop) {
-    String paths[];
+  private static String[] GetPathArray(String prop) {
     // First look for the system property (preferred source)
     String cPath = GetPathFromProperty(prop);
     if (cPath == null)
       cPath = GetPathFromEnvVar(prop);
 
     if (cPath == null) {
-      System.out.println("No variable for \"" + prop + "\", using \".\""); 
-      cPath = ".";
-    } else 
-      System.out.println("Using \"" + prop + "\" path \"" + cPath + "\""); 
-      
-    int i,count=1,start,end;
-    for (i=0; i > -1 ; i++ ) {
-      i = cPath.indexOf(pathSep,i); 
-      if (i > -1) { count++; } else { i--; } 
-    }
-    paths = new String[count+1];
-    paths[0] = currDir;
-    start = 0; i = 1; 
-    while (start < cPath.length()) {
-      end = cPath.indexOf(pathSep,start);
-      if (end == -1) { 
-        end = cPath.length()+1; 
-        paths[i] = cPath.substring(start);
-      } else {
-        paths[i] = cPath.substring(start,end);
-      }
-      if (paths[i].equals(".")) { paths[i] = currDir; }
-      i++;
-      start = end+1;
-    }
-    return paths;
+        System.err.println("No variable for \"" + prop + "\", using \".\""); 
+        cPath = ".";
+    } else if (summary) 
+        System.out.println("Using \"" + prop + "\" path \"" + cPath + "\""); 
+    
+    String[] splits = cPath.split(PATHSEPSTRING);
+    return splits;
   }
 
-  public static File getPackageFile(String name) {
-    File inFile = new File(currDir,name);
+  public static File getPackageFile(String name) { 
+    File inFile = new File(pkgRoot,name);
     if (!inFile.exists()) {
-      boolean found = false;
-      for (int i=0; (i < classPath.length) && (!found); i++) {
-        if (ClassDesc.verbose) {
-          System.out.println("<" + classPath[i] + sepCh + name + ">");
+        boolean found = false;
+        for (int i=0; (i < classPath.length) && (!found); i++) {
+            if (verbose) {
+                System.out.println("<" + classPath[i] + FILESEP + name + ">");
+            }
+            inFile = new File(classPath[i],name);
+            found = inFile.exists();
         }
-        inFile = new File(classPath[i],name);
-        found = inFile.exists();
-      }
-      if (!found) {
-        System.err.println("Cannot open class directory <" + name + ">");
-        System.exit(0);
-      }
+        if (!found) {
+          System.err.println(
+                  "Cannot open package directory <" + name + ">, quitting");
+          // 
+          // Is this too severe?
+          //
+          System.exit(0);
+        }
+    } else {
+        System.out.print("INFO: opened package directory <" + name + ">");
+        if (summary)
+            System.out.print(" from package-root <" + rootName + ">");
+        System.out.println();
     }
     return inFile;
   }
 
   public static File OpenClassFile(String name) {
-    if (!name.endsWith(classExt)) { name = name.concat(classExt); }
-    File inFile = new File(currDir,name);
+    if (!name.endsWith(CLASSEXT)) { name = name.concat(CLASSEXT); }
+    File inFile = new File(CURRDIR,name);
     if (!inFile.exists()) {
       inFile = FindClassFile(name);
     }
@@ -135,7 +167,7 @@ public class J2CPSFiles implements FilenameFilter {
     File inFile = new File(dir,fName);
     if (!inFile.exists()) {
       System.err.println("Cannot open class file <" + dir.getName() +
-                                                 sepCh + fName + ">");
+                                                 FILESEP + fName + ">");
       System.exit(0);
     }
     return inFile;
@@ -145,17 +177,17 @@ public class J2CPSFiles implements FilenameFilter {
   public static File FindClassFile(String name) {
     File inFile = null;
     boolean found = false;
-    if (!name.endsWith(classExt)) { name = name.concat(classExt); }
+    if (!name.endsWith(CLASSEXT)) { name = name.concat(CLASSEXT); }
     for (int i=0; (i < classPath.length) && (!found); i++) {
-      if (ClassDesc.verbose) {
-        System.out.println("<" + classPath[i] + sepCh + name + ">");
+      if (verbose) {
+        System.out.println("<" + classPath[i] + FILESEP + name + ">");
       }
       inFile = new File(classPath[i],name);
       found = inFile.exists();
     }
     if (!found) {
       System.err.println("Cannot open class file <" + name + ">");
-      System.exit(0);
+      System.exit(1);
     }
     return inFile;
   }
@@ -164,34 +196,34 @@ public class J2CPSFiles implements FilenameFilter {
                                     throws FileNotFoundException, IOException {
     File inFile = null;
     boolean found = false;
-    if (!name.endsWith(symExt)) { name = name.concat(symExt); }
+    if (!name.endsWith(SYMFILEXT)) { 
+        name = name.concat(SYMFILEXT); 
+    }
     for (int i=0; (i < symPath.length) && (!found); i++) {
-      if (ClassDesc.verbose) {
-        System.out.println("<" + symPath[i] + sepCh + name + ">");
+      if (verbose) {
+        System.out.println("Seeking <" + symPath[i] + FILESEP + name + ">");
       }
       inFile = new File(symPath[i],name);
       found = inFile.exists();
     }
     if (!found) {
-      if (ClassDesc.verbose) 
-        { System.out.println("Cannot find symbol file <" + name + ">"); }
+      if (verbose) {
+        System.out.println("Cannot find symbol file <" + name + ">");
+      }
       return null;
+    } else {
+        return inFile;
     }
-    return inFile;
   }
 
   public static DataOutputStream CreateSymFile(String fileName) 
                                                           throws IOException {
-    String dirName;
-    if (symDir == null) { dirName = currDir; } else { dirName = symDir; }
-    if (ClassDesc.verbose) {  
-      System.out.println("Creating symbolfile " + fileName + symExt +
-                         " in directory " + dirName);
-    }
+    String dirName = (dstDir == null ? CURRDIR : dstDir);
+    System.out.print("INFO: Creating symbolfile <" + fileName + SYMFILEXT + ">");
+    if (summary) 
+        System.out.print(" in directory <" + dirName + ">");
+    System.out.println();
     return new DataOutputStream(new FileOutputStream(
-                                new File(dirName,fileName + symExt)));
-  }
+                                new File(dirName,fileName + SYMFILEXT)));
+  }    
 }
-
-
-

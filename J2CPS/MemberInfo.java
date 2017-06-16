@@ -1,9 +1,9 @@
 /**********************************************************************/
-/*                  Member Info class for J2CPS                       */
+/*                  Member Info class for j2cps                       */
 /*                                                                    */   
-/*                      (c) copyright QUT                             */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017    */ 
 /**********************************************************************/
-package J2CPS;
+package j2cps;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -50,7 +50,7 @@ public class MemberInfo {
            ConstantPool.isPublic(accessFlags);
   }
 
-  public boolean isExported() {
+  public final boolean isExported() {
     return (ConstantPool.isPublic(accessFlags) ||
             ConstantPool.isProtected(accessFlags)); 
   }
