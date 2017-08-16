@@ -1,4 +1,9 @@
-# Project Description
+# Gardens Point Component Pascal (_GPCP_)
+
+## Getting Started
+* [Download the latest release](https://github.com/k-john-gough/gpcp/releases)
+
+## Project Description
 Gardens Point Component Pascal is an implementation of the Component Pascal Language (CP).  There are implementations for both the CLR and the JVM.  
 
 Component Pascal is an object oriented language in the Pascal family.  Its closest relatives are Oberon-2 and Oberon.
