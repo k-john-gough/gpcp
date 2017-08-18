@@ -20,6 +20,7 @@ MODULE CompState;
         IdDesc,
         Console, 
         CPascalS,
+        LitValue,
         NameHash,
         FileNames,
         ClassMaker,
@@ -44,6 +45,7 @@ MODULE CompState;
     ntvEvt* : Symbols.Type;     (* native MulticastDelegate     *)
     rtsXHR* : Symbols.Type;     (* native XHR type descriptor   *)
     ntvVal* : Symbols.Type;     (* native ValueType type        *)
+    ntvStrArr* : Symbols.Type; 
 
     objId*  : Symbols.Idnt;
     strId*  : Symbols.Idnt;
@@ -69,12 +71,15 @@ MODULE CompState;
     lstNam-   : FileNames.NameString;    (* name of the listing file    *)
 
     target-   : ARRAY 6 OF CHAR;
+    asmVer-   : ARRAY 6 OF CHAR; 
     emitter-  : ClassMaker.ClassEmitter;
+    emitNam*  : POINTER TO ARRAY OF CHAR;
 
     cpSymX-,                             (* User supplied CPSYM name    *)
     binDir-,                             (* PE-file directory .NET only *)
     symDir-   : FileNames.NameString;    (* Symbol file directory       *)
-
+    
+    
     strict-,
     special-,
     warning-,
@@ -89,15 +94,17 @@ MODULE CompState;
     doVersion-,
     doneVersion,
     doSym-,
-    doAsm-,
+    doAsm5-,      (* Default for jvm, as of gpcp v1.4.02  *)
+    doDWC-,       (* Legacy class file emitter in v1.3.19 *)
     doJsmn-,
     forceIlasm,
     forcePerwapi,
     doIlasm-,
+    doAsm-,
     doCode-,
     quiet-,
     system-    : BOOLEAN;
-    legacy*    : BOOLEAN;
+
     netRel-,
     listLevel-,
     hashSize-  : INTEGER;
@@ -125,10 +132,25 @@ MODULE CompState;
   VAR
     expectedNet : BOOLEAN;         (* A .NET specific option was parsed  *)
     expectedJvm : BOOLEAN;         (* A JVM specific option was parsed   *)
-    expectedLlvm : BOOLEAN;        (* An LLVM specific option was parsed *)
+
+  VAR
+    indent : INTEGER;
 
 (* ==================================================================== *)
 (*                             Utilities                                *)
+(* ==================================================================== *)
+
+    PROCEDURE IncIndent*(); BEGIN INC(indent) END IncIndent;
+    PROCEDURE DecIndent*(); BEGIN DEC(indent) END DecIndent;
+    PROCEDURE ZeroIndent*(); BEGIN indent := 0   END ZeroIndent;
+
+    PROCEDURE IndentMsg*( IN s : ARRAY OF CHAR );
+      VAR i : INTEGER;
+    BEGIN
+      FOR i := 0 TO indent DO Console.WriteString( "  " ) END;
+      Console.WriteString( s ); Console.WriteLn;
+    END IndentMsg;
+
 (* ==================================================================== *)
 
     PROCEDURE SetSysLib*(lib : IdDesc.BlkId);
@@ -146,14 +168,21 @@ MODULE CompState;
       emitter.ObjectFeatures();
     END ImportObjectFeatures;
 
+	PROCEDURE Suppress239*() : BOOLEAN; 
+	BEGIN 
+	  RETURN CPascalErrors.no239Err;
+	END Suppress239;
+
     PROCEDURE SetQuiet*(); 
     BEGIN
       CPascalErrors.nowarn := TRUE;
+	  CPascalErrors.no239Err := TRUE;
     END SetQuiet;
     
     PROCEDURE RestoreQuiet*();
     BEGIN
       CPascalErrors.nowarn := ~warning;
+	  CPascalErrors.no239Err := FALSE;
     END RestoreQuiet;
 
     PROCEDURE targetIsNET*() : BOOLEAN;
@@ -165,11 +194,6 @@ MODULE CompState;
     BEGIN
       RETURN target = "jvm";
     END targetIsJVM;
-
-    PROCEDURE targetIsLLVM*() : BOOLEAN;
-    BEGIN
-      RETURN target = "llvm";
-    END targetIsLLVM;
 
     PROCEDURE Message*(IN mss : ARRAY OF CHAR);
     BEGIN
@@ -220,6 +244,7 @@ MODULE CompState;
       PrintLn("gardens point component pascal: " + GPCPcopyright.verStr);
       Message("Usage from the command line ...");
       IF RTS.defaultTarget = "net" THEN
+
 PrintLn("       $ gpcp [cp-options] file {file}");
 PrintLn("# CP Options ...");
 PrintLn("       /bindir=XXX  ==> Place binary files in directory XXX");
@@ -244,7 +269,7 @@ PrintLn("       /quiet       ==> Compile silently if possible");
 PrintLn("       /strict      ==> Disallow non-standard constructs");
 PrintLn("       /special     ==> Compile dummy symbol file");
 PrintLn("       /symdir=XXX  ==> Place symbol files in directory XXX");
-PrintLn("       /target=XXX  ==> Emit (jvm|net|llvm) assembly");
+PrintLn("       /target=XXX  ==> Emit (jvm|net) assembly");
 PrintLn("       /unsafe      ==> Allow unsafe code generation");
 PrintLn("       /vX.X        ==> (v1.0 | v1.1 | v2.0) CLR target version");
 PrintLn("       /verbose     ==> Emit verbose diagnostics");
@@ -253,24 +278,25 @@ PrintLn("       /vserror     ==> Print error messages in Visual Studio format");
 PrintLn("       /warn-       ==> Don't emit warnings");
 PrintLn("       /nowarn      ==> Don't emit warnings");
 PrintLn("       /whidbey     ==> Target code for Whidbey Beta release");
-PrintLn("       /xmlerror    ==> Print error messages in XML format");
+PrintLn("       /xmlerror    ==> Emit error messages in XML format");
 PrintLn(' Unix-style options: "-option" are recognized also');
-      ELSE
-        IF RTS.defaultTarget = "jvm" THEN
+
+      ELSIF RTS.defaultTarget = "jvm" THEN
+
 PrintLn("       $ cprun gpcp [cp-options] file {file}, OR");
 PrintLn("       $ java [java-options] CP.gpcp.gpcp [cp-options] file {file}");
-        ELSIF RTS.defaultTarget = "llvm" THEN
-          PrintLn("       $ gpcp [cp-options] file {file}");
-        END;
 PrintLn("# CP Options ...");
-PrintLn("       -clsdir=XXX  ==> Set class tree root in directory XXX");
+PrintLn("       -asm7        ==> Default: Generate class files with V1_7 format");
+PrintLn("       -asmN        ==> Classfiles use V1_N format, N = (5 .. 8)");
+PrintLn("       -clsdir:XXX  ==> Set class tree root in directory XXX");
 PrintLn("       -copyright   ==> Display copyright notice");
-PrintLn("       -cpsym=XXX   ==> Use environ. variable XXX instead of CPSYM");
+PrintLn("       -cpsym:XXX   ==> Use environ. variable XXX instead of CPSYM");
 PrintLn("       -dostats     ==> Give a statistical summary");
 PrintLn("       -extras      ==> Enable experimental compiler features");
 PrintLn("       -help        ==> Write out this usage message");
-PrintLn("       -hsize=NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
+PrintLn("       -hsize:NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
 PrintLn("       -jasmin      ==> Ceate asm files and run Jasmin");
+PrintLn("       -legacy      ==> Use the pre-v1.4 jvm class writer");
 PrintLn("       -list        ==> (default) Create *.lst file if errors");
 PrintLn("       -list+       ==> Unconditionally create *.lst file");
 PrintLn("       -list-       ==> Don't create error *.lst file");
@@ -280,17 +306,20 @@ PrintLn("       -nosym       ==> Don't create *.sym (or asm or object) files");
 PrintLn("       -quiet       ==> Compile silently if possible");
 PrintLn("       -special     ==> Compile dummy symbol file");
 PrintLn("       -strict      ==> Disallow non-standard constructs");
-PrintLn("       -symdir=XXX  ==> Place symbol files in directory XXX");
-PrintLn("       -target=XXX  ==> Emit (jvm|net|llvm) assembly");
+PrintLn("       -symdir:XXX  ==> Place symbol files in directory XXX");
+PrintLn("       -target:XXX  ==> Emit (jvm|net) assembly");
 PrintLn("       -verbose     ==> Emit verbose diagnostics");
 PrintLn("       -version     ==> Write out version number");
 PrintLn("       -warn-       ==> Don't emit warnings");
 PrintLn("       -nowarn      ==> Don't emit warnings");
-PrintLn("       -xmlerror    ==> Print error messages in XML format");
+PrintLn("       -xmlerror    ==> Emit error messages in XML format");
+
         IF RTS.defaultTarget = "jvm" THEN
+
 PrintLn("# Java Options ...");
 PrintLn("       -D<name>=<value>  pass <value> to JRE as system property <name>");
 PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JRE");
+
         END;
       END;
       Message("This program comes with NO WARRANTY");
@@ -304,7 +333,7 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     PROCEDURE ParseOption*(IN opt : ARRAY OF CHAR);
 	  CONST MaxTargetLength = 4;
       VAR copy : ARRAY 16 OF CHAR;
-	      trgt : ARRAY MaxTargetLength + 1 OF CHAR;
+          trgt : ARRAY MaxTargetLength + 1 OF CHAR;
           indx : INTEGER;
      (* ----------------------------------------- *)
       PROCEDURE Unknown(IN str : ARRAY OF CHAR);
@@ -350,22 +379,23 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
         END;
       END GetSuffix;
      (* ----------------------------------------- *)
-	  PROCEDURE RaiseSuffix(preLen : INTEGER;
-	                        outLen : INTEGER;
-	                        IN opt : ARRAY OF CHAR;
-							OUT dir : ARRAY OF CHAR);
+      PROCEDURE RaiseSuffix(preLen : INTEGER;
+                            outLen : INTEGER;
+                            IN opt : ARRAY OF CHAR;
+                           OUT dir : ARRAY OF CHAR);
         VAR idx : INTEGER;
             chr : CHAR;
       BEGIN
         idx := 0;
-		REPEAT
+        REPEAT
           chr := opt[idx + preLen];
-		  dir[idx] := CAP(chr);
-		  INC(idx);
-		UNTIL (chr = 0X) OR (idx >= outLen) OR ((idx + preLen) > LEN(opt));
-		dir[idx] := 0X;
+          dir[idx] := CAP(chr);
+          INC(idx);
+        UNTIL (chr = 0X) OR (idx >= outLen) OR ((idx + preLen) > LEN(opt));
+        dir[idx] := 0X;
       END RaiseSuffix;
-
+     (* ----------------------------------------- *)
+     (*  Note: str is mutable, pat is immutable   *)
      (* ----------------------------------------- *)
       PROCEDURE StartsWith(str : ARRAY OF CHAR; IN pat : ARRAY OF CHAR) : BOOLEAN;
       BEGIN
@@ -381,8 +411,23 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
       copy[15] := 0X;
 
       CASE copy[0] OF
+      | "a" : 
+          IF StartsWith(copy, "asm") THEN
+            GetSuffix(LEN("-asm"), opt, asmVer);
+            IF (LEN(asmVer$) # 1) OR
+               ( asmVer[0] < '5') OR (asmVer[0] > '8') THEN 
+              Unknown(opt);
+            ELSE
+              doCode     := TRUE;
+              doAsm5     := TRUE;
+              expectedJvm := TRUE;
+            END;
+          ELSE 
+            Unknown(opt);
+          END;
       | "b" : 
-          IF StartsWith(copy, "bindir=") THEN
+          IF StartsWith(copy, "bindir=") OR 
+             StartsWith(copy, "bindir:") THEN
             GetSuffix(LEN("/bindir="), opt, binDir);
             expectedNet := TRUE;
             IF ~quiet THEN 
@@ -394,17 +439,21 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
       | "c" : 
           IF copy = "copyright" THEN 
             GPCPcopyright.Write;
-          ELSIF StartsWith(copy, "clsdir=") THEN
+          ELSIF StartsWith(copy, "clsdir=") OR
+                StartsWith(copy, "clsdir:") THEN
             GetSuffix(LEN("/clsdir="), opt, binDir);
             expectedJvm := TRUE;
             IF ~quiet THEN 
               Message("output class tree rooted at <" + binDir +">");
             END;
-          ELSIF StartsWith(copy, "cpsym=") THEN
+          ELSIF StartsWith(copy, "cpsym=") OR
+                StartsWith(copy, "cpsym:") THEN
             GetSuffix(LEN("/cpsym="), opt, cpSymX);
+          (*
             IF ~quiet THEN 
               Message("using %" + cpSymX +"% as symbol file path");
             END;
+           *)
           ELSE
             Unknown(opt);
           END;
@@ -450,7 +499,10 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           ELSIF copy = "list" THEN
             listLevel  := CPascalS.listErrOnly;
           ELSIF copy = "legacy" THEN
-            legacy := TRUE;
+            doDWC      := TRUE;
+            doCode     := TRUE;
+            doAsm5     := FALSE;
+            expectedJvm := TRUE;
           ELSE 
             Unknown(opt);
           END;
@@ -497,7 +549,8 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
             strict     := FALSE;
           ELSIF copy = "strict" THEN
             strict     := TRUE;
-          ELSIF StartsWith(copy, "symdir=") THEN
+          ELSIF StartsWith(copy, "symdir=") OR
+                StartsWith(copy, "symdir:") THEN
             GetSuffix(LEN("/symdir="), opt, symDir);
             IF ~quiet THEN 
               Message("sym directory set to <" + symDir +">");
@@ -506,7 +559,8 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
             Unknown(opt);
           END;
       | "t" :
-          IF StartsWith(copy, "target=") THEN
+          IF StartsWith(copy, "target=") OR
+             StartsWith(copy, "target:") THEN
             RaiseSuffix(LEN("/target="), MaxTargetLength, opt, trgt);
             IF trgt = "JVM" THEN
               IF RTS.defaultTarget = "jvm" THEN
@@ -518,8 +572,6 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
                 Message("NET is default target for this build");
               END;
               target := "net";
-            ELSIF trgt = "LLVM" THEN
-              target := "llvm";
             ELSE
               Message('Unknown target, using "target=' +
                                                     RTS.defaultTarget + '"');
@@ -593,28 +645,22 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           ("WARNING - a JVM-specific option was specified for .NET target");
           expectedJvm := FALSE;
         END;
-        IF expectedLlvm THEN Message
-          ("WARNING - an LLVM-specific option was specified for .NET target");
-          expectedLlvm := FALSE;
-        END;
       ELSIF target = "jvm" THEN
         IF expectedNet THEN Message
           ("WARNING - a .NET-specific option was specified for JVM target");
           expectedNet := FALSE;
         END;
-        IF expectedLlvm THEN Message
-          ("WARNING - an LLVM-specific option was specified for JVM target");
-          expectedLlvm := FALSE;
-        END;
-      ELSIF target = "llvm" THEN
-        IF expectedJvm THEN Message
-          ("WARNING - a JVM-specific option was specified for LLVM target");
-          expectedJvm := FALSE;
-        END;
-        IF expectedNet THEN Message
-          ("WARNING - a .NET-specific option was specified for LLVM target");
-          expectedNet := FALSE;
-        END;
+      END;
+     (*
+      *  If gpcp is running on the CLR, then (currently) 
+      *  the asm5 emitter is not supported.
+      *)
+      IF (RTS.defaultTarget = "net") & doAsm5  THEN
+        Message
+          ("WARNING - gpcp-CLR does not support ASM5, using -legacy emitter"); 
+        doDWC      := TRUE;
+        doCode     := TRUE;
+        doAsm5     := FALSE;
       END;
      (* 
       *  If debug is set, for this version, ILASM is used unless /perwapi is explicit
@@ -644,8 +690,12 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
       FileNames.AppendExt(basNam, "lst", lstNam);
 
       CreateThisMod;
+
       xhrId := IdDesc.newFldId();
       xhrId.hash := NameHash.enterStr("prev");
+      xhrId.fldNm := BOX( "prev" );
+      emitNam    := BOX("????");
+
       srcBkt     := NameHash.enterStr("src");
       corBkt     := NameHash.enterStr("mscorlib_System");
 
@@ -659,7 +709,8 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     VAR str1 : ARRAY 8 OF CHAR;
         str2 : ARRAY 8 OF CHAR;
   BEGIN
-    Message(target + GPCPcopyright.verStr); 
+    Message("GPCP-" + target + GPCPcopyright.verStr); 
+    Message("Using " + emitNam^ + " emitter" );
     GPText.IntToStr(CPascalS.line, str1);
     Message(str1 + " source lines");
     GPText.IntToStr(impMax, str1);
@@ -681,7 +732,6 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
 
   PROCEDURE InitOptions*;
   BEGIN
-    legacy      := FALSE;
     warning     := TRUE;
     verbose     := FALSE;
     doHelp      := FALSE; doneHelp    := FALSE;
@@ -699,6 +749,8 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     forcePerwapi := FALSE;
     doCode      := TRUE;
     doAsm       := TRUE;
+    doAsm5      := (RTS.defaultTarget = "jvm");
+    doDWC       := FALSE;
     special     := FALSE;
     strict      := FALSE;
     quiet       := FALSE;
@@ -707,7 +759,6 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     hashSize    := 5000;        (* gets default hash size *)
     expectedNet := FALSE;
     expectedJvm := FALSE;
-    expectedLlvm := FALSE;
     cpSymX      := "CPSYM";
   END InitOptions;
 

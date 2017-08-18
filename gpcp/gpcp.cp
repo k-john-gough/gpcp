@@ -1,7 +1,7 @@
 (* ==================================================================== *)
 (*									*)
 (*  Driver Module for the Gardens Point Component Pascal Compiler.	*)
-(*	Copyright (c) John Gough 1999, 2000.				*)
+(*	Copyright (c) John Gough 1999, 2016.				*)
 (*	This module was extensively modified from the driver		*)
 (*	automatically produced by the M2 version of COCO/R, using	*)
 (*	the CPascal.atg grammar used for the JVM version of GPCP.	*)

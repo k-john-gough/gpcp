@@ -1,12 +1,13 @@
 /**********************************************************************/
-/*                  Symbol File class for J2CPS                       */
+/*                  Symbol File class for j2cps                       */
 /*                                                                    */   
-/*                      (c) copyright QUT                             */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017    */ 
 /**********************************************************************/
-package J2CPS;
+package j2cps;
 
 import java.io.*;
 import java.util.ArrayList;
+import j2cpsfiles.j2cpsfiles;
 
 class SymbolFile {
  
@@ -22,11 +23,24 @@ class SymbolFile {
   // Import     = impSy Name [String] Key.
   // Constant   = conSy Name Literal.
   // Variable   = varSy Name TypeOrd.
+  // -------- Note --------
+  //  The Type syntax is used to declare the type ordinals 
+  //  that are used for all references to this module's types.
+  // ----------------------
   // Type       = typSy Name TypeOrd.
   // Procedure  = prcSy Name [String] [truSy] FormalType.
   // Method     = mthSy Name Byte Byte TypeOrd [String] FormalType.
   // FormalType = [retSy TypeOrd] frmSy {parSy Byte TypeOrd} endFm.
   // TypeOrd    = ordinal.
+  // -------- Note --------
+  //  TypeHeaders are used in the symbol file format to 
+  //  denote a type that is defined here or is imported.
+  //  For types defined here, the ordinal is that declard
+  //  in the definition section of this symbol file.
+  //  For imported types the first ordinal is the ordinal
+  //  declared in the definition section, the second ordinal
+  //  is the index into the package import list.
+  // ----------------------
   // TypeHeader = tDefS Ord [fromS Ord Name].
   // TypeList   = start {Array | Record | Pointer | ProcType | 
   //                     NamedType | Enum} close.
@@ -67,9 +81,8 @@ class SymbolFile {
   static final String[] mark = {"", "*", "-", "!"};
   static final String[] varMark = {"", "IN", "OUT", "VAR"};
 
-  private static final String spaces = "         ";
-  private static final String recEndSpace = "      "; 
-  private static final char qSepCh = '/';
+  //private static final String spaces = "         ";
+  //private static final String recEndSpace = "      "; 
 
   static final int modSy = (int) 'H';
   static final int namSy = (int) '$';
@@ -129,15 +142,29 @@ class SymbolFile {
   private static char cVal;
   private static double dVal;
   private static DataInputStream in;
-
-// Symbol file writing 
+  
+  private static int count = 0;
+  private static PackageDesc target = null;
+  private static ArrayList<PackageDesc> imps = null;
+  
+// Symbol file writing
 
   static void writeName(DataOutputStream out,int access, String name) 
                                                             throws IOException{
     out.writeByte(namSy);
-    if (ConstantPool.isPublic(access))   { out.writeByte(pubMode); }
-    else if (ConstantPool.isProtected(access)) { out.writeByte(protect); }
-    else /* if (ConstantPool.isPrivate(access)) */ { out.writeByte(prvMode); }
+    if (ConstantPool.isPublic(access))   { 
+        out.writeByte(pubMode); 
+    }
+    else if (ConstantPool.isProtected(access)) { 
+        out.writeByte(protect); 
+    }
+    else /* if (ConstantPool.isPrivate(access)) */ { 
+        out.writeByte(prvMode); 
+    }
+    if (name == null) {
+        name = "DUMMY" + count++;
+        System.err.println( name );
+    }
     out.writeUTF(name);
   }
 
@@ -154,13 +181,13 @@ class SymbolFile {
       out.writeLong(((Integer)val).longValue());
     } else if (val instanceof Long) {
       out.writeByte(numSy);
-      out.writeLong(((Long)val).longValue());
+      out.writeLong(((Long)val));
     } else if (val instanceof Float) {
       out.writeByte(fltSy);
       out.writeDouble(((Float)val).doubleValue());
     } else if (val instanceof Double) {
       out.writeByte(fltSy);
-      out.writeDouble(((Double)val).doubleValue());
+      out.writeDouble(((Double)val));
     } else {
       System.out.println("Unknown constant type");
       System.exit(1);
@@ -170,19 +197,19 @@ class SymbolFile {
   public static void writeOrd(DataOutputStream out,int i) throws IOException {
     // DIAGNOSTIC
     if (i < 0)
-      throw new IOException(); 
+        throw new IOException(); 
     // DIAGNOSTIC
     if (i <= 0x7f) {
-      out.writeByte(i);
+        out.writeByte(i);
     } else if (i <= 0x7fff) {
-      out.writeByte(128 + i % 128);  
-      out.writeByte(i / 128);
+        out.writeByte(128 + i % 128);  
+        out.writeByte(i / 128);
     } else {
-      throw new IOException(); 
+        throw new IOException(); 
     }
   }
 
-  private static void InsertType(TypeDesc ty) {
+  private static void InsertTypeInTypeList(TypeDesc ty) {
     if (ty.outTypeNum > 0) { return; }
     ty.outTypeNum = nextType++;
     if (tListIx >= typeList.length) {
@@ -190,53 +217,91 @@ class SymbolFile {
       System.arraycopy(typeList, 0, tmp, 0, typeList.length);
       typeList = tmp;
     }
+    // Temporary diagnostic code
+    if (ClassDesc.VERBOSE && (ty.name != null)) {
+        System.out.printf("Inserting %s at ix %d\n", ty.name, tListIx);
+        if (ty instanceof ClassDesc 
+                && target != ((ClassDesc)ty).parentPkg
+                && !imps.contains(((ClassDesc)ty).parentPkg)) {
+            System.err.println(ty.name + " not on import list");
+        }
+    }
     typeList[tListIx++] = ty;
   }
 
-  public static void AddType(TypeDesc ty) {
-    InsertType(ty); 
-    if (!ty.writeDetails) { return; }
+  public static void AddTypeToTypeList(TypeDesc ty) {
+    InsertTypeInTypeList(ty); 
+    if (!ty.writeDetails) { 
+        return; 
+    }
     if (ty instanceof ClassDesc) {
-      ClassDesc aClass = (ClassDesc)ty;
-      if (aClass.outBaseTypeNum > 0) { return; }
-      aClass.outBaseTypeNum = nextType++;
-      if (aClass.superClass != null) {
-        aClass.superClass.writeDetails = true; 
-        AddType(aClass.superClass); 
-      }
-      if (aClass.isInterface) {
-        for (int i=0; i < aClass.interfaces.length; i++) {
-          aClass.interfaces[i].writeDetails = true;
-          AddType(aClass.interfaces[i]);
+        ClassDesc aClass = (ClassDesc)ty;
+        if (aClass.outBaseTypeNum > 0) { 
+            return; 
         }
-      }
+        aClass.outBaseTypeNum = nextType++;
+        if (aClass.superClass != null) {
+            aClass.superClass.writeDetails = true; 
+            AddTypeToTypeList(aClass.superClass); 
+        }
+        if (aClass.isInterface) {
+            for (ClassDesc intf : aClass.interfaces) {
+                intf.writeDetails = true;
+                AddTypeToTypeList(intf); // Recurse
+            }
+        }
     } else if (ty instanceof PtrDesc) { 
         ty = ((PtrDesc)ty).boundType; 
-        if (ty.outTypeNum == 0) { AddType(ty); }
+        if (ty.outTypeNum == 0) { 
+            AddTypeToTypeList(ty); 
+        }
     } else if (ty instanceof ArrayDesc) {
-      ty = ((ArrayDesc)ty).elemType;
-      while (ty instanceof ArrayDesc) {
-        ArrayDesc aTy = (ArrayDesc)ty;
-        if (aTy.ptrType.outTypeNum == 0) { InsertType(aTy.ptrType); }
-        if (aTy.outTypeNum == 0) { InsertType(aTy); }
-        ty = aTy.elemType;
-      }                   
-      if (ty.outTypeNum == 0) { InsertType(ty); }
+        ty = ((ArrayDesc)ty).elemType;
+        while (ty instanceof ArrayDesc) {
+            ArrayDesc aTy = (ArrayDesc)ty;
+            if (aTy.ptrType.outTypeNum == 0) { 
+                InsertTypeInTypeList(aTy.ptrType); 
+            }
+            if (aTy.outTypeNum == 0) { 
+                InsertTypeInTypeList(aTy); 
+            }
+            ty = aTy.elemType;
+        }                   
+        if (ty.outTypeNum == 0) { 
+            InsertTypeInTypeList(ty); 
+        }
     }
   }
 
-  static void writeTypeOrd(DataOutputStream out,TypeDesc ty)throws IOException {
-    if (ty.typeOrd < TypeDesc.ordT) { 
-      out.writeByte(ty.typeOrd); 
-    } else {
-      if (ty.outTypeNum == 0) { AddType(ty); }
-      if (ty.outTypeNum == 0) { 
-        System.out.println("ERROR: type has number 0 for type " + ty.name); 
-        System.exit(1); 
-      }
-      writeOrd(out,ty.outTypeNum);
+    /**
+     * Writes out the ordinal number of the type denoted by this
+     * <code>TypeDesc</code> object. If a descriptor does not have
+     * a ordinal already allocated this implies that the type has
+     * not yet been added to the type-list. In this case the type
+     * is added to the list and an ordinal allocated.
+     * <p>
+     * Builtin types have pre-allocated type ordinal, less than 
+     * <code>TypeDesc.ordT</code>.
+     * @param out The data stream to which the symbol file is being written.
+     * @param ty The <code>TypeDesc</code> whose type ordinal is required.
+     * @throws IOException 
+     */
+    static void writeTypeOrd(DataOutputStream out,TypeDesc ty)throws IOException {
+        if (ty.typeOrd < TypeDesc.ordT) { 
+            // ==> ty is a builtin type.
+            out.writeByte(ty.typeOrd); 
+        } else {
+            if (ty.outTypeNum == 0) { 
+              // ==> ty is a class type.
+              AddTypeToTypeList(ty); // blame ty
+            }
+            if (ty.outTypeNum == 0) { 
+                System.out.println("ERROR: type has number 0 for type " + ty.name); 
+                System.exit(1); 
+            }
+            writeOrd(out,ty.outTypeNum);
+        }
     }
-  }
 
   public static void WriteFormalType(MethodInfo m,DataOutputStream out) 
                                                      throws IOException {
@@ -245,52 +310,82 @@ class SymbolFile {
       writeTypeOrd(out,m.retType);
     } 
     out.writeByte(frmSy);
-    for (int i=0; i < m.parTypes.length; i++) {
-      out.writeByte(parSy);
-      if (m.parTypes[i] instanceof ArrayDesc) {
-        out.writeByte(1);   // array params are IN
-      } else {
-        out.writeByte(0);   // all other java parameters are value 
+      for (TypeDesc parType : m.parTypes) {
+          out.writeByte(parSy);
+          if (parType instanceof ArrayDesc) {
+              out.writeByte(1);   // array params are IN
+          } else {
+              out.writeByte(0);   // all other java parameters are value 
+          }
+          writeTypeOrd(out, parType);
       }
-      writeTypeOrd(out,m.parTypes[i]);
-    }
     out.writeByte(endFm);
   }
 
   public static void WriteSymbolFile(PackageDesc thisPack) throws IOException{
     ClearTypeList();
-    DataOutputStream out = J2CPSFiles.CreateSymFile(thisPack.cpName);
-
-    System.out.println("INFO:  Creating symbol file " + thisPack.cpName);
-
+    DataOutputStream out = j2cpsfiles.CreateSymFile(thisPack.cpName);
     out.writeInt(magic);
     out.writeByte(modSy);
     writeName(out,0,thisPack.cpName);
     writeString(out,thisPack.javaName);
     out.writeByte(falSy); /* package is not an interface */
-    for (int i=0; i < thisPack.imports.size(); i++) {
-      out.writeByte(impSy);
-      PackageDesc imp = (PackageDesc)thisPack.imports.get(i);
-      imp.impNum = i+1;
-      writeName(out,0,imp.cpName);
-      writeString(out,imp.javaName);
-      out.writeByte(keySy);
-      out.writeInt(0);
+    // #############################
+    imps = thisPack.pkgImports;
+    target = thisPack;
+    // #############################
+    //
+    //  Emit package import list
+    //    Import = impSy Name [String] Key.
+    //  Imports are given an index as they are listed.
+    //
+    for (int i=0; i < thisPack.pkgImports.size(); i++) {
+        out.writeByte(impSy);
+        PackageDesc imp = (PackageDesc)thisPack.pkgImports.get(i);
+        // -------------------
+        if (ClassDesc.VERBOSE)
+            System.out.printf("import %d %s %d\n", 
+                i, 
+               (imp.javaName == null ? "null" : imp.javaName), 
+                i+1);      
+        // -------------------
+        imp.impNum = i+1;
+        writeName(out,0,imp.cpName);
+        writeString(out,imp.javaName);
+        out.writeByte(keySy);
+        out.writeInt(0);
     }
-    for (int cNum=0; cNum < thisPack.classes.length; cNum++) {
-      ClassDesc thisClass = thisPack.classes[cNum];
-      if ((thisClass != null) && ConstantPool.isPublic(thisClass.access)) {
-        thisClass.writeDetails = true;
-        out.writeByte(typSy);
-        writeName(out,thisClass.access,thisClass.objName);
-        writeTypeOrd(out,thisClass);
-      }
+    for (ClassDesc thisClass : thisPack.myClasses) {
+        if ((thisClass != null) && ConstantPool.isPublic(thisClass.access)) {
+            // -------------------
+            if (ClassDesc.verbose)
+                System.out.printf("Member class %s\n", thisClass.javaName);   
+            // -------------------
+            // This class is a class of the package being
+            // emitted to this symbol file. Details are required.
+            // -------------------
+            thisClass.writeDetails = true;
+            out.writeByte(typSy);
+            writeName(out,thisClass.access,thisClass.objName);
+            writeTypeOrd(out,thisClass);
+        }
     }
+    //
+    //  Write out typelist
+    //
     out.writeByte(start);
     for (int i=0; i < tListIx; i++) {
-      out.writeByte(tDefS);
-      writeOrd(out,typeList[i].outTypeNum);
-      typeList[i].writeType(out,thisPack);
+        TypeDesc desc = typeList[i];
+        // -------------------
+        if (ClassDesc.VERBOSE) 
+            System.out.printf("typeList element %d (of %d) %s %d\n", 
+                i, tListIx,
+               (desc.name == null ? "null" : desc.name), 
+                desc.outTypeNum); 
+        // -------------------
+        out.writeByte(tDefS);
+        writeOrd(out,desc.outTypeNum);      
+        desc.writeType(out, thisPack);
     }
     out.writeByte(close);
     out.writeByte(keySy);
@@ -298,8 +393,9 @@ class SymbolFile {
     thisPack.ResetImports();
   }
 
-// Symbol file reading 
-
+  //
+  // Symbol file reading 
+  //
   private static void InsertType(int tNum,TypeDesc ty) {
     if (tNum >= typeList.length) {
       int newLen = 2 * typeList.length;
@@ -384,42 +480,57 @@ class SymbolFile {
 
   private static void SkipToEndRec(DataInputStream in) throws IOException {
     while (sSym != endRc) { 
-      if (sSym == mthSy) {
-        GetSym(); // name
-        in.readByte(); 
-        in.readByte();
-        readOrd();
-      } else if (sSym == varSy) {
-        GetSym(); // name
-        readOrd();
-      } else if (sSym == conSy) {
-        GetSym(); // name
-        GetSym(); // Literal
-      } else if (sSym == prcSy) {
-        GetSym(); // name
-      } else if (sSym == parSy) {
-        in.readByte();
-        readOrd();
-      } else if (sSym == namSy) {
-        readOrd();
-      } else {
-      }
+        switch (sSym) {
+            case mthSy:
+                GetSym(); // name
+                in.readByte();
+                in.readByte();
+                readOrd();
+                break;
+            case varSy:
+                GetSym(); // name
+                readOrd();
+                break;
+            case conSy:
+                GetSym(); // name
+                GetSym(); // Literal
+                break;
+            case prcSy:
+                GetSym(); // name
+                break;
+            case parSy:
+                in.readByte();
+                readOrd();
+                break;
+            case namSy:
+                readOrd();
+                break;
+            default:
+                break;
+        }
       GetSym(); 
     }
   }
 
   private static int GetAccess() {
-    if (acc == prvMode) { return ConstantPool.ACC_PRIVATE; }
-    else if (acc == pubMode) { return ConstantPool.ACC_PUBLIC; }
-    else if (acc == protect) { return ConstantPool.ACC_PROTECTED; }
+      switch (acc) {
+          case prvMode:
+              return ConstantPool.ACC_PRIVATE;
+          case pubMode:
+              return ConstantPool.ACC_PUBLIC;
+          case protect:
+              return ConstantPool.ACC_PROTECTED;
+          default:
+              break;
+      }
     return 0;
   }
 
   private static ClassDesc GetClassDesc(PackageDesc thisPack,String className) {
-    ClassDesc aClass = ClassDesc.GetClassDesc(thisPack.name + qSepCh + 
+    ClassDesc aClass = ClassDesc.GetClassDesc(thisPack.name + Util.FWDSLSH + 
                                               className,thisPack);
-    if (aClass.fieldList == null){ aClass.fieldList = new ArrayList(); }
-    if (aClass.methodList == null){ aClass.methodList = new ArrayList(); }
+    if (aClass.fieldList == null){ aClass.fieldList = new ArrayList<>(); }
+    if (aClass.methodList == null){ aClass.methodList = new ArrayList<>(); }
     return aClass;
   }
 
@@ -435,15 +546,15 @@ class SymbolFile {
     Expect(namSy); 
     switch (sSym) {
       case numSy : typ = TypeDesc.GetBasicType(TypeDesc.longT); 
-                   val = new Long(lVal); break;
+                   val = lVal; break;
       case strSy : typ = TypeDesc.GetBasicType(TypeDesc.strT);
-                   val = name; 
+                   val = name; break;
       case setSy : typ = TypeDesc.GetBasicType(TypeDesc.setT);
-                   val = new Integer(iVal); break;
+                   val = iVal; break;
       case chrSy : typ = TypeDesc.GetBasicType(TypeDesc.charT);
-                   val = new Character(cVal); break;
+                   val = cVal; break;
       case fltSy : typ = TypeDesc.GetBasicType(TypeDesc.dbleT);
-                   val = new Double(dVal); break;
+                   val = dVal; break;
       case falSy : typ = TypeDesc.GetBasicType(TypeDesc.boolT);
                    val = false; break;
       case truSy : typ = TypeDesc.GetBasicType(TypeDesc.boolT);
@@ -545,7 +656,9 @@ class SymbolFile {
     Expect(namSy); 
     if (sSym == strSy) { jName = name; GetSym();  }
     MethodInfo m = new MethodInfo(pClass,procName,jName,pAcc); 
-    if (sSym == truSy) { m.isInitProc = true; GetSym();  }
+    if (sSym == truSy) { 
+        m.isInitProc = true; GetSym();  
+    }
     GetFormalType(pClass,m);
     pClass.methodList.add(m);
   }
@@ -592,291 +705,323 @@ class SymbolFile {
     return typeList[num];
   } 
 
-  public static void ReadSymbolFile(File symFile,PackageDesc thisPack) 
-                                     throws FileNotFoundException, IOException {
-
-    if (ClassDesc.verbose)
-      System.out.println("INFO:  Reading symbol file " + symFile.getName());
-
-    ClearTypeList();
-    ClassDesc aClass, impClass;
-    int maxInNum = 0;
-    FileInputStream fIn = new FileInputStream(symFile);
-    in = new DataInputStream(fIn);
-    if (in.readInt() != magic) {
-      System.out.println(symFile.getName() + " is not a valid symbol file.");
-      System.exit(1);
-    }
-    GetSym();
-    Expect(modSy);
-    if (!thisPack.cpName.equals(name)) {
-      System.out.println("ERROR:  Symbol file " + symFile.getName() + 
-      " does not contain MODULE " + thisPack.cpName + ", it contains MODULE " +
-      name);
-      System.exit(1);
-    }
-    Expect(namSy);
-    if (sSym == strSy) { 
-      if (!name.equals(thisPack.javaName)) { 
-        System.out.println("Wrong name in symbol file.");
-        System.exit(1); 
-      }
-      GetSym();
-      if (sSym == truSy) {  
-        System.out.println("ERROR:  Java Package cannot be an interface.");
-        System.exit(1);
-      }
-      GetSym();
-    } else {
-      System.err.println("<" + symFile.getName() + 
-                         "> NOT A SYMBOL FILE FOR A JAVA PACKAGE!");
-      System.exit(1);
-    }
-    while (sSym != start) {
-      switch (sSym) {
-        case impSy : GetSym(); // name
-                     String iName = name;
-                     GetSym(); 
-                     if (sSym == strSy) { 
-                       PackageDesc pack = PackageDesc.getPackage(name);
-                       thisPack.imports.add(pack);
-                       GetSym(); 
-                     }
-                     Expect(keySy);  
-                     break;
-        case conSy : 
-        case varSy : 
-        case prcSy : System.out.println("Symbol File is not from a java class");
-                     System.exit(1);
-                     break;
-        case typSy : GetType(thisPack); break;
-      }
-    }
-    Expect(start);
-    while (sSym != close) {
-      PackageDesc impPack;
-      impClass = null;
-      String impModName = null;
-      int impAcc = 0, impModAcc = 0;
-      Check(tDefS); 
-      int tNum = tOrd; GetSym(); 
-      if (tNum > maxInNum) { maxInNum = tNum; }
-      if (sSym == fromS) {
-        int impNum = tOrd - 1;
-        GetSym(); 
-        Check(namSy);
-        String impName = name;
-        impAcc = acc; 
-        if (impNum < 0) {
-          impPack = thisPack;
-        } else {
-          impPack = (PackageDesc)thisPack.imports.get(impNum);
+    public static void ReadSymbolFile(File symFile, PackageDesc thisPack)
+            throws FileNotFoundException, IOException {
+        if (ClassDesc.verbose) {
+            System.out.println("INFO:  Reading symbol file " + symFile.getName());
         }
-        impClass = GetClassDesc(impPack,impName);
-        GetSym(); 
-      }
-      switch (sSym) { 
-        case arrSy : ArrayDesc newArr = null;
-                     int elemOrd = tOrd;
-                     GetSym();
-                     Expect(endAr);
-                     TypeDesc eTy = null;
-                     if (elemOrd < typeList.length) {
-                       if (elemOrd < TypeDesc.specT) { 
-                         eTy = TypeDesc.GetBasicType(elemOrd); 
-                       } else { 
-                         eTy = typeList[elemOrd]; 
-                       }
-                       if ((eTy != null) && (eTy instanceof PtrDesc) &&
-                          (((PtrDesc)eTy).boundType != null) && 
-                          (((PtrDesc)eTy).boundType instanceof ClassDesc)) {
-                         eTy = ((PtrDesc)eTy).boundType;   
-                       } 
-                     }
-                     if (eTy != null) {
-                       newArr = ArrayDesc.FindArrayType(1,eTy,true); 
-                     } else {
-                       newArr = new ArrayDesc(elemOrd); 
-                     }
-                     if ((tNum < typeList.length) && (typeList[tNum] != null)) {
-                       PtrDesc desc = (PtrDesc) typeList[tNum];
-                       if (desc.inBaseTypeNum != tNum) {
-                         System.out.println("WRONG BASE TYPE FOR POINTER!");
-                         System.exit(1);
-                       }
-                       desc.Init(newArr);
-                       newArr.SetPtrType(desc);
-                     }
-                     InsertType(tNum,newArr);
-                     break; 
-        case ptrSy : TypeDesc ty = null;
-                     if (impClass != null) { 
-                       InsertType(tNum,impClass);
-                       ty = impClass;
-                       ty.inTypeNum = tNum;
-                       ty.inBaseTypeNum = tOrd;
-                       InsertType(tOrd,ty);
-                     } else if ((tNum < typeList.length) && 
-                                (typeList[tNum] != null) &&
-                                (typeList[tNum] instanceof ClassDesc)) { 
-                       ty = typeList[tNum];
-                       ty.inTypeNum = tNum;
-                       ty.inBaseTypeNum = tOrd;
-                       InsertType(tOrd,ty);
-                     } else {
-                       ty = new PtrDesc(tNum,tOrd);
-                       InsertType(tNum,ty);
-                       if ((tOrd < typeList.length) && 
-                                (typeList[tOrd] != null)) { 
-                         ((PtrDesc)ty).Init(typeList[tOrd]);
-                       }
-                     }
-                     GetSym();
-                     break; 
-        case recSy : if ((tNum >= typeList.length) || (typeList[tNum] == null)||
-                         (!(typeList[tNum] instanceof ClassDesc))) {
-                     /* cannot have record type that is not a base type
-                        of a pointer in a java file                     */
-                       System.err.println(
-                         "RECORD TYPE " + tNum + " IS NOT POINTER BASE TYPE!");
-                       System.exit(1);
-                     }
-                     aClass = (ClassDesc) typeList[tNum];
-                     acc = in.readByte();
-                     aClass.setRecAtt(acc);
-                     if (aClass.read) { 
-                       GetSym();
-                       SkipToEndRec(in); 
-                       GetSym();
-                     } else {
-                       GetSym();
-                       if (sSym == truSy) { 
-                         aClass.isInterface = true; 
-                         GetSym();
-                       } else if (sSym == falSy) { 
-                         GetSym(); 
-                       }
-                       if (sSym == basSy) { 
-                         aClass.superNum = tOrd; 
-                         GetSym(); 
-                       }
-                       if (sSym == iFcSy) {
-                         GetSym();
-                         aClass.intNums = new int[10];
-                         aClass.numInts = 0;
-                         while (sSym == basSy) {
-                           if (aClass.numInts >= aClass.intNums.length) {
-                             int tmp[] = new int[aClass.intNums.length*2];
-                             System.arraycopy(aClass.intNums, 0, tmp, 0, aClass.intNums.length);
-                             aClass.intNums = tmp;
-                           }
-                           aClass.intNums[aClass.numInts] = tOrd;
-                           aClass.numInts++;
-                           GetSym();
-                         }
-                       }
-                       while (sSym == namSy) {
-                         FieldInfo f = new FieldInfo(aClass,GetAccess(),name,
-                                       null,null); 
-                         f.typeFixUp = readOrd(); 
-                         GetSym();
-                         boolean ok = aClass.fieldList.add(f);
-                         aClass.scope.put(f.name,f);
-                       } 
-                       while ((sSym == mthSy) || (sSym == prcSy) ||
-                              (sSym == varSy) || (sSym == conSy)) { 
-                         switch (sSym) {
-                           case mthSy : GetMethod(aClass); break; 
-                           case prcSy : GetProc(aClass); break;
-                           case varSy : GetVar(aClass); break;
-                           case conSy : GetConstant(aClass); break;
-                         }
-                       }
-                       Expect(endRc);
-                     }
-                     break; 
-        case pTpSy : System.out.println("CANNOT HAVE PROC TYPE IN JAVA FILE!"); 
-                     break;
-        case evtSy :System.out.println("CANNOT HAVE EVENT TYPE IN JAVA FILE!"); 
-                     break;
-        case eTpSy : System.out.println("CANNOT HAVE ENUM TYPE IN JAVA FILE!"); 
-                     break;
-        case tDefS : 
-        case close : InsertType(tNum,impClass);
-                     break;
-        default : char ch = (char) sSym; 
-                  System.out.println("UNRECOGNISED TYPE!" + sSym + "  " + ch); 
-                  System.exit(1);
-      }
-    }
-    Expect(close);
-    Check(keySy); 
-    fIn.close();
-    // do fix ups...
-    for (int i = TypeDesc.specT; i <= maxInNum; i++) {
-      if ((typeList[i] != null) && (typeList[i] instanceof ClassDesc)) {
-        if (!((ClassDesc)typeList[i]).read) {
-          aClass = (ClassDesc)typeList[i];
-          if (aClass.superNum != 0) {
-            aClass.superClass = (ClassDesc)typeList[aClass.superNum];
-          }
-          aClass.interfaces = new ClassDesc[aClass.numInts];
-          for (int j=0; j < aClass.numInts; j++) {
-            aClass.interfaces[j] = (ClassDesc) GetFixUpType(aClass.intNums[j]); 
-          }
-          int size;
-          if (aClass.fieldList == null) { 
-            size = 0; 
-          } else {
-            size = aClass.fieldList.size(); 
-          }
-          aClass.fields = new FieldInfo[size];
-          for (int j=0; j < size; j++) {
-            aClass.fields[j] = (FieldInfo)aClass.fieldList.get(j);
-            aClass.fields[j].type = GetFixUpType(aClass.fields[j].typeFixUp); 
-            if (aClass.fields[j].type instanceof ClassDesc) {
-              aClass.AddImport((ClassDesc)aClass.fields[j].type);
-            }  
-          }
-          aClass.fieldList = null;
-          if (aClass.methodList == null) { size = 0;
-          } else { size = aClass.methodList.size(); }
-          aClass.methods = new MethodInfo[size];
-          for (int k=0; k < size; k++) {
-            aClass.methods[k] = (MethodInfo)aClass.methodList.get(k);
-            aClass.methods[k].retType = GetFixUpType(
-                                        aClass.methods[k].retTypeFixUp); 
-            if (aClass.methods[k].retType instanceof ClassDesc) {
-              aClass.AddImport((ClassDesc)aClass.methods[k].retType);
-            }  
-            aClass.methods[k].parTypes = new TypeDesc[
-                                         aClass.methods[k].parFixUps.length];
-            for (int j=0; j < aClass.methods[k].parFixUps.length; j++) {
-              aClass.methods[k].parTypes[j] = GetFixUpType(
-                                              aClass.methods[k].parFixUps[j]);
-              if (aClass.methods[k].parTypes[j] instanceof ClassDesc) {
-                aClass.AddImport((ClassDesc)aClass.methods[k].parTypes[j]);
-              }  
+
+        ClearTypeList();
+        ClassDesc aClass, impClass;
+        int maxInNum = 0;
+        //
+        //  Read the symbol file and create descriptors
+        //
+        try (FileInputStream fIn = new FileInputStream(symFile)) {
+            in = new DataInputStream(fIn);
+            if (in.readInt() != magic) {
+                System.out.println(symFile.getName() + " is not a valid symbol file.");
+                System.exit(1);
             }
-          }
-          aClass.methodList = null;
-          aClass.read = true;
-          aClass.done = true;
+            GetSym();
+            Expect(modSy);
+            if (!thisPack.cpName.equals(name)) {
+                System.out.println("ERROR:  Symbol file " + symFile.getName()
+                        + " does not contain MODULE " + thisPack.cpName + ", it contains MODULE "
+                        + name);
+                System.exit(1);
+            }
+            Expect(namSy);
+            if (sSym == strSy) {
+                if (!name.equals(thisPack.javaName)) {
+                    System.out.println("Wrong name in symbol file.");
+                    System.exit(1);
+                }
+                GetSym();
+                if (sSym == truSy) {
+                    System.out.println("ERROR:  Java Package cannot be an interface.");
+                    System.exit(1);
+                }
+                GetSym();
+            } else {
+                System.err.println("<" + symFile.getName()
+                        + "> NOT A SYMBOL FILE FOR A JAVA PACKAGE!");
+                System.exit(1);
+            }
+            while (sSym != start) {
+                switch (sSym) {
+                    case impSy:
+                        GetSym(); // name
+                        String iName = name;
+                        GetSym();
+                        if (sSym == strSy) {
+                            PackageDesc pack = PackageDesc.getPackage(name);
+                            thisPack.pkgImports.add(pack);
+                            GetSym();
+                        }
+                        Expect(keySy);
+                        break;
+                    case conSy:
+                    case varSy:
+                    case prcSy:
+                        System.out.println("Symbol File is not from a java class");
+                        System.exit(1);
+                        break;
+                    case typSy:
+                        GetType(thisPack);
+                        break;
+                }
+            }
+            Expect(start);
+            while (sSym != close) {
+                PackageDesc impPack;
+                impClass = null;
+                String impModName = null;
+                int impAcc = 0,
+                        impModAcc = 0;
+                Check(tDefS);
+                int tNum = tOrd;
+                GetSym();
+                if (tNum > maxInNum) {
+                    maxInNum = tNum;
+                }
+                if (sSym == fromS) {
+                    int impNum = tOrd - 1;
+                    GetSym();
+                    Check(namSy);
+                    String impName = name;
+                    impAcc = acc;
+                    if (impNum < 0) {
+                        impPack = thisPack;
+                    } else {
+                        impPack = (PackageDesc) thisPack.pkgImports.get(impNum);
+                    }
+                    impClass = GetClassDesc(impPack, impName);
+                    GetSym();
+                }
+                switch (sSym) {
+                    case arrSy:
+                        ArrayDesc newArr;
+                        int elemOrd = tOrd;
+                        GetSym();
+                        Expect(endAr);
+                        TypeDesc eTy = null;
+                        if (elemOrd < typeList.length) {
+                            if (elemOrd < TypeDesc.specT) {
+                                eTy = TypeDesc.GetBasicType(elemOrd);
+                            } else {
+                                eTy = typeList[elemOrd];
+                            }
+                            if ((eTy != null) && (eTy instanceof PtrDesc)
+                                    && (((PtrDesc) eTy).boundType != null)
+                                    && (((PtrDesc) eTy).boundType instanceof ClassDesc)) {
+                                eTy = ((PtrDesc) eTy).boundType;
+                            }
+                        }
+                        if (eTy != null) {
+                            newArr = ArrayDesc.FindOrCreateArrayType(1, eTy, true);
+                        } else {
+                            newArr = new ArrayDesc(elemOrd);
+                        }
+                        if ((tNum < typeList.length) && (typeList[tNum] != null)) {
+                            PtrDesc desc = (PtrDesc) typeList[tNum];
+                            if (desc.inBaseTypeNum != tNum) {
+                                System.out.println("WRONG BASE TYPE FOR POINTER!");
+                                System.exit(1);
+                            }
+                            desc.Init(newArr);
+                            newArr.SetPtrType(desc);
+                        }
+                        InsertType(tNum, newArr);
+                        break;
+                    case ptrSy:
+                        TypeDesc ty;
+                        if (impClass != null) {
+                            InsertType(tNum, impClass);
+                            ty = impClass;
+                            ty.inTypeNum = tNum;
+                            ty.inBaseTypeNum = tOrd;
+                            InsertType(tOrd, ty);
+                        } else if ((tNum < typeList.length)
+                                && (typeList[tNum] != null)
+                                && (typeList[tNum] instanceof ClassDesc)) {
+                            ty = typeList[tNum];
+                            ty.inTypeNum = tNum;
+                            ty.inBaseTypeNum = tOrd;
+                            InsertType(tOrd, ty);
+                        } else {
+                            ty = new PtrDesc(tNum, tOrd);
+                            InsertType(tNum, ty);
+                            if ((tOrd < typeList.length)
+                                    && (typeList[tOrd] != null)) {
+                                ((PtrDesc) ty).Init(typeList[tOrd]);
+                            }
+                        }
+                        GetSym();
+                        break;
+                    case recSy:
+                        if ((tNum >= typeList.length) 
+                                || (typeList[tNum] == null)
+                                || (!(typeList[tNum] instanceof ClassDesc))) {
+                            /* cannot have record type that is not a base type
+                               of a pointer in a java file                     */
+                            System.err.println(
+                                    "RECORD TYPE " + tNum + " IS NOT POINTER BASE TYPE!");
+                            System.exit(1);
+                        }
+                        aClass = (ClassDesc) typeList[tNum];
+                        acc = in.readByte();
+                        aClass.setRecAtt(acc);
+                        if (aClass.read) {
+                            GetSym();
+                            SkipToEndRec(in);
+                            GetSym();
+                        } else {
+                            GetSym();
+                            if (sSym == truSy) {
+                                aClass.isInterface = true;
+                                GetSym();
+                            } else if (sSym == falSy) {
+                                GetSym();
+                            }
+                            if (sSym == basSy) {
+                                aClass.superNum = tOrd;
+                                GetSym();
+                            }
+                            if (sSym == iFcSy) {
+                                GetSym();
+                                aClass.intNums = new int[10];
+                                aClass.numInts = 0;
+                                while (sSym == basSy) {
+                                    if (aClass.numInts >= aClass.intNums.length) {
+                                        int tmp[] = new int[aClass.intNums.length * 2];
+                                        System.arraycopy(aClass.intNums, 0, tmp, 0, aClass.intNums.length);
+                                        aClass.intNums = tmp;
+                                    }
+                                    aClass.intNums[aClass.numInts] = tOrd;
+                                    aClass.numInts++;
+                                    GetSym();
+                                }
+                            }
+                            while (sSym == namSy) {
+                                FieldInfo f = new FieldInfo(aClass, GetAccess(), name,
+                                        null, null);
+                                f.typeFixUp = readOrd();
+                                GetSym();
+                                boolean ok = aClass.fieldList.add(f);
+                                aClass.scope.put(f.name, f);
+                            }
+                            while ((sSym == mthSy) || (sSym == prcSy)
+                                    || (sSym == varSy) || (sSym == conSy)) {
+                                switch (sSym) {
+                                    case mthSy:
+                                        GetMethod(aClass);
+                                        break;
+                                    case prcSy:
+                                        GetProc(aClass);
+                                        break;
+                                    case varSy:
+                                        GetVar(aClass);
+                                        break;
+                                    case conSy:
+                                        GetConstant(aClass);
+                                        break;
+                                }
+                            }
+                            Expect(endRc);
+                        }
+                        break;
+                    case pTpSy:
+                        System.out.println("CANNOT HAVE PROC TYPE IN JAVA FILE!");
+                        break;
+                    case evtSy:
+                        System.out.println("CANNOT HAVE EVENT TYPE IN JAVA FILE!");
+                        break;
+                    case eTpSy:
+                        System.out.println("CANNOT HAVE ENUM TYPE IN JAVA FILE!");
+                        break;
+                    case tDefS:
+                    case close:
+                        InsertType(tNum, impClass);
+                        break;
+                    default:
+                        char ch = (char) sSym;
+                        System.out.println("UNRECOGNISED TYPE!" + sSym + "  " + ch);
+                        System.exit(1);
+                }
+            }
+            Expect(close);
+            Check(keySy);
         }
-      } else if ((typeList[i] != null) && (typeList[i] instanceof ArrayDesc)) {
-        FixArrayElemType((ArrayDesc)typeList[i]);
-      } else if ((typeList[i] != null) && (typeList[i] instanceof PtrDesc)) {
-        PtrDesc ptr = (PtrDesc)typeList[i];
-        if (ptr.typeOrd == TypeDesc.arrPtr) { 
-          ptr.Init(typeList[ptr.inBaseTypeNum]);
+        //
+        //  Now do the type fixups
+        //
+        for (int i = TypeDesc.specT; i <= maxInNum; i++) {
+            if ((typeList[i] != null) && (typeList[i] instanceof ClassDesc)) {
+                if (!((ClassDesc) typeList[i]).read) {
+                    aClass = (ClassDesc) typeList[i];
+                    if (aClass.superNum != 0) {
+                        aClass.superClass = (ClassDesc) typeList[aClass.superNum];
+                    }
+                    aClass.interfaces = new ClassDesc[aClass.numInts];
+                    for (int j = 0; j < aClass.numInts; j++) {
+                        aClass.interfaces[j] = (ClassDesc) GetFixUpType(aClass.intNums[j]);
+                    }
+                    int size;
+                    if (aClass.fieldList == null) {
+                        size = 0;
+                    } else {
+                        size = aClass.fieldList.size();
+                    }
+                    //aClass.fields = new FieldInfo[size];
+                    for (int j = 0; j < size; j++) {
+                        FieldInfo fieldJ = (FieldInfo) aClass.fieldList.get(j);
+                        //aClass.fields[j] = fieldJ;
+                        fieldJ.type = GetFixUpType(fieldJ.typeFixUp);
+                        if (fieldJ.type instanceof ClassDesc) { // FIXME And is public?
+                            aClass.AddImportToClass((ClassDesc) fieldJ.type);
+                        }
+                    }
+                    aClass.fieldList = null;
+                    if (aClass.methodList == null) {
+                        size = 0;
+                    } else {
+                        size = aClass.methodList.size();
+                    }
+                    //aClass.methods = new MethodInfo[size];
+                    for (int k = 0; k < size; k++) {
+                        MethodInfo methodK = (MethodInfo) aClass.methodList.get(k);
+                        //aClass.methods[k] = methodK;
+                        methodK.retType = GetFixUpType(methodK.retTypeFixUp);
+                        if (methodK.retType instanceof ClassDesc) {
+                            aClass.AddImportToClass((ClassDesc) methodK.retType);
+                        }
+                        methodK.parTypes = new TypeDesc[methodK.parFixUps.length];
+                        for (int j = 0; j < methodK.parFixUps.length; j++) {
+                            methodK.parTypes[j] = GetFixUpType(methodK.parFixUps[j]);
+                            if (methodK.parTypes[j] instanceof ClassDesc) {
+                                aClass.AddImportToClass((ClassDesc) methodK.parTypes[j]);
+                            }
+                        }
+                    }
+                    aClass.methodList = null;
+                    aClass.read = true;
+                    aClass.done = true;
+                }
+            } else if ((typeList[i] != null) && (typeList[i] instanceof ArrayDesc)) {
+                FixArrayElemType((ArrayDesc) typeList[i]);
+            } else if ((typeList[i] != null) && (typeList[i] instanceof PtrDesc)) {
+                PtrDesc ptr = (PtrDesc) typeList[i];
+                if (ptr.typeOrd == TypeDesc.arrPtr) {
+                    ptr.Init(typeList[ptr.inBaseTypeNum]);
+                }
+            } else if (typeList[i] != null) {
+                System.out.println("Type " + i + " " + typeList[i].name
+                        + " is NOT array or class");
+                System.exit(0);
+            }
         }
-      } else if (typeList[i] != null) { 
-        System.out.println("Type " + i + " " + typeList[i].name + 
-                           " is NOT array or class"); 
-        System.exit(0);
-      }
     }
-  }
 }
 
 

@@ -27,7 +27,6 @@ MODULE CPascalP;
         Bi := Builtin,
         StatDesc,
         Visitor,
-        OldSymFileRW,
         NewSymFileRW,
         NameHash;
 
@@ -307,6 +306,7 @@ VAR
     IF (nextT.sym = T.colonequalSym) THEN
       alias := Id.newAlias();
       alias.hash  := NameHash.enterSubStr(token.pos, token.len);
+      IF Cs.verbose THEN alias.SetNameFromHash(alias.hash) END;
       IF Sy.refused(alias, modScope) THEN SemError(4) END;
       Get; (* Read past colonequals symbol *)
      (*
@@ -326,10 +326,9 @@ VAR
       ELSE
         Expect(T.identSym);
         alias.token := token;  (* fake the name for err-msg use *)
-		ident.aliasMod := alias;
-		IF Cs.verbose THEN alias.SetNameFromHash(alias.hash) END;
         idHsh := NameHash.enterSubStr(token.pos, token.len);
       END;
+      ident.aliasMod := alias;
     ELSE
       idHsh := NameHash.enterSubStr(token.pos, token.len);
     END;
@@ -337,7 +336,8 @@ VAR
     ident.dfScp := ident;
     ident.hash  := idHsh;
 
-	IF Cs.verbose THEN ident.SetNameFromHash(idHsh) END;
+(* FIXME *)
+    IF Cs.verbose THEN ident.SetNameFromHash(idHsh) ELSE ident.ClearName() END;
 
     IF ident.hash = Bi.sysBkt THEN
       dummy := Cs.thisMod.symTb.enter(Bi.sysBkt, Cs.sysMod);
@@ -360,7 +360,7 @@ VAR
       *  there are already references to it in the structure.
       *)
       clash.token := ident.token;   (* to help error reports  *)
-	  IF Cs.verbose THEN clash.SetNameFromHash(clash.hash) END;
+      IF Cs.verbose THEN clash.SetNameFromHash(clash.hash) END;
       ident := clash(Id.BlkId);
 	 (*
 	  *  If this is the explicit import of a module that
@@ -406,7 +406,9 @@ VAR
       *  List the file, for importation later  ...
       *)
       Sy.AppendScope(impSeq, ident);
-      IF alias # NIL THEN INCL(ident.xAttr, Sy.anon) END;	        
+      IF alias # NIL THEN 
+	    INCL(ident.xAttr, Sy.anon);
+	  END;	        
       EXCL(ident.xAttr, Sy.weak); (* ==> directly imported *)
       INCL(ident.xAttr, Sy.need); (* ==> needed in symfile *)
 	END;
@@ -463,11 +465,7 @@ VAR
     END;
     
     Cs.import1 := RTS.GetMillis();
-IF Cs.legacy THEN
-    OldSymFileRW.WalkImports(Cs.impSeq, modScope);
-ELSE
     NewSymFileRW.WalkImports(Cs.impSeq, modScope);
-END;
     Cs.import2 := RTS.GetMillis();
   END ImportList;
 
@@ -2604,6 +2602,7 @@ END;
         fDsc := list.a[fIdx](Id.FldId);
         fDsc.type := fTyp;
         fDsc.recTyp := recT;
+        fDsc.fldNm := Sy.getName.ChPtr(fDsc); (* retro fitted *)
         Sy.AppendIdnt(recT.fields, fDsc);
       END;
     END;
@@ -3250,7 +3249,7 @@ END;
       RETURN idnt;
     ELSE
       modS := idnt(Id.BlkId);
-	  IF Sy.anon IN modS.xAttr THEN 
+	  IF (Sy.anon IN modS.xAttr) & ~Cs.Suppress239() THEN 
 	    SemErrorS1(239, Sy.getName.ChPtr(modS.aliasMod));
 	  END;
     END;
@@ -3309,7 +3308,7 @@ END;
       RETURN idnt(Id.TypId);
     ELSIF (idnt.kind = Id.impId) OR (idnt.kind = Id.alias) THEN
       modS := idnt(Id.BlkId);
-	  IF Sy.anon IN modS.xAttr THEN 
+	  IF (Sy.anon IN modS.xAttr) & ~Cs.Suppress239() THEN 
 	    SemErrorS1(239, Sy.getName.ChPtr(modS.aliasMod));
 	  END;
     ELSE
@@ -3367,7 +3366,7 @@ END;
     IF iSyn IS Sy.Scope THEN iSyn(Sy.Scope).ovfChk := Cs.ovfCheck END;
     iSyn.token := nextT;
     iSyn.hash  := NameHash.enterSubStr(nextT.pos, nextT.len);
-    IF Cs.verbose THEN iSyn.SetNameFromHash(iSyn.hash) END;
+    IF Cs.verbose OR Cs.doAsm5 THEN iSyn.SetNameFromHash(iSyn.hash) END;
     iSyn.dfScp := inhScp;
     IF nextT.dlr & ~Cs.special THEN SemErrorT(186, nextT) END;
     Expect(T.identSym);

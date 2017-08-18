@@ -14,8 +14,8 @@ FOREIGN MODULE MsilAsm;
   PROCEDURE Init*();
 
   PROCEDURE Assemble*(IN file : ARRAY OF CHAR; 
-		     IN optn : ARRAY OF CHAR; (* "/debug" or "" *)
-			    main : BOOLEAN); 	  (* /exe or /dll   *)
+                      IN optn : ARRAY OF CHAR; (* "/debug" or "" *)
+                         main : BOOLEAN); 	  (* /exe or /dll   *)
 
   PROCEDURE DoAsm*(IN file : ARRAY OF CHAR; 
 		   IN optn : ARRAY OF CHAR;	(* "/debug" or "" *)

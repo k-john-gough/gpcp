@@ -144,6 +144,7 @@ MODULE MsilMaker;
     Bi.MkDummyClass("String", blk, Ty.noAtt, str);
     Bi.SetPtrBase(str, obj);
     CSt.ntvStr := str.type;
+    CSt.ntvStrArr := Ty.mkArrayOf(str.type);
     Bi.MkDummyClass("Exception", blk, Ty.extns, exc);
     Bi.SetPtrBase(exc, obj);
     CSt.ntvExc := exc.type;

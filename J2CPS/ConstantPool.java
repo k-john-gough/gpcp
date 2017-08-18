@@ -1,9 +1,9 @@
 /**********************************************************************/
-/*                  ConstantPool class for J2CPS                      */
+/*                  ConstantPool class for j2cps                      */
 /*                                                                    */   
-/*                      (c) copyright QUT                             */ 
+/*  (c) copyright QUT, John Gough 2000-2012, John Gough, 2012-2017    */ 
 /**********************************************************************/
-package J2CPS;
+package j2cps;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -16,7 +16,7 @@ public class ConstantPool {
 
   /* Tags for constant pool entries */
   public final static int CONSTANT_Utf8               = 1;
-  public static final int CONSTANT_Unicode            = 2;
+  //public static final int CONSTANT_Unicode            = 2;
   public final static int CONSTANT_Integer            = 3;
   public final static int CONSTANT_Float              = 4;
   public final static int CONSTANT_Long               = 5;
@@ -27,7 +27,10 @@ public class ConstantPool {
   public final static int CONSTANT_Methodref          = 10;
   public final static int CONSTANT_InterfaceMethodref = 11;
   public final static int CONSTANT_NameAndType        = 12;
-  public final static int CONSTANT_Unknown            = 13;
+  //public final static int CONSTANT_Unknown            = 13;
+  public final static int CONSTANT_MethodHandle       = 15;
+  public final static int CONSTANT_MethodType         = 16;
+  public final static int CONSTANT_InvokeDynamic      = 18;
 
   /* access flags */
   public static final int ACC_PUBLIC       = 0x0001;
@@ -69,20 +72,19 @@ public class ConstantPool {
     pool = null;
   }
 
-  private Object ReadConstant(DataInputStream stream) 
-                                                            throws IOException {
+  private Object ReadConstant(DataInputStream stream) throws IOException {
     int tag = stream.readUnsignedByte();
     switch (tag) {
     case CONSTANT_Utf8:
       return stream.readUTF();
     case CONSTANT_Integer: 
-      return new Integer(stream.readInt());
+      return stream.readInt();
     case CONSTANT_Float: 
-      return new Float(stream.readFloat());
+      return stream.readFloat();
     case CONSTANT_Long: 
-      return new Long(stream.readLong());
+      return stream.readLong();
     case CONSTANT_Double: 
-      return new Double(stream.readDouble());
+      return stream.readDouble();
     case CONSTANT_Class: 
       return new ClassRef(this,stream.readUnsignedShort());
     case CONSTANT_String:
@@ -99,11 +101,25 @@ public class ConstantPool {
     case CONSTANT_NameAndType:
       return new NameAndType(this,stream.readUnsignedShort(), 
                              stream.readUnsignedShort());
+    case CONSTANT_MethodHandle:
+        return SkipInfo(this,tag,stream.readUnsignedByte(),
+                    stream.readUnsignedShort());
+    case CONSTANT_MethodType:
+        return SkipInfo(this,tag,stream.readUnsignedShort(),0);
+    case CONSTANT_InvokeDynamic:
+        return SkipInfo(this,tag,stream.readUnsignedShort(),
+                    stream.readUnsignedShort());
     default:
       System.out.println("Unrecognized constant type: "+String.valueOf(tag));
-	return null;
+	throw new IOException("Unrecognized constant in constant pool");
     }
   }
+  
+  private Object SkipInfo(ConstantPool cp, int tag, int I, int II) {
+      return null;
+  }
+  
+  
   
   public final Object Get(int index) {
     return pool[index];
@@ -154,6 +170,7 @@ public class ConstantPool {
   }
 
   /** Check if a flag has the public bit set */
+  
   public static boolean isPublic(int flags) {
     return (flags & ACC_PUBLIC) != 0;
   }
@@ -161,6 +178,10 @@ public class ConstantPool {
   /** Check if a flag has the private bit set */
   public static boolean isPrivate(int flags) {
     return (flags & ACC_PRIVATE) != 0;
+  }
+  
+  public static boolean isPublicOrProtected(int flags) {
+      return (flags & ACC_PUBLIC) != 0 || (flags & ACC_PROTECTED) != 0;
   }
 
   /** Check if a flag has the protected bit set */
@@ -203,7 +224,8 @@ public class ConstantPool {
     return (flags & ACC_VOLATILE) != 0;
   }
 
-  /** Check if a flag has the transient bit set */
+
+  /** Check if the flag has the transient bit set */
   public static boolean isTransient(int flags) {
     return (flags & ACC_TRANSIENT) != 0;
   }

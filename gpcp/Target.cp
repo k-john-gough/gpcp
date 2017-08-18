@@ -3,7 +3,7 @@
 (*  Copyright (c) John Gough 1999, 2000.			*)
 (* ============================================================ *)
 
-MODULE Target;
+MODULE Target; 
 
   IMPORT 
 	GPCPcopyright,
@@ -11,9 +11,6 @@ MODULE Target;
 	CompState,
 	ClassMaker,
 	JavaMaker,
-(*
- *	LlvmMaker,
- *)
 	MsilMaker,
 	IdDesc;
 
@@ -36,14 +33,6 @@ MODULE Target;
       maker := MsilMaker.newMsilEmitter(mod);
       assmb := MsilMaker.newMsilAsm();
       Symbols.SetTargetIsNET(TRUE);
-(*
- *   (* LLVM backend coming in 2013? *)
- *  ELSIF str = "llvm" THEN 
- *    maker := LlvmMaker.newBitCodeEmitter(mod);
- *    assmb := LlvmMaker.newBitCodeAssembler();
- *    Symbols.SetTargetIsNET(FALSE);
- *  ELSIF ...
- *)
     ELSE
       CompState.Message("Unknown emitter name <" + str + ">");
     END;

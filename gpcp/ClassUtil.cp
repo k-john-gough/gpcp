@@ -623,6 +623,10 @@ MODULE ClassUtil;
     fil.exceptAttIx := 0;
     fil.lineNumTabIx := 0;
     fil.jlExceptIx := 0;
+    CSt.emitNam := BOX("ClassUtil");
+    IF CSt.doVersion THEN
+      CSt.Message("Using " + CSt.emitNam^ + " emitter" );
+    END;
     RETURN fil;
   END newClassFile;
 
@@ -682,6 +686,54 @@ MODULE ClassUtil;
 (* ============================================================ *)
 (*                   Java Class File Stuff                      *)
 (* ============================================================ *)
+
+  PROCEDURE (jf : ClassFile)LoadLocal*(ord : INTEGER; typ : D.Type);
+    VAR code : INTEGER;
+  BEGIN
+    IF (typ # NIL) & (typ IS Ty.Base) THEN 
+      code := J.typeLoad[typ(Ty.Base).tpOrd];
+    ELSE
+      code := Jvm.opc_aload; 
+    END;
+    IF ord < 4 THEN
+      CASE code OF
+      | Jvm.opc_iload : code := Jvm.opc_iload_0 + ord;
+      | Jvm.opc_lload : code := Jvm.opc_lload_0 + ord;
+      | Jvm.opc_fload : code := Jvm.opc_fload_0 + ord;
+      | Jvm.opc_dload : code := Jvm.opc_dload_0 + ord;
+      | Jvm.opc_aload : code := Jvm.opc_aload_0 + ord;
+      END;
+      jf.Code(code);
+    ELSE
+      jf.CodeI(code, ord);
+    END;
+  END LoadLocal;
+
+(* ---------------------------------------------------- *)
+
+  PROCEDURE (jf : ClassFile)StoreLocal*(ord : INTEGER; typ : D.Type);
+    VAR code : INTEGER;
+  BEGIN
+    IF (typ # NIL) & (typ IS Ty.Base) THEN 
+      code := J.typeStore[typ(Ty.Base).tpOrd];
+    ELSE
+      code := Jvm.opc_astore;
+    END;
+    IF ord < 4 THEN
+      CASE code OF
+      | Jvm.opc_istore : code := Jvm.opc_istore_0 + ord;
+      | Jvm.opc_lstore : code := Jvm.opc_lstore_0 + ord;
+      | Jvm.opc_fstore : code := Jvm.opc_fstore_0 + ord;
+      | Jvm.opc_dstore : code := Jvm.opc_dstore_0 + ord;
+      | Jvm.opc_astore : code := Jvm.opc_astore_0 + ord;
+      END;
+      jf.Code(code);
+    ELSE
+      jf.CodeI(code, ord);
+    END;
+  END StoreLocal;
+
+(* ---------------------------------------------------- *)
 
   PROCEDURE (cf : ClassFile) InitFields*(numFields : INTEGER);
   BEGIN
@@ -798,7 +850,7 @@ MODULE ClassUtil;
     m.methId := meth;
     IF meth = NIL THEN
       m.localNum := 0;
-      m.maxLocals := 1;
+      m.maxLocals := 2; (* need 2 for __copy__  'this' + 'arg'*)
     ELSE        (* Id.BlkId *)
       m.localNum := meth.rtsFram;
       m.maxLocals := MAX(meth.rtsFram, 1);
@@ -870,7 +922,7 @@ MODULE ClassUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (cf : ClassFile)newLocal*() : INTEGER;
+  PROCEDURE (cf : ClassFile)newLocal*( t : D.Type ) : INTEGER;
     VAR ord : INTEGER;
   BEGIN
     ord := cf.meth.localNum;
@@ -883,14 +935,30 @@ MODULE ClassUtil;
 
 (* ------------------------------------------------------------ *)
 
-  PROCEDURE (cf : ClassFile)ReleaseLocal*(i : INTEGER);
+  PROCEDURE (cf : ClassFile)newLongLocal*( t : D.Type ) : INTEGER;
+    VAR ord : INTEGER;
   BEGIN
-   (*
-    *  If you try to release not in LIFO order, the 
-    *  location will not be made free again. This is safe!
-    *)
-    IF i+1 = cf.meth.localNum THEN DEC(cf.meth.localNum) END;
-  END ReleaseLocal;
+    ord := cf.meth.localNum;
+    INC(cf.meth.localNum, 2);
+    IF cf.meth.localNum > cf.meth.maxLocals THEN 
+      cf.meth.maxLocals := cf.meth.localNum;
+    END;
+    RETURN ord;
+  END newLongLocal;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (cf : ClassFile)PopLocal*();
+  BEGIN
+    DEC(cf.meth.localNum);
+  END PopLocal;
+
+(* ------------------------------------------------------------ *)
+
+  PROCEDURE (cf : ClassFile)PopLongLocal*();
+  BEGIN
+    DEC(cf.meth.localNum, 2);
+  END PopLongLocal;
 
 (* ------------------------------------------------------------ *)
 
@@ -1056,7 +1124,8 @@ MODULE ClassUtil;
     *)
     FOR idx := 0 TO rec.fields.tide-1 DO
       fld := rec.fields.a[idx];
-      IF (fld.type IS Ty.Record) OR (fld.type IS Ty.Array) THEN
+      IF (fld.type IS Ty.Record) OR 
+         ((fld.type IS Ty.Array) & ~(fld.type IS Ty.Vector)) THEN
 	cf.Code(Jvm.opc_aload_0);
 	cf.VarInit(fld);
         cf.PutGetF(Jvm.opc_putfield, rec, fld(Id.FldId));
@@ -1101,7 +1170,7 @@ MODULE ClassUtil;
 
 (* ============================================================ *)
 
-  PROCEDURE GetTypeName*(typ : D.Type) : L.CharOpen;
+  PROCEDURE GetTypeName(typ : D.Type) : L.CharOpen;
   VAR
     arrayName : L.CharOpenSeq;
     arrayTy : D.Type;
@@ -1188,14 +1257,15 @@ MODULE ClassUtil;
  
   PROCEDURE (cf : ClassFile)DefLab*(lab : J.Label);
   BEGIN
-    ASSERT(lab.defIx = 0);
-    lab.defIx := cf.meth.codes.codeLen;
+    IF lab.defIx = 0 THEN lab.defIx := cf.meth.codes.codeLen END;
   END DefLab;
 
   PROCEDURE (cf : ClassFile)DefLabC*(lab : J.Label; IN c : ARRAY OF CHAR);
   BEGIN
-    ASSERT(lab.defIx = 0);
-    lab.defIx := cf.meth.codes.codeLen;
+    IF lab.defIx = 0 THEN lab.defIx := cf.meth.codes.codeLen END;
+(*
+CSt.PrintLn( "DefLabC: " + c );
+ *)
   END DefLabC;
 
 (* -------------------------------------------- *)
@@ -1221,6 +1291,7 @@ MODULE ClassUtil;
     op.op := code;
     op.lab := lab;
     INC(cf.meth.codes.codeLen,3);
+    INCL(lab.attr, J.jumpSeen);
     cf.meth.codes.AddInstruction(op);
     cf.meth.FixStack(code);
   END CodeLb;
@@ -1368,8 +1439,10 @@ MODULE ClassUtil;
   END CodeInc;
 
 (* -------------------------------------------- *)
-
-  PROCEDURE (cf : ClassFile)CodeSwitch*(low,high : INTEGER; defLab : J.Label);
+(*          defLab is the default label         *)
+(* -------------------------------------------- *)
+  PROCEDURE (cf : ClassFile)CodeSwitch*(
+                   low,high : INTEGER; defLab : J.Label);
   VAR
     sw : OpSwitch;
     len : INTEGER;
