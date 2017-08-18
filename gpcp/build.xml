@@ -1,0 +1,208 @@
+
+<!-- ============================================================  -->
+<!-- This is an ANT build file to build the JVM executables for    -->
+<!-- CPMake, gpcp and Browse from the sources in this directory.   -->
+<!-- Typical invocation is                                         -->
+<!--     $ ant rebuildall                                          -->
+<!-- ============================================================  -->
+<!-- Build gpcp with -asm8 flag, including packaging in a jar file -->
+<!-- ============================================================  -->
+
+<project>
+    <target name="help"> 
+        <echo>Run ant -projecthelp</echo>
+    </target>
+
+    <target name="clean" description="Remove most generated files">
+	    <delete dir="staging/gpcp"/>
+	    <delete dir="staging/cpmake"/>
+	    <delete dir="staging/browse"/>
+	    <delete dir="staging/CP"/>
+	    <delete dir="deploy"/>
+    </target>
+    
+    <target name="cleancp" description="Remove classfile tree ./CP">
+	    <delete dir="CP"/>
+    </target>
+    
+    <!-- Set some property values -->
+    <target name="init">
+        <property name="JRoot" location="./../../"/>
+	<echo>$${JRoot} set to ${JRoot}</echo>
+	<property name="CPSYM" value=".;${JRoot}/symfiles;${JRoot}/symfiles/JvmSystem"/>
+	<echo>$${CPSYM} set to ${CPSYM}</echo>
+    </target>
+
+    <!-- Build gpcp into staging/gpcp directory -->
+    <target name="-buildgpcp" depends="init" description="Compile gpcp compiler sources"> 
+	    <!-- Ensure that we have the JVM-specific source variants -->
+	    <copy file="JavaTargetForJVM.cp" tofile="JavaTarget.cp" overwrite="true"/>
+	    <copy file="PeUtilForJVM.cp" tofile="PeUtil.cp" overwrite="true"/>
+	    <!-- Compile all the source files of gpcp in dependency order -->
+	    <java jar="${JRoot}/jars/cpmake.jar" failonerror="true" fork="true" dir=".">
+                <jvmarg value="-DCPSYM=${CPSYM}"/>
+                <arg value="-all"/>
+                <arg value="-nowarn"/>
+                <arg value="-asm8"/>
+		<arg value="-clsdir:staging/gpcp"/>
+                <arg value="gpcp"/>
+	    </java>
+	    <javac srcdir="${JRoot}/sources/gpcp/libs/java" failonerror="true" destdir="staging/gpcp" includeantruntime="false" debug="true"/>
+    </target>
+
+    <!-- Build CPMake into staging/cpmake directory -->
+    <target name="-buildcpmake" depends="init" description="Compile CPMake sources not part of gpcp">            
+	    <java jar="${JRoot}/jars/gpcp.jar" failonerror="true" fork="true" dir=".">
+                <jvmarg value="-DCPSYM=${CPSYM}"/>
+                <arg value="-nowarn"/>
+                <arg value="-asm8"/>
+		<arg value="-clsdir:staging/cpmake"/>
+		<arg value="ModuleHandler.cp"/>
+		<arg value="SymbolFile.cp"/>
+                <arg value="CPMake.cp"/>
+	    </java>
+    </target>
+
+    <!-- Build Browse into staging/browse directory -->
+    <target name="-buildbrowse" depends="init" description="Compile Browse sources not part of gpcp">            
+	    <java jar="${JRoot}/jars/gpcp.jar" failonerror="true" fork="true" dir=".">
+                <jvmarg value="-DCPSYM=${CPSYM}"/>
+                <arg value="-nowarn"/>
+                <arg value="-asm8"/>
+		<arg value="-clsdir:staging/browse"/>
+                <arg value="Browse.cp"/>
+	    </java>
+    </target>
+
+    <!-- Create the gpcp.jar archive, referencing asm.jar and cprts.jar -->
+    <target name="jargpcp" depends="-buildgpcp" description="Create gpcp.jar into ./deploy">
+	    <mkdir dir="deploy"/>
+	    <jar destfile="deploy/gpcp.jar" basedir="staging/gpcp">
+		    <manifest>
+			    <attribute name="Main-Class" value="CP.gpcp.gpcp"/>
+			    <attribute name="Class-Path" value="cprts.jar asm-5.1.jar"/>
+		    </manifest>
+	    </jar>
+    </target>
+
+    <!-- Create the cpmake.jar archive, referencing gpcp.jar etc. -->
+    <target name="jarcpmake" depends="-buildcpmake" description="Create cpmake.jar into ./deploy">
+	    <mkdir dir="deploy"/>
+	    <jar destfile="deploy/cpmake.jar" basedir="staging/cpmake">
+		    <manifest>
+			    <attribute name="Main-Class" value="CP.CPMake.CPMake"/>
+			    <attribute name="Class-Path" value="gpcp.jar cprts.jar asm-5.1.jar"/>
+		    </manifest>
+	    </jar>
+    </target>
+
+    <!-- Create the browse.jar archive, referencing gpcp.jar etc. -->
+    <target name="jarbrowse" depends="-buildbrowse" description="Create Browse.jar into ./deploy">
+	    <mkdir dir="deploy"/>
+	    <jar destfile="deploy/browse.jar" basedir="staging/browse">
+		    <manifest>
+			    <attribute name="Main-Class" value="CP.Browse.Browse"/>
+			    <attribute name="Class-Path" value="gpcp.jar cprts.jar"/>
+		    </manifest>
+	    </jar>
+    </target>
+
+    <!-- Build runtime system libraries into ${JRoot}/sources/libs/java/dest -->
+    <target name="-buildrts" depends="init" description="Compile runtime system sources">
+	    <delete dir="${JRoot}/sources/libs/java/dest"/>
+	    <mkdir dir="${JRoot}/sources/libs/java/dest"/>
+	    <!-- Compile all the runtime system java classes -->
+	    <javac srcdir="${JRoot}/sources/libs/java" failonerror="true" destdir="${JRoot}/sources/libs/java/dest" includeantruntime="false" debug="true"/>
+    </target>
+
+    <!-- Build component pascal libraries into ../libs/cpascal              -->
+    <!-- Symbol Files go to ../libs/cpascal/symfiles                      -->
+    <!-- Browse HTML Files go to ../libs/cpascal/symfiles/HtmlBrowseFiles -->
+    <!-- Class Files go to ../libs/cpascal/CP/*                           -->
+    <target name="buildcplibs" depends="init" description="Compile gpcp library sources">
+	    <delete dir="${JRoot}/sources/libs/cpascal/CP"/>
+	    <delete dir="${JRoot}/sources/libs/cpascal/symfiles"/>
+	    <mkdir dir="${JRoot}/sources/libs/cpascal/symfiles"/>
+	    <mkdir dir="${JRoot}/sources/libs/cpascal/HtmlBrowseFiles"/>
+	    <!-- Compile all the CP system (foreign implementation) files -->
+	    <java jar="${JRoot}/jars/gpcp.jar" fork="true" dir="${JRoot}/sources/libs/cpascal">
+                <jvmarg value="-DCPSYM=${CPSYM}"/>
+                <arg value="-special"/>
+		<arg value="-symdir:symfiles"/>
+		<arg value="ASCII.cp"/>
+		<arg value="Console.cp"/>
+		<arg value="CPmain.cp"/>
+		<arg value="Error.cp"/>
+		<arg value="GPFiles.cp"/>
+		<arg value="GPBinFiles.cp"/>
+		<arg value="GPTextFiles.cp"/>
+                <arg value="ProgArgs.cp"/>
+                <arg value="RTS.cp"/>
+                <arg value="StdIn.cp"/>
+	    </java>
+	    <!-- Compile all the CP (non-foreign implementation) files -->
+	    <java jar="${JRoot}/jars/gpcp.jar" fork="true" dir="${JRoot}/sources/libs/cpascal">
+                <jvmarg value="-DCPSYM=${CPSYM}"/>
+		<arg value="-symdir:symfiles"/>
+		<arg value="RealStr.cp"/>
+		<arg value="StringLib.cp"/>
+	    </java>
+	    <!-- Create html browse files for all libraries -->
+	    <java jar="${JRoot}/jars/browse.jar" fork="true" dir="${JRoot}/sources/libs/cpascal/symfiles">
+		<jvmarg value="-DCPSYM=${CPSYM}"/>
+		<arg value="-dst:HtmlBrowseFiles"/>
+		<arg value="-html"/>
+		<arg value="-sort"/>
+		<arg value="ASCII.cps"/>
+		<arg value="ASCII.cps"/>
+		<arg value="Console.cps"/>
+		<arg value="CPmain.cps"/>
+		<arg value="Error.cps"/>
+		<arg value="GPFiles.cps"/>
+		<arg value="GPBinFiles.cps"/>
+		<arg value="GPTextFiles.cps"/>
+		<arg value="ProgArgs.cps"/>
+		<arg value="RTS.cps"/>
+		<arg value="StdIn.cps"/>
+		<arg value="RealStr.cps"/>
+		<arg value="StringLib.cps"/>
+	    </java>
+    </target>
+
+    <!-- Create the cprts.jar cp runtime system archive -->
+    <target name="jarRTS" depends="-buildrts" description="Create cprts.jar archive into ./deploy">
+	    <mkdir dir="deploy"/>
+	    <!-- Create the jar archive for these RTS classes -->
+	    <jar destfile="deploy/cprts.jar" basedir="../libs/java/dest"/>
+    </target>
+
+    <!-- Copy the ASM library and copyright notice to ./deploy -->
+    <target name="-copyAsmJar" depends="init" description="Copy asm.jar from JRoot/jars to ./deploy">
+	    <mkdir dir="deploy"/>
+	    <!-- Copy the ASM library class files -->
+	    <copy file="${JRoot}/jars/asm-5.1.jar" todir="deploy"/>
+	    <copy file="${JRoot}/jars/asm-5.1.pom" todir="deploy"/>
+    </target>
+
+    <target name="rebuildgpcp" depends="clean, jargpcp"/>
+    <target name="rebuildall" depends="clean, -copyAsmJar, jarRTS, jargpcp, jarcpmake, jarbrowse" description="Rebuild all jar files into ./deploy"/>
+
+    <!-- Copy the class files to a class tree hierarchy. Used so that -->
+    <!-- the compiler may be run from the classpath rather than jars. -->
+    <target name="makeclasstree" depends="-buildgpcp, -buildcpmake, -buildbrowse, -buildrts, cleancp" description="Rebuild all tools into classfile tree ./CP">
+	    <mkdir dir="CP"/>
+	    <copy todir="CP">
+		    <fileset dir="staging/gpcp/CP"/>
+	    </copy>
+	    <copy todir="CP">
+		    <fileset dir="staging/cpmake/CP"/>
+	    </copy>
+	    <copy todir="CP">
+		    <fileset dir="staging/browse/CP"/>
+	    </copy>
+	    <copy todir="CP">
+		    <fileset dir="../libs/java/dest/CP"/>
+	    </copy>
+    </target>
+</project>
+
