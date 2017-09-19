@@ -34,5 +34,16 @@ public class GPFiles {
     File path = new File(CP.CPJ.CPJ.MkStr(dirName));
     return path.exists();
   }
-  
+
+  public static char[][] FileList(char[] dirPath) throws IOException {
+    File theDir = new File(CP.CPJ.CPJ.MkStr(dirPath));
+    String[] files = theDir.list();
+    if (files == null || files.length == 0 ) return null;
+    else {
+      char[][] rslt = new char[files.length][];
+      for (int i = 0; i < files.length; i++)
+        rslt[i] = CP.CPJrts.CPJrts.JavaStrToChrOpen(files[i]);
+      return rslt;
+    }
+  }
 }

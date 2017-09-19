@@ -243,6 +243,7 @@ MODULE JavaMaker;
         str : Id.TypId;
         exc : Id.TypId;
         xhr : Id.TypId;
+        thr : Id.TypId;
   BEGIN
    (*
     *  Create import descriptor for java.lang
@@ -261,7 +262,8 @@ MODULE JavaMaker;
     CSt.ntvExc := exc.type;
     Bi.MkDummyClass("Class", blk, Ty.noAtt, cls);
     CSt.ntvTyp := cls.type;
-
+    Bi.MkDummyClass("Throwable", blk, Ty.extns, thr);
+    Bi.AddDummyBaseTp(exc, thr);
    (*
     *  Create import descriptor for CP.RTS
     *)

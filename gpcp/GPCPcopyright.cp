@@ -1,5 +1,5 @@
 MODULE GPCPcopyright;
-  IMPORT Console;
+  IMPORT RTS, Console;
 
   CONST
      (*	VERSION    = "0.1 of 26 December 1999"; *)
@@ -53,7 +53,8 @@ MODULE GPCPcopyright;
      (* VERSION    = "1.4.00 of 17 August 2016"; *)
      (* VERSION    = "1.4.01 of 21 October 2016"; *)
      (* VERSION    = "1.4.02 of 14 November 2016"; *)
-        VERSION    = "1.4.03 of 13 June 2017"; 
+     (* VERSION    = "1.4.04 of 07 August 2017"; *)
+        VERSION    = "1.4.05 of 30 August 2017"; 
 	verStr*    = " version " + VERSION;
 
   CONST	prefix     = "#gpcp: ";
@@ -74,7 +75,7 @@ MODULE GPCPcopyright;
     W("GARDENS POINT COMPONENT PASCAL");
     W("The files which import this module constitute a compiler");
     W("for the programming language Component Pascal.");
-    W("Copyright (c) 1998 -- 2013 K John Gough.");
+    W("Copyright (c) 1998 -- 2017 K John Gough.");
     W("Copyright (c) 2000 -- 2013 Queensland University of Technology.");
     Console.WriteLn;
 
@@ -89,8 +90,7 @@ MODULE GPCPcopyright;
     Console.WriteLn;
 
     W("The authoritative version for this program, and all future upgrades");
-    W("is at http://gpcp.codeplex.com. The project page on CodePlex allows");
-    W("discussions, an issue tracker and source code repository");
+    W("is at https://github.com/k-john-gough/gpcp");
     W("The program's news group is GPCP@yahoogroups.com.");
   END Write;
 

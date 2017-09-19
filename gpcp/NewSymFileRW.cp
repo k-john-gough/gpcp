@@ -2,7 +2,7 @@
 (* ==================================================================== *)
 (*									*)
 (*  SymFileRW:  Symbol-file reading and writing for GPCP.		*)
-(*	Copyright (c) John Gough 1999 -- 2011.				*)
+(*	Copyright (c) John Gough 1999 -- 2017.				*)
 (*									*)
 (* ==================================================================== *)
 
@@ -922,7 +922,7 @@ MODULE NewSymFileRW;
       *)
       NEW(symVisit);
       symVisit.sym := symfile;
-      symfile.modS.symTb.Apply(symVisit); 
+      symfile.modS.symTb.Apply(symVisit); (* Apply SymFileSFA to sym-tab *)
      (*
       *  Now emit the types on the worklist.
       *)
@@ -1190,6 +1190,7 @@ MODULE NewSymFileRW;
       f.SymFile(filNm);
       IF CSt.verbose THEN 
         CSt.Message(message^ + ", Key: " + Lt.intToCharOpen(f.impS.modKey)^);
+        CSt.Message(BOX("Found " + BF.getFullPathName(f.file)^ + " ?"));
         FOR index := 0 TO f.sArray.tide - 1 DO
           CSt.Message("  imports " + NameAndKey(f.sArray.a[index])^);
         END;
@@ -1444,6 +1445,9 @@ MODULE NewSymFileRW;
   PROCEDURE^ (f : SymFileReader)variable()  : Id.VarId,NEW;
 (* ============================================ *)
 
+ (*
+  *  Read a record type from the symbol file.
+  *)
   PROCEDURE (f : SymFileReader)recordType(old  : D.Type) : D.Type,NEW;
   (* Assert: at entry the current symbol is recSy.			*)
   (* Record     = TypeHeader recSy recAtt [truSy | falSy | <others>] 	*)
@@ -1477,18 +1481,18 @@ MODULE NewSymFileRW;
     rslt.recAtt := attr;
     f.GetSym();				(* Get past recSy rAtt	*)
     IF f.sSym = falSy THEN
-      INCL(rslt.xAttr, D.isFn);
+      INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
       f.GetSym();
     ELSIF f.sSym = truSy THEN
-      INCL(rslt.xAttr, D.isFn);
-      INCL(rslt.xAttr, D.fnInf);
-      INCL(rslt.xAttr, D.noCpy);
+      INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
+      INCL(rslt.xAttr, D.fnInf); (* This record is an interface *)
+      INCL(rslt.xAttr, D.noCpy); (* Record has no constructor   *)
       f.GetSym();
     END;
    (* 
-	*  Do not override extrnNm values set
-	*  by *Maker.Init for Native* types.
-	*)
+    *  Do not override extrnNm values set
+    *  by *Maker.Init for Native* types.
+    *)
     IF (f.impS.scopeNm # NIL) & (rslt.extrnNm = NIL) THEN
       rslt.extrnNm := f.impS.scopeNm; 
     END;
@@ -1610,8 +1614,13 @@ MODULE NewSymFileRW;
     IF oldI # newI THEN 
       f.tArray.a[newI.type.dump - D.tOffset] := oldI.type;
     END;
-
-    IF newI.type.idnt = NIL THEN newI.type.idnt := oldI END;
+   (*
+    * In the case of symbol files created by J2CPS
+    * it is possible that oldI.vMod may be set to the
+    * default value private (0), while the real definition
+    * in newI should be public. ==> override oldI.vMod !
+    *)
+    IF newI.type.idnt = NIL THEN newI.type.idnt := oldI; oldI.SetMode(newI.vMod); END;
   END Type;
 
 (* ============================================ *)
@@ -1943,7 +1952,7 @@ MODULE NewSymFileRW;
               END;
             END;
           END;
-        ELSE (* skip *)
+        ELSE (* skip other types *)
         END; (* with *)
       END;
     END; (* for linkIx do *)
@@ -1953,7 +1962,7 @@ MODULE NewSymFileRW;
     *)
     NEW(typeFA);
     typeFA.sym := f;
-    f.impS.symTb.Apply(typeFA); 
+    f.impS.symTb.Apply(typeFA); (* Apply a TypeLinker to the sym-tab *)
     f.ReadPast(close);
    (*
     *  Now check that all overloaded ids are necessary
@@ -2154,18 +2163,18 @@ MODULE NewSymFileRW;
       INC(indx);
     END;
    (*
-	* If sysLib has NOT been explicitly imported, then
-	* insert dummy definitions for the native object methods
-	* so that user code may explictly extend RTS.NativeObject
-	* and override these methods.
-	*)
-	IF ~(D.fixd IN CSt.sysLib.xAttr) THEN 
-	  CSt.ImportObjectFeatures();
-	END;
+    * If sysLib has NOT been explicitly imported, then
+    * insert dummy definitions for the native object methods
+    * so that user code may explictly extend RTS.NativeObject
+    * and override these methods.
+    *)
+    IF ~(D.fixd IN CSt.sysLib.xAttr) THEN 
+         CSt.ImportObjectFeatures();
+    END;
     FOR indx := 0 TO fScp.work.tide-1 DO
       blkI := fScp.work.a[indx](Id.BlkId);
       NEW(rAll);
-      blkI.symTb.Apply(rAll);
+      blkI.symTb.Apply(rAll); (* Apply ResolveAll to sym-tab *)
     END;
    (*
     *  Copy the (possibly mutated) sequence out.

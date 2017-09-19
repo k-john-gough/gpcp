@@ -624,9 +624,11 @@ MODULE ClassUtil;
     fil.lineNumTabIx := 0;
     fil.jlExceptIx := 0;
     CSt.emitNam := BOX("ClassUtil");
-    IF CSt.doVersion THEN
-      CSt.Message("Using " + CSt.emitNam^ + " emitter" );
-    END;
+(*
+ *  IF CSt.doVersion & CSt.verbose THEN
+ *    CSt.Message("Using " + CSt.emitNam^ + " emitter" );
+ *  END;
+ *)
     RETURN fil;
   END newClassFile;
 

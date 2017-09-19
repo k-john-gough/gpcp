@@ -6,6 +6,7 @@ javac -d . CPJrts.java
 javac -d . XHR.java
 javac -d . CPmain.java
 javac -d . Error.java
+javac -d . ProgArgs.java
 javac -d . GPFiles_FILE.java
 javac -d . GPFiles.java
 javac -d . GPBinFiles_FILE.java
@@ -13,7 +14,6 @@ javac -d . GPBinFiles.java
 javac -d . GPTextFiles_FILE.java
 javac -d . GPTextFiles.java
 javac -d . ProcType.java
-javac -d . ProgArgs.java
 javac -d . RTS.java
 javac -d . StdIn.java
 javac -d . VecBase.java

@@ -48,6 +48,17 @@ public abstract class GPFiles {
 	return System.IO.File.Exists(path);
     }
 
+   public static char[][] FileList(char[] dirPath) {
+       string dirStr = mkStr(dirPath);
+       string[] files = System.IO.Directory.GetFiles(dirStr);
+       if (files == null || files.Length ==0) return null;
+       else {
+           char[][] rslt = new char[files.Length][];
+           for (int i = 0; i < files.Length; i++)
+               rslt[i] = files[i].ToCharArray();
+	   return rslt;
+       }
+   } 
   } // end of class GPFiles
 
 /* ------------------------------------------------------------ */

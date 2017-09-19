@@ -1,3 +1,4 @@
+
 MODULE Browse;
 
   IMPORT 
@@ -293,9 +294,10 @@ MODULE Browse;
 (* ============================================================ *)
 
   VAR
+    multiMods : BOOLEAN;
     args, argNo  : INTEGER;
     fileName, modName  : CharOpen;
-    printFNames, doAll, verbatim, verbose, hexCon, alpha : BOOLEAN;
+    printFNames, doAll, verbatim, verbose, unwind, hexCon, alpha : BOOLEAN;
     file  : GPBinFiles.FILE;
     sSym  : INTEGER;
     cAtt  : CHAR;
@@ -309,6 +311,7 @@ MODULE Browse;
     output : Output;
     module : Module;
     modList : ModList;
+    dstPath : CharOpen;
 
 (* ============================================================ *)
 (* ============================================================ *)
@@ -362,7 +365,9 @@ MODULE Browse;
     i : INTEGER;
     tmp : POINTER TO ARRAY OF Module;
     mod : Module;
+	mlst : ModList;
   BEGIN
+    mlst := modList;
     ASSERT(modList.list # NIL);
     FOR i := 0 TO modList.tide-1 DO
       IF modList.list[i].name^ = name^ THEN RETURN modList.list[i] END;
@@ -377,7 +382,7 @@ MODULE Browse;
     NEW(mod);
     mod.systemMod := FALSE;
     mod.progArg := FALSE;
-    mod.name := name;
+    mod.name := BOX(name^$);
     mod.symName := BOX(name^ + symExt);
     modList.list[modList.tide] := mod;
     INC(modList.tide);
@@ -575,6 +580,14 @@ MODULE Browse;
     END;
   END readOrd;
 
+(* ======================================= *)
+
+  PROCEDURE ReinitializeTypes();
+    VAR i : INTEGER;
+  BEGIN
+    FOR i := Symbols.tOffset TO LEN(typeList) - 1 DO typeList[i] := NIL END;
+  END ReinitializeTypes;
+ 
 (* ============================================================ *)
 (* ========		Symbol File Reader		======= *)
 (* ============================================================ *)
@@ -969,6 +982,7 @@ MODULE Browse;
         impName : CharOpen;
         i,j : INTEGER;
   BEGIN
+    ReinitializeTypes();
     GetSym();
     typOrd := 0;
     WHILE sSym = tDefS DO
@@ -1208,7 +1222,7 @@ MODULE Browse;
         Error.WriteString("Wrong name in symbol file. Expected <");
         Error.WriteString(mod.name^ + ">, found <");
         Error.WriteString(sAtt^ + ">"); 
-	    Error.WriteLn;
+        Error.WriteLn;
         HALT(1);
       END;
       GetSym();
@@ -1290,6 +1304,8 @@ MODULE Browse;
     END;
   END GetSymAndModNames;
 
+(* ============================================================ *)
+
   PROCEDURE Parse();
   VAR 
     marker,modIx,i   : INTEGER;
@@ -1312,30 +1328,39 @@ MODULE Browse;
         i := 0;
         WHILE (i < LEN(mod.pathName)) & (mod.pathName[i] # ".") DO INC(i); END;
         mod.pathName[i] := 0X;
-      ELSE 
-        marker := readInt();
-        IF marker = RTS.loInt(magic) THEN
-        (* normal case, nothing to do *)
-        ELSIF marker = RTS.loInt(syMag) THEN
-          mod.systemMod := TRUE;
-        ELSE
-          Error.WriteString("File <" + fileName^ + "> is not a valid symbol file"); 
-          Error.WriteLn;
-          RETURN;
-        END;
-        mod.print := TRUE;
-        GetSym();
-        IF verbose THEN
-          Error.WriteString("Reading " + mod.name^); Error.WriteLn;
-        END;
-        SymFile(mod);
-        GPBinFiles.CloseFile(file);
+	  ELSE
+	    mod.pathName := mod.symName;
+	  END;
+	  IF verbose THEN
+	    Error.WriteString("Opened " + mod.pathName^); Error.WriteLn;
+	  END;
+      marker := readInt();
+      IF marker = RTS.loInt(magic) THEN
+      (* normal case, nothing to do *)
+      ELSIF marker = RTS.loInt(syMag) THEN
+        mod.systemMod := TRUE;
+      ELSE
+        Error.WriteString("File <" + fileName^ + "> is not a valid symbol file"); 
+        Error.WriteLn;
+        RETURN;
       END;
+      mod.print := TRUE;
+      GetSym();
+      IF verbose THEN
+        Error.WriteString("Reading " + mod.name^); Error.WriteLn;
+      END;
+      SymFile(mod);
+      GPBinFiles.CloseFile(file);
     END;
+  END Parse;
+
+  PROCEDURE WrapParse();
+  BEGIN
+    Parse();
   RESCUE (x)
     Error.WriteString("Error in Parse()"); Error.WriteLn;
     Error.WriteString(RTS.getStr(x)); Error.WriteLn;
-  END Parse;
+  END WrapParse;
 
 (* ===================================================================== *)
 
@@ -2143,7 +2168,6 @@ END MethAnchor;
       INC(indent,LEN(m.recName$));
     END;
     output.WriteString(":"); 
-    ASSERT(m.receiver.importedFrom = NIL);
     output.WriteString(m.receiver.declarer.name);
     output.WriteString(") ");
     output.WriteIdent(m.declarer.name);
@@ -2274,6 +2298,21 @@ END MethAnchor;
 
 (* ==================================================================== *)
 
+  PROCEDURE PrintProcType(procTp : Proc; desc : Desc);
+  BEGIN
+    WITH procTp : Meth DO
+      IF procTp.receiver.declarer = NIL THEN
+        procTp.receiver.declarer := desc;
+        procTp.receiver.importedFrom := NIL;
+        procTp.receiver.importedName := NIL;
+      END;
+    ELSE (* skip *)
+    END;
+    procTp.PrintType(0);
+  END PrintProcType;
+
+(* ==================================================================== *)
+
   PROCEDURE PrintModule(mod : Module);
   VAR
     i,j : INTEGER;
@@ -2281,6 +2320,7 @@ END MethAnchor;
     rec : Record;
     first : BOOLEAN;
     heading : ARRAY 20 OF CHAR;
+    declarer : Desc;
     (* --------------------------- *)
     PROCEDURE WriteOptionalExtras(impMod : Module);
     BEGIN
@@ -2374,18 +2414,19 @@ END MethAnchor;
           QuickSortDescs(0, rec.methods.tide-1, rec.methods);
         END;
 
-(* FIXME *)
         IF rec.methods.tide > 0 THEN
-          IF rec.declarer # NIL THEN 
-            output.MethAnchor(rec.declarer.name);
+          IF rec.declarer # NIL THEN
+            declarer := rec.declarer; 
           ELSIF (rec.ptrType # NIL) & (rec.ptrType.declarer # NIL) THEN
-            output.MethAnchor(rec.ptrType.declarer.name);
+            declarer := rec.ptrType.declarer;
+          ELSE 
+            declarer := NIL;
           END;
-        END;
-(* FIXME *)
+          IF declarer # NIL THEN output.MethAnchor(declarer.name) END;
 
-        FOR j := 0 TO rec.methods.tide -1 DO
-          rec.methods.list[j](ProcDesc).pType.PrintType(0);
+          FOR j := 0 TO rec.methods.tide - 1 DO
+            PrintProcType(rec.methods.list[j](ProcDesc).pType, declarer);
+          END;
         END;
       END;
     END;
@@ -2423,7 +2464,7 @@ END MethAnchor;
  *  NEW(t); t.name := "SPECIAL"; typeList[16] := t;
  *)
   END InitTypes;
- 
+
   PROCEDURE InitAccArray();
   BEGIN
     accArray[0] := ' ';
@@ -2439,46 +2480,52 @@ BEGIN
   Console.WriteString("gardens point Browse: " + GPCPcopyright.verStr);
   Console.WriteLn;
   IF RTS.defaultTarget = "net" THEN
-    Console.WriteString("Usage:  Browse [options] <ModuleName>");
+    Console.WriteString("Usage:  Browse [options] <ModuleNames>");
     Console.WriteLn;
     Console.WriteString("Browse Options ... ");
     Console.WriteLn;
-    Console.WriteString(" /all ==> browse this and all imported modules");
+    Console.WriteString(" /all      ==> browse this and all imported modules");
     Console.WriteLn;
-    Console.WriteString(" /file ==> write output to a file <ModuleName>.bro ");
+    Console.WriteString(" /dst=dir  ==> create output files in directory dir");
     Console.WriteLn;
-    Console.WriteString(" /full ==> display explicit foreign names ");
+    Console.WriteString(" /file     ==> write output to a file <ModuleName>.bro ");
     Console.WriteLn;
-    Console.WriteString(" /help ==> display this usage message");
+    Console.WriteString(" /full     ==> display explicit foreign names ");
     Console.WriteLn;
-    Console.WriteString(" /hex  ==> use hexadecimal for short literals"); 
+    Console.WriteString(" /help     ==> display this usage message");
     Console.WriteLn;
-    Console.WriteString(
-                    " /html ==> write html output to file <ModuleName>.html");
+    Console.WriteString(" /hex      ==> use hexadecimal for short literals"); 
     Console.WriteLn;
-    Console.WriteString(" /sort ==> sort procedures and types alphabetically");
+    Console.WriteString(" /html     ==> write html output to file <ModuleName>.html");
+    Console.WriteLn;
+    Console.WriteString(" /sort     ==> sort procedures and types alphabetically");
+    Console.WriteLn;
+    Console.WriteString(" /verbose  ==> chatter on about progress");
     Console.WriteLn;
     Console.WriteString(" /verbatim ==> display anonymous public type names");
     Console.WriteLn;
   ELSE			(* RTS.defaultTarget = "jvm" *)
-    Console.WriteString("Usage: cprun Browse [options] <ModuleName>");
+    Console.WriteString("Usage: browse [options] <ModuleNames>");
     Console.WriteLn;
     Console.WriteString("Browse Options ... ");
     Console.WriteLn;
-    Console.WriteString(" -all ==> browse this and all imported modules");
+    Console.WriteString(" -all      ==> browse this and all imported modules");
     Console.WriteLn;
-    Console.WriteString(" -file ==> write output to a file <ModuleName>.bro ");
+    Console.WriteString(" -dst:dir  ==> create output files in directory dir");
     Console.WriteLn;
-    Console.WriteString(" -full ==> display explicit foreign names ");
+    Console.WriteString(" -file     ==> write output to a file <ModuleName>.bro ");
     Console.WriteLn;
-    Console.WriteString(" -help ==> display this usage message");
+    Console.WriteString(" -full     ==> display explicit foreign names ");
     Console.WriteLn;
-    Console.WriteString(" -hex  ==> use hexadecimal for short literals"); 
+    Console.WriteString(" -help     ==> display this usage message");
     Console.WriteLn;
-    Console.WriteString(
-	" -html ==> write html output to file <ModuleName>.html");
+    Console.WriteString(" -hex      ==> use hexadecimal for short literals"); 
     Console.WriteLn;
-    Console.WriteString(" -sort ==> sort procedures and types alphabetically");
+    Console.WriteString(" -html     ==> write html output to file <ModuleName>.html");
+    Console.WriteLn;
+    Console.WriteString(" -sort     ==> sort procedures and types alphabetically");
+    Console.WriteLn;
+    Console.WriteString(" -verbose  ==> chatter on about progress");
     Console.WriteLn;
     Console.WriteString(" -verbatim ==> display anonymous public type names");
     Console.WriteLn;
@@ -2499,6 +2546,33 @@ VAR
   fOutput : FileOutput;
   hOutput : HtmlOutput; 
   fileOutput, htmlOutput : BOOLEAN;
+
+   (* ----------------------------------------- *)
+   (*  Note: str is mutable, pat is immutable   *)
+   (* ----------------------------------------- *)
+    PROCEDURE StartsWith(str : ARRAY OF CHAR; IN pat : ARRAY OF CHAR) : BOOLEAN;
+    BEGIN
+      str[LEN(pat$)] := 0X;
+      RETURN str = pat;
+    END StartsWith;
+   (* ----------------------------------------- *)
+    PROCEDURE SuffixString(IN str : ARRAY OF CHAR; ofst : INTEGER) : CharOpen;
+      VAR len : INTEGER;
+          idx : INTEGER;
+          out : CharOpen;
+    BEGIN
+      len := LEN(str$) - ofst;
+      IF len > 0 THEN
+        NEW(out, len + 1);
+        FOR idx := 0 TO len - 1 DO
+          out[idx] := str[ofst + idx];
+        END;
+        out[len] := 0X;
+        RETURN out;
+      END;
+      RETURN NIL;
+    END SuffixString;
+   (* ----------------------------------------- *)
 BEGIN
   printFNames := FALSE;
   fileOutput := FALSE;
@@ -2527,6 +2601,13 @@ BEGIN
       ELSE
         BadOption(option);
       END;
+    ELSIF option[1] = 'd' THEN
+      IF StartsWith(option, "-dst:") OR
+         StartsWith(option, "-dst=") THEN
+        dstPath := SuffixString(option, 5);
+      ELSE
+        BadOption(option);
+      END;
     ELSIF option[1] = 'v' THEN
       IF option = "-verbatim" THEN
         verbatim := TRUE;
@@ -2550,6 +2631,9 @@ BEGIN
       END;
     ELSIF option = "-sort" THEN
       alpha := TRUE;
+    ELSIF option = "-unwind" THEN
+      unwind := TRUE;
+      verbose := TRUE;
     ELSIF option = "-help" THEN
       Usage();
     ELSE
@@ -2560,27 +2644,73 @@ BEGIN
   RETURN argNo;
 END ParseOptions;
 
-PROCEDURE Print();
-VAR
-  i : INTEGER;
-BEGIN
-  FOR i := 0 TO modList.tide-1 DO
-    IF modList.list[i].print THEN
-      output.thisMod := modList.list[i];
-      IF output IS FileOutput THEN
-        output(FileOutput).file := 
-            GPTextFiles.createFile(modList.list[i].name^ + outExt);
-      END;
-      PrintModule(modList.list[i]); 
-      IF output IS FileOutput THEN
-        GPTextFiles.CloseFile(output(FileOutput).file);
+(* ============================================================ *)
+
+  PROCEDURE Print();
+  VAR
+    i : INTEGER;
+    fNamePtr : CharOpen;
+    (* ----------------------------------- *)
+      PROCEDURE mkPathName(IN fileName : ARRAY OF CHAR) : CharOpen;
+        VAR str : CharOpen;
+            sep : ARRAY 2 OF CHAR;
+      BEGIN
+        str := dstPath;
+        IF str[LEN(str) - 2] = GPFiles.fileSep THEN
+          str := BOX(str^ + fileName);
+        ELSE
+          sep[0] := GPFiles.fileSep;
+          str := BOX(str^ + sep + fileName);
+        END;
+        RETURN str;
+      END mkPathName;
+    (* ----------------------------------- *)
+  BEGIN
+    FOR i := 0 TO modList.tide-1 DO
+      IF modList.list[i].print THEN
+        output.thisMod := modList.list[i];
+        IF output IS FileOutput THEN
+          fNamePtr := BOX(modList.list[i].name^ + outExt);
+          IF dstPath = NIL THEN
+            output(FileOutput).file := 
+              GPTextFiles.createFile(fNamePtr^);
+          ELSE
+            fNamePtr := mkPathName(fNamePtr^);
+          output(FileOutput).file := 
+              GPTextFiles.createPath(fNamePtr);
+          END;
+          IF verbose THEN
+            Error.WriteString("Creating " + fNamePtr^);
+            Error.WriteLn;
+          END;
+        END;
+        PrintModule(modList.list[i]); 
+        IF output IS FileOutput THEN
+          GPTextFiles.CloseFile(output(FileOutput).file);
+        END;
       END;
     END;
-  END;
-RESCUE (x)
-  Error.WriteString("Error in Parse()"); Error.WriteLn;
-  Error.WriteString(RTS.getStr(x)); Error.WriteLn;
-END Print;
+  END Print;
+
+(* ============================================================ *)
+ (*
+  *  The hidden option -unwind is a diagnostic aid so 
+  *  that if the Print() procedure throws an exception
+  *  this is NOT caught and a stack-unwind is produced.
+  *
+  *  The default behaviour is for Print to be called via
+  *  WrapPrint(), which catches the exception, producing 
+  *  a simple diagnostic message but no stack-unwind.
+  *)
+  PROCEDURE WrapPrint();
+  BEGIN
+    Print();
+  RESCUE (x)
+    Error.WriteString("Error in Print()"); Error.WriteLn;
+    Error.WriteString(RTS.getStr(x)); Error.WriteLn;
+  END WrapPrint;
+
+(* ============================================================ *)
 
 BEGIN
   NEW(fileName, 256);
@@ -2590,6 +2720,25 @@ BEGIN
   modList.tide := 0;
   NEW(modList.list,5);
   NEW(output);
+
+  IF verbose & unwind THEN
+    args := ProgArgs.ArgNumber();
+    Console.WriteString("Before wildcard expansion"); Console.WriteLn;
+    FOR argNo := 0 TO args - 1 DO 
+      ProgArgs.GetArg(argNo,fileName);
+      Console.WriteString(fileName); Console.WriteLn;
+    END;
+    ProgArgs.ExpandWildcards(0);
+    args := ProgArgs.ArgNumber();
+    Console.WriteString("After wildcard expansion"); Console.WriteLn;
+    FOR argNo := 0 TO args - 1 DO 
+      ProgArgs.GetArg(argNo,fileName);
+      Console.WriteString(fileName); Console.WriteLn;
+    END;
+  ELSE
+    ProgArgs.ExpandWildcards(0);
+  END;
+
   args := ProgArgs.ArgNumber();
   IF (args < 1) THEN Usage(); END; 
   argNo := ParseOptions(); 
@@ -2600,16 +2749,21 @@ BEGIN
       outExt := broExt;
     END; 
   END;
-  WHILE (argNo < args) DO
+  multiMods := (args - argNo) > 1;
+  WHILE argNo < args DO
     ProgArgs.GetArg(argNo,fileName);
     GetSymAndModNames(fileName,modName);
+    IF multiMods & (output IS FileOutput) THEN
+      Console.WriteInt(argNo, 3);
+      Console.WriteString(" Processing "); 
+      Console.WriteString(fileName); Console.WriteLn;
+    END;
     module := GetModule(modName);
-    module.symName := fileName;
     module.progArg := TRUE;
     INC(argNo);
   END;
-  Parse();
-  Print();
+  IF unwind THEN Parse() ELSE WrapParse() END;
+  IF unwind THEN Print() ELSE WrapPrint() END;
 END Browse.
 
 (* ============================================================ *)

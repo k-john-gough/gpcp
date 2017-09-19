@@ -2173,10 +2173,14 @@ MODULE ExprDesc;
         (x.ident.dfScp = scp) &
         ~x.ident.isIn(lIn) THEN 
       IF x.isPointerExpr() THEN
+       (*
+        * For v1.4.04 + this is an error rather than a warning
+        *)
         x.ExprError(316);
+        x.ExprError(135);
       ELSE
         x.ExprError(135);
-      END;
+      END; 
     END;
     RETURN lIn;
   END checkLive;

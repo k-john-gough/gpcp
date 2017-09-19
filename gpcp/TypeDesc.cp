@@ -1103,6 +1103,14 @@ MODULE TypeDesc;
       ty.TypeErrStr^(n,s);
     END;
   END TypeErrStr;
+(* -------------------------------------------- *)
+
+  PROCEDURE (ty : Record)TypeErrSS*(n : INTEGER;
+          IN s1 : ARRAY OF CHAR;
+          IN s2 : ARRAY OF CHAR),NEW;
+  BEGIN
+    S.SemError.RepSt2(n, s1, s2, S.line, S.col);
+  END TypeErrSS;
 
 (* ============================================================ *)
 (*      Constructor methods     *)
@@ -1642,7 +1650,6 @@ MODULE TypeDesc;
    (* ----------------------------------------- *)
   BEGIN (* resolve *)
     IF i.depth = initialMark THEN
-
 	  IF CSt.verbose THEN
   	    IF i.idnt # NIL THEN
 	      ntvNm := Sy.getName.NtStr(i.idnt);
@@ -1711,8 +1718,15 @@ MODULE TypeDesc;
           ELSE
             i.TypeError(16);  (* base type is not an extensible record   *)
           END;
-          IF (iFace = i.recAtt) &
-             ~baseT.isNativeObj() THEN i.TypeError(156) END;
+(* --- Checks for interface records --- *)
+          (*
+           *  There is a problem here when cross-compiling.
+           *  When cross-compiling the relevant native object
+           *  is NOT the native object type of the host.
+           *)
+          IF (iFace = i.recAtt) & ~baseT.isNativeObj() THEN 
+            i.TypeErrSS(156, i.name(), baseT.name());
+          END;
          (*
           *  Propagate no-block-copy attribute to extensions.
           *  Note the special case here: in .NET extensions 

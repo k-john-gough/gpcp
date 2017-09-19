@@ -17,17 +17,10 @@
 //END MsilAsm.
 // 
 // 
-//  NOTE: this needs (as at 13-Jun-2000) to be compiled using
-//
-//  $ csc /t:library /r:System.Diagnostics.dll /r:RTS.dll MsilAsm.cs
-//
-//  NOTE: for Beta2 this finds System.Diagnostics in mscorlib.dll
+//  NOTE: this needs (since 2005) to be compiled using
 //
 //  $ csc /t:library /r:RTS.dll MsilAsm.cs
 // 
-#if !BETA1
-  #define BETA2
-#endif
 
 using System.Diagnostics;
 
@@ -51,12 +44,8 @@ public class MsilAsm {
 	if (asm == null) {
 	    asm = new Process();
 	    asm.StartInfo.FileName = GetDotNetRuntimeInstallDirectory() + "ilasm";
-#if BETA1
-	    asm.StartInfo.WindowStyle = ProcessWindowStyle.Minimized;
-#else //BETA2
 	    asm.StartInfo.CreateNoWindow = true;
 	    asm.StartInfo.UseShellExecute = false;
-#endif
 	}
     }
 
@@ -66,7 +55,7 @@ public class MsilAsm {
 	System.String suffx;
 	System.String fName = CP_rts.mkStr(fil);
 	if (hasMain) {
-	    optNm ="/exe ";
+	    optNm = "/exe ";
 	    suffx = ".exe";
 	} else {
 	    optNm = "/dll ";
@@ -100,14 +89,10 @@ public class MsilAsm {
 	optNm = optNm + CP_rts.mkStr(opt) + ' ';
 	if (verbose) {
 	    System.Console.WriteLine("#gpcp: Calling " + asm.StartInfo.FileName);
-#if BETA2
 	    asm.StartInfo.CreateNoWindow = false;
-#endif
 	    asm.StartInfo.Arguments = optNm + "/nologo " + fName + ".il";
 	} else {
-#if BETA2
 	    asm.StartInfo.CreateNoWindow = true;
-#endif
 	    asm.StartInfo.Arguments = optNm + "/nologo /quiet " + fName + ".il";
 	}
 	asm.Start();
@@ -122,6 +107,5 @@ public class MsilAsm {
         char[] opt = {'/', 'd', 'e', 'b', 'u', 'g', '\0' };
         Assemble(fil, opt, hasMain);
     }
-
   }
 }

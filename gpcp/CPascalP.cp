@@ -336,7 +336,6 @@ VAR
     ident.dfScp := ident;
     ident.hash  := idHsh;
 
-(* FIXME *)
     IF Cs.verbose THEN ident.SetNameFromHash(idHsh) ELSE ident.ClearName() END;
 
     IF ident.hash = Bi.sysBkt THEN
@@ -362,27 +361,27 @@ VAR
       clash.token := ident.token;   (* to help error reports  *)
       IF Cs.verbose THEN clash.SetNameFromHash(clash.hash) END;
       ident := clash(Id.BlkId);
-	 (*
-	  *  If this is the explicit import of a module that
-	  *  has an alias, then all is ok, make import usable.
-	  *)
-	  IF ident.aliasMod # NIL THEN
-	    EXCL(ident.xAttr, Sy.anon);
-		IF alias # NIL THEN (* multiple aliases for same module *)
-		  SemErrorS1(240, Sy.getName.ChPtr(ident.aliasMod));
-		END;
-	 (*
-	  *  If ident is the target of an alias then the 
-	  *  target is also made visible in the module.
-	  *)
-	  ELSIF alias # NIL THEN
-	    ident.aliasMod := alias;	    
      (*
-	  *  Else this really is an error.
-	  *)
+      *  If this is the explicit import of a module that
+      *  has an alias, then all is ok, make import usable.
+      *)
+      IF ident.aliasMod # NIL THEN
+        EXCL(ident.xAttr, Sy.anon);
+        IF alias # NIL THEN (* multiple aliases for same module *)
+          SemErrorS1(240, Sy.getName.ChPtr(ident.aliasMod));
+        END;
+       (*
+        *  If ident is the target of an alias then the 
+	*  target is also made visible in the module.
+	*)
+      ELSIF alias # NIL THEN
+        ident.aliasMod := alias;	    
+     (*
+      *  Else this really is an error.
+      *)
       ELSIF ~ident.isWeak() & 
          (ident.hash # Bi.sysBkt) THEN SemError(170); (* imported twice  *)
-	  END;
+      END;
     ELSE
       SemError(4);
     END;
@@ -402,22 +401,22 @@ VAR
 
     IF Sy.weak IN ident.xAttr THEN
      (*
-	  *  Module ident is a newly declared import.
+      *  Module ident is a newly declared import.
       *  List the file, for importation later  ...
       *)
       Sy.AppendScope(impSeq, ident);
       IF alias # NIL THEN 
-	    INCL(ident.xAttr, Sy.anon);
-	  END;	        
+        INCL(ident.xAttr, Sy.anon);
+      END;	        
       EXCL(ident.xAttr, Sy.weak); (* ==> directly imported *)
       INCL(ident.xAttr, Sy.need); (* ==> needed in symfile *)
-	END;
+    END;
    (*
     *  Alias (if any) must appear after ImpId
     *)
-	IF alias # NIL THEN
-	  alias.dfScp := ident;
-	  Sy.AppendScope(impSeq, alias);
+    IF alias # NIL THEN
+       alias.dfScp := ident;
+       Sy.AppendScope(impSeq, alias);
     END;
   END Import;
   
@@ -449,14 +448,14 @@ VAR
       Import(modScope, Cs.impSeq);
     END;
     Expect(T.semicolonSym);
-	(*
-	 * Now some STA-specific tests.
-	 *)
-	IF Sy.sta IN modScope.xAttr THEN
+   (*
+    * Now some STA-specific tests.
+    *)
+    IF Sy.sta IN modScope.xAttr THEN
       IF Sy.trgtNET THEN
         ImportThreading(modScope, Cs.impSeq);
-       ELSE
-         SemError(238);
+      ELSE
+        SemError(238);
       END;
       IF ~modScope.main THEN 
         SemError(319); 

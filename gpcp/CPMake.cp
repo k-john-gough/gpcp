@@ -69,27 +69,27 @@ VAR
   END Warn;
 
   PROCEDURE Usage();
-    CONST jPre = "cprun ";
-	  str1 = "Usage: CPMake [";
-	  str2 = "all] [gpcp-options] <ModuleName>";
+    CONST 
+	  str0 = "Usage: cpmake [-all]";
+	  str1 = "Usage: CPMake [/all]";
+	  str2 = " [gpcp-options] <ModuleNames>";
 	  str3 = "	For gpcp-options, type: ";
-	  str4 = "gpcp ";
-	  str5 = "help";
+	  str4 = "gpcp -help";
+	  str5 = "gpcp /help";
     VAR   isNt : BOOLEAN;
   BEGIN
     Console.WriteString("gardens point CPMake: " + GPCPcopyright.verStr);
     Console.WriteLn;
     isNt := RTS.defaultTarget = "net";
-    IF ~isNt THEN Console.WriteString(jPre) END;
-    Console.WriteString(str1);
-    Console.Write(GPFiles.optChar);
+    IF ~isNt THEN Console.WriteString(str0);
+    ELSE Console.WriteString(str1);
+    END; 
     Console.WriteString(str2);
     Console.WriteLn();
     Console.WriteString(str3);
-    IF ~isNt THEN Console.WriteString(jPre) END;
-    Console.WriteString(str4);
-    Console.Write(GPFiles.optChar);
-    Console.WriteString(str5);
+    IF ~isNt THEN Console.WriteString(str4) 
+    ELSE Console.WriteString(str5);
+    END; 
     Console.WriteLn();
   END Usage;
 

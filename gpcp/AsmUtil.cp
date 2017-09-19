@@ -1172,7 +1172,13 @@ MODULE AsmUtil;
 
   PROCEDURE (emtr : AsmEmitter)CallGetClass*();
   BEGIN
-    THROW( "method CallGetClass not implemented" );
+    emtr.CheckFrame();
+    emtr.thisMv.visitMethodInsn( 
+        ASM.Opcodes.INVOKEVIRTUAL,
+        jloStr,
+        MKSTR("getClass"), 
+        MKSTR("()Ljava/lang/Class;"),
+        FALSE ); (* ==> not an interface *)
   END CallGetClass; 
 
  (* --------------------------------------------------------- *)

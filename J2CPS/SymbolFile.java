@@ -159,7 +159,7 @@ class SymbolFile {
         out.writeByte(protect); 
     }
     else /* if (ConstantPool.isPrivate(access)) */ { 
-        out.writeByte(prvMode); 
+        out.writeByte(prvMode); // Why are we emitting this if it is private?
     }
     if (name == null) {
         name = "DUMMY" + count++;
@@ -210,6 +210,7 @@ class SymbolFile {
   }
 
   private static void InsertTypeInTypeList(TypeDesc ty) {
+    // Make a longer list.
     if (ty.outTypeNum > 0) { return; }
     ty.outTypeNum = nextType++;
     if (tListIx >= typeList.length) {
@@ -362,12 +363,16 @@ class SymbolFile {
                 System.out.printf("Member class %s\n", thisClass.javaName);   
             // -------------------
             // This class is a class of the package being
-            // emitted to this symbol file. Details are required.
+            // emitted to this symbol file. Details are required.            
             // -------------------
             thisClass.writeDetails = true;
             out.writeByte(typSy);
             writeName(out,thisClass.access,thisClass.objName);
             writeTypeOrd(out,thisClass);
+            // Sanity check.
+            assert (thisClass.access & 0x200) == 0 || 
+                    (thisClass.access & 1) == 1 :
+                    "Interface not public : " + thisClass.qualName;
         }
     }
     //
@@ -778,7 +783,7 @@ class SymbolFile {
                 impClass = null;
                 String impModName = null;
                 int impAcc = 0,
-                        impModAcc = 0;
+                    impModAcc = 0;
                 Check(tDefS);
                 int tNum = tOrd;
                 GetSym();

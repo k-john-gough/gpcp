@@ -177,6 +177,10 @@ public class TypeDesc {
     return typeArr; 
   }
 
+  /**
+   * Initialize <code>typeList</code> to begin with
+   * the basic, predeclared types.
+   */
   public static void InitTypes() {
     for (int i=0; i < specT; i++) {
       basicTypes[i] = new TypeDesc(i);

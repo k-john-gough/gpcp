@@ -16,4 +16,9 @@ PROCEDURE CurrentDirectory*(): FileNameArray;
 
 PROCEDURE exists*(fName : ARRAY OF CHAR) : BOOLEAN;
 
+PROCEDURE FileList*(IN dirPath : ARRAY OF CHAR) : 
+              POINTER TO ARRAY OF FileNameArray;
+
 END GPFiles.
+
+

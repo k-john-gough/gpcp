@@ -168,6 +168,12 @@ MODULE Builtin;
     jnk := blk.symTb.enter(tId.hash, tId);
   END MkDummyClass;
 
+  PROCEDURE AddDummyBaseTp*(typId : IdDesc.TypId; basId : IdDesc.TypId);
+  BEGIN
+    typId.type(Typ.Pointer).boundTp(Typ.Record).baseTp := 
+                                       basId.type(Typ.Pointer).boundTp;
+  END AddDummyBaseTp;
+
 (* ------------------------------------------------------------	*)
 
   PROCEDURE MkDummyMethodAndInsert*(IN namStr : ARRAY OF CHAR;

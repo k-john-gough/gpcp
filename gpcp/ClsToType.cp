@@ -45,7 +45,8 @@ MODULE ClsToType;
         enuCls*  =  3; evtCls*  =  4; dlgCls*  =  5;
         primTyp* =  6; arrTyp*  =  7; voidTyp* =  8;
         strTyp*  =  9; objTyp*  = 10; sysValT* = 11;
-        sysEnuT* = 12; sysDelT* = 13; sysExcT* = 14; voidStar* = 15;
+        sysEnuT* = 12; sysDelT* = 13; sysExcT* = 14; 
+		voidStar* = 15;
 
   CONST (* type attribute enumeration bits   *)
         absTp = 7; intTp = 5; sldTp = 8;
@@ -530,7 +531,6 @@ MODULE ClsToType;
     | sysEnuT  : RETURN ntvEnu;
     | sysDelT  : RETURN ntvEvt;
     | voidStar : RETURN voidSt;
-
     ELSE (* default, refCls, valCls, enuCls, evtCls, dlgCls *)  
       WITH peT : Per.Class DO
         RETURN lookup(peT, spc);

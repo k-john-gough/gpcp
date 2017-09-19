@@ -20,7 +20,7 @@ MODULE MsilMaker;
         GPFiles,
         GPBinFiles,
         GPTextFiles,
-        PeUtil,
+        (* PeUtil, *)
         IlasmUtil,
         Nh  := NameHash,
         Scn := CPascalS,
@@ -741,17 +741,21 @@ MODULE MsilMaker;
         classIx   : INTEGER;
         idDesc    : Sy.Idnt;
         impElem   : Id.BlkId;
-        callApi   : BOOLEAN;
+        callApi   : BOOLEAN; 
   BEGIN
-(*
- *  callApi := CSt.doCode & ~CSt.debug;
- *)
+  (* callApi will become relevant again when we have the Reflection.Emit backend *)
     callApi := CSt.doCode & ~CSt.doIlasm;
     Mu.MkBlkName(this.mod);
     IF callApi THEN
-      out := PeUtil.newPeFile(this.mod.pkgNm, ~this.mod.main);
-      this.outF := out;
+      ASSERT(FALSE);
+      out := NIL;
+     (*
+      * CSt.emitNam := BOX("PERWAPI");
+      * out := PeUtil.newPeFile(this.mod.pkgNm, ~this.mod.main);
+      * this.outF := out;
+      *)
     ELSE (* just produce a textual IL file *)
+      CSt.emitNam := BOX("Ilasm-emit");
       out := IlasmUtil.newIlasmFile(this.mod.pkgNm);
       this.outF := out;
     END;

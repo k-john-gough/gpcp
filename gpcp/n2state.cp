@@ -52,7 +52,6 @@ MODULE N2State;
         Verbose-  : BOOLEAN;
         superVb-  : BOOLEAN;
         generics- : BOOLEAN;
-        legacy-   : BOOLEAN;
         cpCmpld-  : BOOLEAN;
 
  (* ---------------------------------------------------------- *)
@@ -201,17 +200,13 @@ MODULE N2State;
     IF netDflt THEN
       WLn("Options: /big       ==> allocate huge hash table");
       WLn("         /copyright ==> display copyright notice");
-      WLn("         /generics  ==> enable CLI v2.0 generics");
       WLn("         /help      ==> display this message");
-      WLn("         /legacy    ==> produce compatible symbol file");
       WLn("         /verbose   ==> chatter on about progress"); 
       WLn("         /Verbose   ==> go on and on and on about progress"); 
     ELSE
       WLn("Options: -big       ==> allocate huge hash table");
       WLn("         -copyright ==> display copyright notice");
-      WLn("         -generics  ==> enable CLI v2.0 generics");
       WLn("         -help      ==> display this message");
-      WLn("         -legacy    ==> produce compatible symbol file");
       WLn("         -verbose   ==> chatter on about progress"); 
       WLn("         -Verbose   ==> go on and on and on about progress"); 
     END;
@@ -279,11 +274,10 @@ MODULE N2State;
         verbose := TRUE;
         Verbose := TRUE;
         superVb := FALSE;
-    ELSIF arg = "-generics" THEN
-        generics := TRUE;
-    ELSIF arg = "-legacy" THEN
-        legacy := TRUE;
-        CompState.legacy := TRUE;
+   (*
+    * ELSIF arg = "-generics" THEN
+    *    generics := TRUE;
+	*)
     ELSIF arg = "-VERBOSE" THEN
         verbose := TRUE;
         Verbose := TRUE;
@@ -315,7 +309,6 @@ BEGIN
   verbose  := FALSE;
   Verbose  := FALSE;
   superVb  := FALSE;
-  legacy   := FALSE;
   cpCmpld  := FALSE; (* pending the custom attribute *)
   hashSize := 5000;
   Sy.InitScpSeq(impSeq, 10);
