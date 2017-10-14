@@ -262,6 +262,12 @@ MODULE JavaMaker;
     CSt.ntvExc := exc.type;
     Bi.MkDummyClass("Class", blk, Ty.noAtt, cls);
     CSt.ntvTyp := cls.type;
+   (*
+    * This next solves a perverse problem when java_lang
+    * (jl) is imported *after* RTS. The merging of the two
+    * definitions of java_lang.Exception loses the base
+    * class name jl.Throwable. There are alternative fixes ...
+    *)
     Bi.MkDummyClass("Throwable", blk, Ty.extns, thr);
     Bi.AddDummyBaseTp(exc, thr);
    (*
