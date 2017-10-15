@@ -18,3 +18,6 @@ As well as the compiler, the distribution contains a number of other utilities
 * The program _CPMake_ which performs a minimal consistent compilation of a set of Component Pascal modules, respecting the module dependencies explicitly declared in the source files.
 * The program _PeToCps_ which creates a _gpcp_ symbol file from a nominated "foreign language" PE file.  Such symbol files are used by _gpcp_ to perform type-safe separate compilation of Component Pascal modules that import foreign language libraries.
 * The program _Browse_ produces a readable, hyperlinked representation of _gpcp_ symbol files.
+
+## Special Note
+Almost all of the sources of the _gpcp_ tools are written in Component Pascal. It is not possible to *use* _gpcp_ until you have executable code of the tools. And you cannot *build* the executables from this source repository unless you already have a Component Pascal compiler. Most users should start by downloading a recent release distribution from the link above. The releases have documentation, usage information and example programs. 
