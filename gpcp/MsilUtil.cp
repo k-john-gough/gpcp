@@ -774,7 +774,7 @@ MODULE MsilUtil;
     END;
     info.dNum := 0;
     info.dMax := 0;
-    info.rtLc := -1;   (* maybe different for IlasmUtil and PeUtil? *)
+    info.rtLc := -1;   (* maybe different for IlasmUtil and API-writer? *)
   END InitProcInfo;
 
 (* ------------------------------------------------------------ *)

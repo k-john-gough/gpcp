@@ -68,13 +68,14 @@ MODULE NameHash;
     RTS.Throw(str + V.intToCharOpen(size)^);
   END HashtableOverflow;
 
-(* ============================================================ *)
+
 
   PROCEDURE hashStr(IN str : ARRAY OF CHAR) : INTEGER;
     VAR tot : INTEGER;
 	idx : INTEGER;
 	len : INTEGER;
   BEGIN [UNCHECKED_ARITHMETIC]
+
     (* need to turn off overflow checking *)
     len := LEN(str$);
     tot := 0;
@@ -143,6 +144,7 @@ MODULE NameHash;
     step := 1;
     key  := hashStr(str);
     val  := name[key];
+
     WHILE (val # NIL) & ~equalStr(val,str) DO
       INC(key, step);
       INC(step,2); 

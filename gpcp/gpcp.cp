@@ -31,6 +31,7 @@ MODULE gpcp;
 
 BEGIN
   filN := 0;
+  ProgArgs.ExpandWildcards(0);
   FOR parN := 0 TO ProgArgs.ArgNumber()-1 DO
     ProgArgs.GetArg(parN, argN);
     chr0 := argN[0];

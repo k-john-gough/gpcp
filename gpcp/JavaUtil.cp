@@ -276,6 +276,21 @@ MODULE JavaUtil;
 
 
 (* ============================================================ *)
+  PROCEDURE DiagS*(IN s : ARRAY OF CHAR);
+  BEGIN
+    Console.WriteString(s); Console.WriteLn;
+  END DiagS;
+
+  PROCEDURE DiagSI*(IN s : ARRAY OF CHAR; n : INTEGER);
+  BEGIN
+    Console.WriteString(s); Console.WriteInt(n,0); Console.WriteLn;
+  END DiagSI;
+
+  PROCEDURE DiagSS*(IN p : ARRAY OF CHAR; IN s : ARRAY OF CHAR);
+  BEGIN
+    Console.WriteString(p); Console.WriteString(s); Console.WriteLn;
+  END DiagSS;
+(* ============================================================ *)
 
   PROCEDURE i2CO*( i : INTEGER ) : L.CharOpen;
     VAR cArr : ARRAY 16 OF CHAR;
@@ -1254,7 +1269,8 @@ CSt.Message( "made mNm name " + mNm^ );
 
 (* ------------------------------------------------------------ *)
 (* Proxies are the local variables corresponding to boxed       *)
-(* arguments that are not also passed by value i.e. OUT mode.   *)
+(* arguments that are not also passed by value, for example,    *)
+(* an OUT mode argument returned as the function return.    .   *)
 (* ------------------------------------------------------------ *)
   PROCEDURE NumberProxies(pIdn : Id.Procs; IN pars : Id.ParSeq);
     VAR parId : Id.ParId;
@@ -1356,10 +1372,8 @@ CSt.Message( "made mNm name " + mNm^ );
     *   Count params (and boxes if needed).
     *)
     NumberParams(prcId, frmTp);
-    IF prcId.body # NIL THEN
-      NumberProxies(prcId, frmTp.formals);
-      NumberLocals(prcId, prcId.locals);
-    END;
+    NumberProxies(prcId, frmTp.formals);
+    NumberLocals(prcId, prcId.locals);
   END RenumberLocals;
 
 (* ------------------------------------------------------------ *)

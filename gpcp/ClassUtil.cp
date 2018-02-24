@@ -624,9 +624,11 @@ MODULE ClassUtil;
     fil.lineNumTabIx := 0;
     fil.jlExceptIx := 0;
     CSt.emitNam := BOX("ClassUtil");
-    IF CSt.doVersion THEN
-      CSt.Message("Using " + CSt.emitNam^ + " emitter" );
-    END;
+(*
+ *  IF CSt.doVersion & CSt.verbose THEN
+ *    CSt.Message("Using " + CSt.emitNam^ + " emitter" );
+ *  END;
+ *)
     RETURN fil;
   END newClassFile;
 
@@ -849,7 +851,7 @@ MODULE ClassUtil;
     NEW(m);
     m.methId := meth;
     IF meth = NIL THEN
-      m.localNum := 0;
+      m.localNum := 2;
       m.maxLocals := 2; (* need 2 for __copy__  'this' + 'arg'*)
     ELSE        (* Id.BlkId *)
       m.localNum := meth.rtsFram;

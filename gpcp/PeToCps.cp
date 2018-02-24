@@ -2,9 +2,9 @@
 (* ================================================================ *)
 (*                                                                  *)
 (*  Module of the V1.4+ gpcp tool to create symbol files from       *)
-(*  the metadata of .NET assemblies, using the PERWAPI interface.   *)
+(*  the metadata of .NET assemblies, using System.Reflection API.   *)
 (*                                                                  *)
-(*  Copyright QUT 2004 - 2005.                                      *)
+(*  Copyright QUT 2004 - 2005, K John Gough 2004 - 2018.            *)
 (*                                                                  *)
 (*  This code released under the terms of the GPCP licence.         *)
 (*                                                                  *)
@@ -20,9 +20,12 @@ MODULE PeToCps;
      FileNames,
      Glb := N2State,
      C2T := ClsToType,
-     Per := "[QUT.PERWAPI]QUT.PERWAPI",
+     IdDesc,
+   (*
+    *  Util := PeToCpsUtils_, only needed while bootstrapping v1.4.05
+    *)
      Sys := "[mscorlib]System",
-     IdDesc;
+     SysRfl := "[mscorlib]System.Reflection";
 
   TYPE
     ArgS = ARRAY 256 OF CHAR;
@@ -69,27 +72,25 @@ MODULE PeToCps;
 
 (* ------------------------------------------------------- *)
 
-  PROCEDURE GetVersionInfo(pef : Per.PEFile; 
+  PROCEDURE GetVersionInfo(asm : SysRfl.Assembly; 
                        OUT inf : POINTER TO ARRAY OF INTEGER);
-    CONST tag = "PublicKeyToken=";
-    VAR   asm : Per.Assembly;
-          str : Sys.String;
-          arr : Glb.CharOpen;
-          idx : INTEGER;
-          tok : LONGINT;
-  BEGIN
-    asm := pef.GetThisAssembly();
-    IF (asm.MajorVersion() # 0) & (LEN(asm.Key()) > 0) THEN
-      NEW(inf, 6);
-      tok := asm.KeyTokenAsLong(); 
-      inf[4] := RTS.hiInt(tok);
-      inf[5] := RTS.loInt(tok);
+    VAR   asmNam : SysRfl.AssemblyName;
+          sysVer : Sys.Version;
+          kToken : POINTER TO ARRAY OF UBYTE;
 
-      inf[0] := asm.MajorVersion();
-      inf[1] := asm.MinorVersion();
-      inf[2] := asm.BuildNumber();
-      inf[3] := asm.RevisionNumber();
+  BEGIN [UNCHECKED_ARITHMETIC]
+    asmNam := asm.GetName();
+    sysVer := asmNam.get_Version();
+    kToken := asmNam.GetPublicKeyToken();
+    IF (sysVer.get_Major() # 0) & (kToken # NIL) & (LEN(kToken) >= 8) THEN 
+      NEW(inf, 6); 
+      inf[4] := (((kToken[0] * 256 + kToken[1]) * 256 + kToken[2]) *256 + kToken[3]);
+      inf[5] := (((kToken[4] * 256 + kToken[5]) * 256 + kToken[6]) *256 + kToken[7]);
 
+      inf[0] := sysVer.get_Major();
+      inf[1] := sysVer.get_Minor();
+      inf[2] := sysVer.get_Revision();
+      inf[3] := sysVer.get_Build();
     ELSE
       inf := NIL;
     END;
@@ -111,50 +112,91 @@ MODULE PeToCps;
 
 (* ==================================================================== *)
 
-  PROCEDURE Process(IN  nam : ARRAY OF CHAR;
-                    OUT rVl : INTEGER);       (* return value *)
-    VAR peFl : Per.PEFile;
-        clss : POINTER TO ARRAY OF Per.ClassDef;
-        indx : INTEGER;
-        nSpc : VECTOR OF C2T.DefNamespace;
-        basS : ArgS;
-        vrsn : POINTER TO ARRAY OF INTEGER;
+  PROCEDURE GetAssembly(IN nam : ARRAY OF CHAR) : SysRfl.Assembly;
+    VAR basS : ArgS;
   BEGIN
-    rVl := 0;
+    Glb.CondMsg(" Reading PE file " + nam);
     FileNames.StripExt(nam, basS);
-
-    Glb.CondMsg(" Reading PE file");
-    peFl := Per.PEFile.ReadPublicClasses(MKSTR(nam));
-
+    IF (basS = "mscorlib") THEN
+      Glb.AbortMsg("Cannot load mscorlib, use the /mscorlib option instead")
+    END;
     Glb.GlobInit(nam, basS);
+    RETURN SysRfl.Assembly.(*ReflectionOnly*)LoadFrom(MKSTR(nam));
+  END GetAssembly;
+
+  PROCEDURE GetMscorlib() : SysRfl.Assembly;
+    VAR objTp : RTS.NativeType;
+  BEGIN
+    Glb.CondMsg(" Reflecting loaded mscorlib assembly");
+    Glb.GlobInit("mscorlib.dll", "mscorlib" );
+    objTp := TYPEOF(RTS.NativeObject);
+    RETURN SysRfl.Assembly.GetAssembly(objTp)
+  END GetMscorlib;
+
+(* ==================================================================== *
+ * PROCEDURE Process(IN  nam : ARRAY OF CHAR;
+ *                   OUT rVl : INTEGER);       (* return value *)
+ * ==================================================================== *)
+
+  PROCEDURE Process(assm : SysRfl.Assembly;
+                OUT rtVl : INTEGER);       (* return value *)
+    VAR indx : INTEGER;
+        nSpc : VECTOR OF C2T.DefNamespace;
+
+        vrsn : POINTER TO ARRAY OF INTEGER;
+      expTps : POINTER TO ARRAY OF Sys.Type;
+      vecTps : VECTOR OF Sys.Type;
+      asmRfs : POINTER TO ARRAY OF SysRfl.AssemblyName;
+
+  BEGIN
+    rtVl := 0;
+    expTps := assm.GetExportedTypes();
+   (*
+    asmRfs := Util.Utils.GetDependencies(assm);
+    *
+    *)
+    asmRfs := assm.GetReferencedAssemblies();
 
     IF ~Glb.isCorLib THEN C2T.InitCorLibTypes() END;
 
     Glb.CondMsg(" Processing PE file");
-    clss := peFl.GetClasses();
-    C2T.Classify(clss, nSpc);
    (*
-    *  Define BlkId for every namespace
+    *  Classify allocates a new DefNamspace object for each
+    *  namespace. Each object is decorated with an IdDesc.BlkId
+    *  module descriptor, a vector of System.Type objects and 
+    *  another of IdDesc.TypId objects.
+    *  Classes on the expTps list are added to the vector of
+    *  the corresponding namespace. For each such Type object
+    *  a TypId object is created and inserted in the TypId
+    *  vector. Each such TypId is inserted into the symbol 
+	*  table of the BlkId describing that namespace.
+    *)  
+    C2T.Classify(expTps, nSpc);
+   (*
+    *  If the assembly has version/strongname info
+    *  this is propagaed to each namespace of nSpc.
     *)
-    GetVersionInfo(peFl, vrsn);
+    GetVersionInfo(assm, vrsn);
     FOR indx := 0 TO LEN(nSpc) - 1 DO
-      C2T.MakeBlkId(nSpc[indx], Glb.basNam);
       CopyVersionInfo(vrsn, nSpc[indx].bloc);
     END;
-
    (*
-    *  Define TypIds in every namespace
+    *  Each namespace is traversed and an object of an appropriate 
+    *  subtype of Symbols.Type is assigned to the TypId.type field.
+    *  For the structured types the details are added later.
     *)
     FOR indx := 0 TO LEN(nSpc) - 1 DO
       IF ~Glb.isCorLib THEN C2T.ImportCorlib(nSpc[indx]) END;
-      C2T.MakeTypIds(nSpc[indx]); 
+      C2T.AddTypesToIds(nSpc[indx]); 
     END;
     IF Glb.isCorLib THEN C2T.BindSystemTypes() END;
    (*
-    *  Define structure of every class
+    *  The structure of each TypId.type field is now elaborated.
+    *  For record types it is only now that base-type, methods
+    *  and static features are added.
     *)
     FOR indx := 0 TO LEN(nSpc) - 1 DO
-      C2T.DefineClss(nSpc[indx]); 
+      C2T.DefineClss(nSpc[indx]);
     END;
    (*
     *  Write out symbol file(s)
@@ -168,11 +210,11 @@ MODULE PeToCps;
     resS := ExceptionName(sysX);
     Glb.Message(" " + resS^);
     Glb.Message(" " + RTS.getStr(sysX)^);
-    rVl := 4;
+    rtVl := 4;
   END Process;
 
 (* ==================================================================== *)
-(*			      Main Argument Loop			*)
+(*                            Main Argument Loop                        *)
 (* ==================================================================== *)
 
 BEGIN
@@ -185,15 +227,23 @@ BEGIN
     IF (chr0 = '-') OR (chr0 = GPFiles.optChar) THEN (* option string *)
       argS[0] := "-";
       Glb.ParseOption(argS$);
-    ELSE
-      timS := RTS.GetMillis();
-      Process(argS$, errs); 
+    ELSIF Glb.isCorLib THEN
+      Glb.Message("Filename arguments not allowed with /mscorlib");
+      Glb.AbortMsg("Rest of arguments will be skipped");
+    ELSE  
       INC(filN); 
-      IF errs = 0 THEN INC(okNm) END;
+      timS := RTS.GetMillis();
+      Process(GetAssembly(argS$), errs);
       timE := RTS.GetMillis();
-
+      IF errs = 0 THEN INC(okNm) END;
       Glb.Report(argS$, resStr(errs), timE - timS);
     END;
+  END;
+  IF Glb.isCorLib THEN
+    timS := RTS.GetMillis();    
+    Process(GetMscorlib(), errs);
+    timE := RTS.GetMillis();
+    Glb.Report(argS$, resStr(errs), timE - timS);
   END;
   Glb.Summary(filN, okNm, timE - tim0);
  (*

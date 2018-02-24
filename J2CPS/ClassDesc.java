@@ -42,7 +42,13 @@ public class ClassDesc extends TypeDesc  {
     
     ConstantPool cp;
     ClassDesc superClass;
-    int access, outBaseTypeNum=0, superNum=0, numInts=0, intNums[];
+    
+    int access;
+    int outBaseTypeNum=0;
+    int superNum=0;
+    int numInts=0;
+    int intNums[];
+    
     public String 
             /**
              * Qualified name of the class e.g. java/lang/Object
@@ -221,6 +227,8 @@ public class ClassDesc extends TypeDesc  {
         ClassDesc put = classMap.put(qualName,this);
       }
       isInterface = ConstantPool.isInterface(access);
+      if (this.isInterface && (access & 1) != 1)
+          throw new IOException("interface not public");
       int superIx = stream.readUnsignedShort();
       if (superIx > 0) {
         tmp = (ClassRef) cp.Get(superIx);

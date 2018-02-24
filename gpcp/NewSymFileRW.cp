@@ -1,9 +1,10 @@
 
+
 (* ==================================================================== *)
-(*									*)
-(*  SymFileRW:  Symbol-file reading and writing for GPCP.		*)
-(*	Copyright (c) John Gough 1999 -- 2011.				*)
-(*									*)
+(*                                                                      *)
+(*  SymFileRW:  Symbol-file reading and writing for GPCP.               *)
+(*          Copyright (c) John Gough 1999 -- 2018.                      *)
+(*                                                                      *)
 (* ==================================================================== *)
 
 MODULE NewSymFileRW;
@@ -32,48 +33,48 @@ MODULE NewSymFileRW;
 // 
 // SymFile    = Header [String (falSy | truSy | <other attribute>)]
 //              [ VersionName ]
-//		{Import | Constant | Variable | Type | Procedure} 
-//		TypeList Key.
-//	-- optional String is external name.
-//	-- falSy ==> Java class
-//	-- truSy ==> Java interface
-//	-- others ...
+//              {Import | Constant | Variable | Type | Procedure} 
+//              TypeList Key.
+//    -- optional String is external name.
+//    -- falSy ==> Java class
+//    -- truSy ==> Java interface
+//    -- others ...
 // Header     = magic modSy Name.
 // VersionName= numSy longint numSy longint numSy longint.
 //      --            mj# mn#       bld rv#    8xbyte extract
 // Import     = impSy Name [String] Key.
-//	-- optional string is explicit external name of class
+//    -- optional string is explicit external name of class
 // Constant   = conSy Name Literal.
 // Variable   = varSy Name TypeOrd.
 // Type       = typSy Name TypeOrd.
 // Procedure  = prcSy Name [String] FormalType.
-//	-- optional string is explicit external name of procedure
+//    -- optional string is explicit external name of procedure
 // Method     = mthSy Name byte byte TypeOrd [String] [Name] FormalType.
-//	-- optional string is explicit external name of method
+//    -- optional string is explicit external name of method
 // FormalType = [retSy TypeOrd] frmSy {parSy byte TypeOrd [String]} endFm.
-//	-- optional phrase is return type for proper procedures
+//    -- optional phrase is return type for proper procedures
 // TypeOrd    = ordinal.
 // TypeHeader = tDefS Ord [fromS Ord Name].
-//	-- optional phrase occurs if:
-//	-- type not from this module, i.e. indirect export
+//    -- optional phrase occurs if:
+//    -- type not from this module, i.e. indirect export
 // TypeList   = start { Array | Record | Pointer | ProcType | 
 //                Enum | Vector | NamedType } close.
 // Array      = TypeHeader arrSy TypeOrd (Byte | Number | <empty>) endAr.
-//	-- nullable phrase is array length for fixed length arrays
+//    -- nullable phrase is array length for fixed length arrays
 // Vector     = TypeHeader vecSy TypeOrd endAr.
 // Pointer    = TypeHeader ptrSy TypeOrd.
 // Event      = TypeHeader evtSy FormalType.
 // ProcType   = TypeHeader pTpSy FormalType.
 // Record     = TypeHeader recSy recAtt [truSy | falSy] 
-//		[basSy TypeOrd] [iFcSy {basSy TypeOrd}]
-//		{Name TypeOrd} {Method} {Statics} endRc.
-//	-- truSy ==> is an extension of external interface
-//	-- falSy ==> is an extension of external class
-// 	-- basSy option defines base type, if not ANY / j.l.Object
+//        [basSy TypeOrd] [iFcSy {basSy TypeOrd}]
+//        {Name TypeOrd} {Method} {Statics} endRc.
+//    -- truSy ==> is an extension of external interface
+//    -- falSy ==> is an extension of external class
+//     -- basSy option defines base type, if not ANY / j.l.Object
 // Statics    = ( Constant | Variable | Procedure ).
 // Enum       = TypeHeader eTpSy { Constant } endRc.
 // NamedType  = TypeHeader.
-// Name	      = namSy byte UTFstring.
+// Name       = namSy byte UTFstring.
 // Literal    = Number | String | Set | Char | Real | falSy | truSy.
 // Byte       = bytSy byte.
 // String     = strSy UTFstring.
@@ -118,37 +119,39 @@ MODULE NewSymFileRW;
         dumped* = -1;
         buffDefault = 1024;
 
+        logPrefix = "Rlog ";
+
 (* ============================================================ *)
 
   TYPE
         SymFile = POINTER TO RECORD 
-        	    file : BF.FILE;
-        	    cSum : INTEGER;
-        	    modS : Id.BlkId;
-        	    iNxt : INTEGER;
-        	    oNxt : INTEGER;
-        	    work : D.TypeSeq;
+                    file : BF.FILE;
+                    cSum : INTEGER;
+                    modS : Id.BlkId;
+                    iNxt : INTEGER;
+                    oNxt : INTEGER;
+                    work : D.TypeSeq;
                     (* Recycled scratch area *)
                     buff : POINTER TO ARRAY OF UBYTE; 
-        	  END;
+                  END;
 
   TYPE
         SymFileReader* = POINTER TO RECORD
-        	    file  : BF.FILE;
-        	    modS  : Id.BlkId;
-        	    impS  : Id.BlkId;
-        	    sSym  : INTEGER;
-        	    cAtt  : CHAR;
-        	    iAtt  : INTEGER;
-        	    lAtt  : LONGINT;
-        	    rAtt  : REAL;
-                    rScp  : ImpResScope;
-        	    strLen : INTEGER;
-        	    strAtt : Lt.CharOpen;
-                    oArray : D.IdSeq;
-        	    sArray : D.ScpSeq;		(* These two sequences	*)
-  		    tArray : D.TypeSeq;		(* must be private as   *)
-        	  END;				(* file parses overlap. *)
+             file  : BF.FILE;
+             modS  : Id.BlkId;
+             impS  : Id.BlkId;
+             sSym  : INTEGER;
+             cAtt  : CHAR;
+             iAtt  : INTEGER;
+             lAtt  : LONGINT;
+             rAtt  : REAL;
+             rScp  : ImpResScope;
+             strLen : INTEGER;
+             strAtt : Lt.CharOpen;
+             oArray : D.IdSeq;
+             sArray : D.ScpSeq;   (* These two sequences  *)
+             tArray : D.TypeSeq;  (* must be private as   *)
+           END;                   (* file parses overlap. *)
 
 (* ============================================================ *)
 
@@ -159,14 +162,16 @@ MODULE NewSymFileRW;
 
 (* ============================================================ *)
 
-  TYPE	TypeLinker*  = POINTER TO RECORD (D.SymForAll) sym : SymFileReader END;
-  TYPE	SymFileSFA*  = POINTER TO RECORD (D.SymForAll) sym : SymFile END;
-  TYPE	ResolveAll*  = POINTER TO RECORD (D.SymForAll) END;
+  TYPE TypeLinker*  = POINTER TO RECORD (D.SymForAll) sym : SymFileReader END;
+  TYPE SymFileSFA*  = POINTER TO RECORD (D.SymForAll) sym : SymFile END;
+  TYPE ResolveAll*  = POINTER TO RECORD (D.SymForAll) END;
 
 (* ============================================================ *)
 
-  VAR   lastKey : INTEGER;	(* private state for CPMake *)
+  VAR   lastKey : INTEGER; (* private state for CPMake *)
         fSepArr : ARRAY 2 OF CHAR;
+
+  PROCEDURE^ (f : SymFile)EmitType(type : D.Type),NEW;
 
 (* ============================================================ *)
 
@@ -226,12 +231,12 @@ MODULE NewSymFileRW;
     idx := 0;
     chr := ORD(nam[0]);
     WHILE chr # 0H DO
-      IF    chr <= 7FH THEN 		(* [0xxxxxxx] *)
+      IF    chr <= 7FH THEN          (* [0xxxxxxx] *)
         f.buff[num] := USHORT(chr); INC(num);
-      ELSIF chr <= 7FFH THEN 		(* [110xxxxx,10xxxxxx] *)
+      ELSIF chr <= 7FFH THEN         (* [110xxxxx,10xxxxxx] *)
         f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num  ] := USHORT(0C0H + chr); INC(num, 2);
-      ELSE 				(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
+      ELSE                           (* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         f.buff[num+2] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num  ] := USHORT(0E0H + chr); INC(num, 3);
@@ -269,12 +274,12 @@ MODULE NewSymFileRW;
       IF chr = 0 THEN         (* [11000000, 10000000] *)
         f.buff[num+1] := 080H; 
         f.buff[num  ] := 0C0H; INC(num, 2);
-      ELSIF chr <= 7FH THEN 		(* [0xxxxxxx] *)
+      ELSIF chr <= 7FH THEN         (* [0xxxxxxx] *)
         f.buff[num  ] := USHORT(chr); INC(num);
-      ELSIF chr <= 7FFH THEN 		(* [110xxxxx,10xxxxxx] *)
+      ELSIF chr <= 7FFH THEN        (* [110xxxxx,10xxxxxx] *)
         f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num  ] := USHORT(0C0H + chr); INC(num, 2);
-      ELSE 				(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
+      ELSE                          (* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         f.buff[num+2] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num+1] := USHORT(080H + chr MOD 64); chr := chr DIV 64;
         f.buff[num  ] := USHORT(0E0H + chr); INC(num, 3);
@@ -304,10 +309,12 @@ MODULE NewSymFileRW;
 (* ======================================= *)
 
   PROCEDURE (f : SymFile)WriteNameForId(idD : D.Idnt),NEW;
+    VAR name : Lt.CharOpen;
   BEGIN
+    name := Nh.charOpenOfHash(idD.hash);
     f.Write(namSy); 
-    f.Write(idD.vMod); 
-    f.WriteNameUTF(Nh.charOpenOfHash(idD.hash));
+    f.Write(idD.vMod);
+    f.WriteNameUTF(name);
   END WriteNameForId;
 
 (* ======================================= *)
@@ -373,8 +380,8 @@ MODULE NewSymFileRW;
     IF ord <= 7FH THEN 
       f.Write(ord);
     ELSIF ord <= 7FFFH THEN
-      f.Write(128 + ord MOD 128);	(* LS7-bits first *)
-      f.Write(ord DIV 128);		(* MS8-bits next  *)
+      f.Write(128 + ord MOD 128);  (* LS7-bits first *)
+      f.Write(ord DIV 128);        (* MS8-bits next  *)
     ELSE
       ASSERT(FALSE);
     END;
@@ -417,9 +424,9 @@ MODULE NewSymFileRW;
         *)
         IF (t.bindTp # NIL) & 
            (t.bindTp.dump = 0) THEN 
-          AddToWorklist(f, t.bindTp);		(* First the pointer...  *)
+          AddToWorklist(f, t.bindTp);   (* First the pointer...  *)
         END;
-        AddToWorklist(f, t);			(* Then this record type *)
+        AddToWorklist(f, t);            (* Then this record type *)
       | t : Ty.Pointer DO
        (*
         *  If a pointer to record is being emitted, and 
@@ -430,17 +437,17 @@ MODULE NewSymFileRW;
         *  relationship between the pointer and record.
         *  (It is possible that DCode need record size.)
         *)
-        AddToWorklist(f, t);			(* First this pointer... *)
+        AddToWorklist(f, t);            (* First this pointer... *)
         IF (t.boundTp # NIL) & 
            (t.boundTp.dump = 0) &
            (t.boundTp IS Ty.Record) THEN
           recT := t.boundTp(Ty.Record);
           IF recT.bindTp = NIL THEN
-            AddToWorklist(f, t.boundTp);	(* Then the record type  *)
+            AddToWorklist(f, t.boundTp);    (* Then the record type  *)
           END;
         END;
       ELSE (* All others *)
-        AddToWorklist(f, t);			(* Just add the type.    *)
+        AddToWorklist(f, t);            (* Just add the type.    *)
       END;
     END;
     f.WriteOrd(t.dump);
@@ -537,6 +544,7 @@ MODULE NewSymFileRW;
   ** Import = impSy Name.
   *)
   BEGIN
+    IF id.namStr = NIL THEN id.SetNameFromHash(id.hash) END;
     IF D.need IN id.xAttr THEN
       f.Write(impSy);
       f.WriteNameForId(id);
@@ -668,6 +676,12 @@ MODULE NewSymFileRW;
       f.Write(fromS);
       f.WriteOrd(mod);
       f.WriteNameForId(idt);
+	  IF (mod > (f.iNxt - 1)) OR (mod < 0) THEN
+	    Console.WriteString(idt.dfScp.namStr); 
+		Console.Write(".");
+		Console.WriteString(idt.namStr);
+		Console.WriteLn;
+	  END;
     END;
   END EmitTypeHeader;
 
@@ -677,9 +691,6 @@ MODULE NewSymFileRW;
   BEGIN
     f.EmitTypeHeader(t);
     IF ~f.isImportedArray(t) THEN
-(*
- *  IF t.force # D.noEmit THEN	(* Don't emit structure unless forced *)
- *)
       IF t.kind = Ty.vecTp THEN f.Write(vecSy) ELSE f.Write(arrSy) END;
       f.EmitTypeOrd(t.elemTp);
       IF t.length > 127 THEN
@@ -701,15 +712,12 @@ MODULE NewSymFileRW;
         method : D.Idnt;
   (*
   **  Record = TypeHeader recSy recAtt [truSy | falSy | <others>] 
-  **		[basSy TypeOrd] [iFcSy {basSy TypeOrd}]
-  **		{Name TypeOrd} {Method} {Statics} endRc.
+  **        [basSy TypeOrd] [iFcSy {basSy TypeOrd}]
+  **        {Name TypeOrd} {Method} {Statics} endRc.
   *)
   BEGIN
     f.EmitTypeHeader(t);
     IF ~f.isImportedRecord(t) THEN
-(*
- *  IF t.force # D.noEmit THEN	(* Don't emit structure unless forced *)
- *)
       f.Write(recSy);
       index := t.recAtt; 
       IF D.noNew IN t.xAttr THEN INC(index, Ty.noNew) END;
@@ -717,19 +725,19 @@ MODULE NewSymFileRW;
       f.Write(index);
    (* ########## *)
       IF t.recAtt = Ty.iFace THEN
-  	f.Write(truSy);
+        f.Write(truSy);
       ELSIF CSt.special OR (D.isFn IN t.xAttr) THEN  
         f.Write(falSy);
       END;
    (* ########## *)
-      IF t.baseTp # NIL THEN			(* this is the parent type *)
+      IF t.baseTp # NIL THEN              (* this is the parent type *)
         f.Write(basSy);
         f.EmitTypeOrd(t.baseTp);
       END;
    (* ########## *)
       IF t.interfaces.tide > 0 THEN
         f.Write(iFcSy);
-        FOR index := 0 TO t.interfaces.tide-1 DO	(* any interfaces  *)
+        FOR index := 0 TO t.interfaces.tide-1 DO    (* any interfaces  *)
           f.Write(basSy);
           f.EmitTypeOrd(t.interfaces.a[index]);
         END;
@@ -796,10 +804,6 @@ MODULE NewSymFileRW;
   BEGIN
     f.EmitTypeHeader(t);
     IF ~f.isImportedPointer(t) THEN
-(*
- *  IF (t.force # D.noEmit) OR 			(* Only emit structure if *)
- *     (t.boundTp.force # D.noEmit) THEN	(* ptr or boundTp forced. *)
- *)
       f.Write(ptrSy);
       f.EmitTypeOrd(t.boundTp);
     END;
@@ -817,6 +821,18 @@ MODULE NewSymFileRW;
 
 (* ======================================= *)
 
+  PROCEDURE (f : SymFile)EmitType(type : D.Type),NEW;
+  BEGIN
+    WITH type : Ty.Array     DO f.EmitArrOrVecType(type);
+    |    type : Ty.Record    DO f.EmitRecordType(type);
+    |    type : Ty.Opaque    DO f.EmitOpaqueType(type);
+    |    type : Ty.Pointer   DO f.EmitPointerType(type);
+    |    type : Ty.Procedure DO f.EmitProcedureType(type);
+    |    type : Ty.Enum      DO f.EmitEnumType(type);
+    END;
+  END EmitType;
+
+
   PROCEDURE (f : SymFile)EmitTypeList(),NEW;
     VAR indx : INTEGER;
         type : D.Type;
@@ -824,17 +840,11 @@ MODULE NewSymFileRW;
    (*
     *   We cannot use a FOR loop here, as the tide changes
     *   during evaluation, as a result of reaching new types.
+    *   (This comment may not be true for the Reflection reader)
     *)
     indx := 0;
     WHILE indx < f.work.tide DO
-      type := f.work.a[indx];
-      WITH type : Ty.Array     DO f.EmitArrOrVecType(type);
-      |    type : Ty.Record    DO f.EmitRecordType(type);
-      |    type : Ty.Opaque    DO f.EmitOpaqueType(type);
-      |    type : Ty.Pointer   DO f.EmitPointerType(type);
-      |    type : Ty.Procedure DO f.EmitProcedureType(type);
-      |    type : Ty.Enum      DO f.EmitEnumType(type);
-      END;
+      f.EmitType(f.work.a[indx]);
       INC(indx);
     END;
   END EmitTypeList;
@@ -863,8 +873,8 @@ MODULE NewSymFileRW;
   (*
   ** SymFile = Header [String (falSy | truSy | <others>)]
   **            [ VersionName]
-  **		{Import | Constant | Variable
-  **                 | Type | Procedure | Method} TypeList.
+  **            {Import | Constant | Variable
+  **             | Type | Procedure | Method} TypeList.
   ** Header = magic modSy Name.
   ** VersionName= numSy longint numSy longint numSy longint.
   **      --            mj# mn#       bld rv#        8xbyte extract
@@ -894,9 +904,9 @@ MODULE NewSymFileRW;
       IF CSt.verbose THEN CSt.Message("Created " + fNamePtr^) END;
      (* End of alternative gpcp1.2 code *)
       IF D.rtsMd IN m.xAttr THEN
-        marker := RTS.loInt(syMag);	(* ==> a system module *)
+        marker := RTS.loInt(syMag);    (* ==> a system module *)
       ELSE
-        marker := RTS.loInt(magic);	(* ==> a normal module *)
+        marker := RTS.loInt(magic);    (* ==> a normal module *)
       END;
       symfile.Write4B(RTS.loInt(marker));
       symfile.Write(modSy);
@@ -922,7 +932,7 @@ MODULE NewSymFileRW;
       *)
       NEW(symVisit);
       symVisit.sym := symfile;
-      symfile.modS.symTb.Apply(symVisit); 
+      symfile.modS.symTb.Apply(symVisit); (* Apply SymFileSFA to sym-tab *)
      (*
       *  Now emit the types on the worklist.
       *)
@@ -976,9 +986,9 @@ MODULE NewSymFileRW;
     idx := 0;
     WHILE idx < len DO
       chr := read(fil); INC(idx);
-      IF chr <= 07FH THEN		(* [0xxxxxxx] *)
+      IF chr <= 07FH THEN            (* [0xxxxxxx] *)
         rdr.strAtt[num] := CHR(chr); INC(num);
-      ELSIF chr DIV 32 = 06H THEN	(* [110xxxxx,10xxxxxx] *)
+      ELSIF chr DIV 32 = 06H THEN    (* [110xxxxx,10xxxxxx] *)
         bNm := chr MOD 32 * 64;
         chr := read(fil); INC(idx);
         IF chr DIV 64 = 02H THEN
@@ -986,7 +996,7 @@ MODULE NewSymFileRW;
         ELSE
           RTS.Throw(bad);
         END;
-      ELSIF chr DIV 16 = 0EH THEN	(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
+      ELSIF chr DIV 16 = 0EH THEN    (* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         bNm := chr MOD 16 * 64;
         chr := read(fil); INC(idx);
         IF chr DIV 64 = 02H THEN
@@ -1131,18 +1141,6 @@ MODULE NewSymFileRW;
         token    : S.Token;
         index    : INTEGER;
         
-    PROCEDURE NameAndKey(idnt : D.Scope) : Lt.CharOpen;
-      VAR name : Lt.CharOpen;
-          keyV : INTEGER;
-    BEGIN
-      WITH idnt : Id.BlkId DO
-        RETURN BOX(Nh.charOpenOfHash(idnt.hash)^ + 
-                   " : "  + Lt.intToCharOpen(idnt.modKey)^);
-      ELSE
-        RETURN BOX("bad idnt");
-      END; 
-    END NameAndKey;
-    
   BEGIN
     message := NIL;
     token := scope.token;
@@ -1169,12 +1167,10 @@ MODULE NewSymFileRW;
       S.SemError.RepSt1(129, BOX(filNm^ + ".cps"), token.lin, token.col); 
       RETURN;
     ELSE
-      IF CSt.verbose THEN 
-        IF D.weak IN scope.xAttr THEN
-          message := BOX("Implicit import " + filNm^);
-        ELSE
-          message := BOX("Explicit import " + filNm^);
-        END;
+      IF D.weak IN scope.xAttr THEN
+        message := BOX("Implicit import " + filNm^);
+      ELSE
+        message := BOX("Explicit import " + filNm^);
       END;
       marker := readInt(f.file);
       IF marker = RTS.loInt(magic) THEN
@@ -1188,12 +1184,6 @@ MODULE NewSymFileRW;
       END;
       f.GetSym();
       f.SymFile(filNm);
-      IF CSt.verbose THEN 
-        CSt.Message(message^ + ", Key: " + Lt.intToCharOpen(f.impS.modKey)^);
-        FOR index := 0 TO f.sArray.tide - 1 DO
-          CSt.Message("  imports " + NameAndKey(f.sArray.a[index])^);
-        END;
-      END;
       BF.CloseFile(f.file);
     END;
   END Parse;
@@ -1215,7 +1205,7 @@ MODULE NewSymFileRW;
     IF sc.symTb.enter(id.hash, id) THEN
       ident := id;
     ELSE
-      ident := sc.symTb.lookup(id.hash);	(* Warp the return Idnt	*)
+      ident := sc.symTb.lookup(id.hash);    (* Warp the return Idnt    *)
       IF ident.kind # id.kind THEN Report(id, sc); ident := id END;
     END;
     RETURN ident;
@@ -1235,7 +1225,7 @@ MODULE NewSymFileRW;
 
   BEGIN
     IF ~tb.enter(id.hash, id) THEN
-      ident := tb.lookup(id.hash);		(* and test isForeign? *)
+      ident := tb.lookup(id.hash);        (* and test isForeign? *)
       IF ident.kind # id.kind THEN Report(id) END;
     END;
   END Insert;
@@ -1252,10 +1242,6 @@ MODULE NewSymFileRW;
       VAR iS, sS : FileNames.NameString;
     BEGIN
       D.getName.Of(i, iS);
-(*
- *    D.getName.Of(s, sS);
- *    S.SemError.RepSt2(172, iS, sS, S.line, S.col);
- *)
       S.SemError.RepSt2(172, iS, s, S.line, S.col);
     END Report;
 
@@ -1279,7 +1265,7 @@ MODULE NewSymFileRW;
     | setSy : expr := ExprDesc.mkSetLt(BITS(f.iAtt));
     | strSy : expr := ExprDesc.mkStrLenLt(f.strAtt, f.strLen);
     END;
-    f.GetSym();						(* read past value  *)
+    f.GetSym();                        (* read past value  *)
     RETURN expr;
   END getLiteral;
 
@@ -1289,14 +1275,14 @@ MODULE NewSymFileRW;
     VAR newT : D.Type;
         indx : INTEGER;
   BEGIN
-    IF ord < D.tOffset THEN				(* builtin type	*)	
+    IF ord < D.tOffset THEN                    (* builtin type    *)    
       RETURN B.baseTypeArray[ord];
     ELSIF ord - D.tOffset < f.tArray.tide THEN
       RETURN f.tArray.a[ord - D.tOffset];
     ELSE 
       indx := f.tArray.tide + D.tOffset;
       REPEAT
-        newT := Ty.newTmpTp();
+        newT := Ty.newTmpTp();                 (* a placeholder *)
         newT.dump := indx; INC(indx);
         D.AppendType(f.tArray, newT);
       UNTIL indx > ord;
@@ -1317,10 +1303,10 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)getFormalType(rslt : Ty.Procedure;
-        				     indx : INTEGER) : D.Type,NEW;
+                                             indx : INTEGER) : D.Type,NEW;
   (*
   ** FormalType = [retSy TypeOrd] frmSy {parSy Byte TypeOrd [String]} endFm.
-  //	-- optional phrase is return type for proper procedures
+  //    -- optional phrase is return type for proper procedures
   *)
     VAR parD : Id.ParId;
         byte : INTEGER;
@@ -1336,6 +1322,7 @@ MODULE NewSymFileRW;
       parD.parMod := byte;
       parD.varOrd := indx; 
       parD.type := f.getTypeFromOrd();
+
      (* Skip over optional parameter name string *)
       IF f.sSym = strSy THEN (* parD.hash := Nh.enterStr(f.strAtt); *)
         f.GetSym;
@@ -1350,8 +1337,8 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)pointerType(old : D.Type) : D.Type,NEW;
-  (* Assert: the current symbol ptrSy 		*)
-  (* Pointer   = TypeHeader ptrSy TypeOrd.	*)
+  (* Assert: the current symbol ptrSy         *)
+  (* Pointer   = TypeHeader ptrSy TypeOrd.    *)
     VAR rslt : Ty.Pointer;
         indx : INTEGER;
         junk : D.Type;
@@ -1381,29 +1368,29 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)procedureType() : D.Type,NEW;
-  (* Assert: the current symbol is pTpSy.	*)
-  (* ProcType  = TypeHeader pTpSy FormalType.	*)
+  (* Assert: the current symbol is pTpSy.     *)
+  (* ProcType  = TypeHeader pTpSy FormalType. *)
   BEGIN
-    f.GetSym();		(* read past pTpSy *)
+    f.GetSym();        (* read past pTpSy *)
     RETURN f.getFormalType(Ty.newPrcTp(), 0);
   END procedureType;
 
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)eventType() : D.Type,NEW;
-  (* Assert: the current symbol is evtSy.	*)
-  (* EventType = TypeHeader evtSy FormalType.	*)
+  (* Assert: the current symbol is evtSy.    *)
+  (* EventType = TypeHeader evtSy FormalType.    *)
   BEGIN
-    f.GetSym();		(* read past evtSy *)
+    f.GetSym();        (* read past evtSy *)
     RETURN f.getFormalType(Ty.newEvtTp(), 0);
   END eventType;
 
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)arrayType() : Ty.Array,NEW;
-  (* Assert: at entry the current symbol is arrSy.		     *)
+  (* Assert: at entry the current symbol is arrSy.             *)
   (* Array      = TypeHeader arrSy TypeOrd (Byte | Number | ) endAr. *)
-  (*	-- nullable phrase is array length for fixed length arrays   *)
+  (*    -- nullable phrase is array length for fixed length arrays   *)
     VAR rslt : Ty.Array;
         eTyp : D.Type;
   BEGIN
@@ -1444,11 +1431,14 @@ MODULE NewSymFileRW;
   PROCEDURE^ (f : SymFileReader)variable()  : Id.VarId,NEW;
 (* ============================================ *)
 
+ (*
+  *  Read a record type from the symbol file.
+  *)
   PROCEDURE (f : SymFileReader)recordType(old  : D.Type) : D.Type,NEW;
-  (* Assert: at entry the current symbol is recSy.			*)
-  (* Record     = TypeHeader recSy recAtt [truSy | falSy | <others>] 	*)
-  (*	[basSy TypeOrd] [iFcSy {basSy TypeOrd}]				*)
-  (*	{Name TypeOrd} {Method} {Statics} endRc.			*)
+  (* Assert: at entry the current symbol is recSy.            *)
+  (* Record     = TypeHeader recSy recAtt [truSy | falSy | <others>]     *)
+  (*    [basSy TypeOrd] [iFcSy {basSy TypeOrd}]                *)
+  (*    {Name TypeOrd} {Method} {Statics} endRc.            *)
     CONST 
         vlTp = Ty.valRc;
     VAR rslt : Ty.Record;
@@ -1475,20 +1465,20 @@ MODULE NewSymFileRW;
     IF attr >= Ty.noNew THEN DEC(attr,Ty.noNew); INCL(rslt.xAttr,D.noNew) END;
 
     rslt.recAtt := attr;
-    f.GetSym();				(* Get past recSy rAtt	*)
+    f.GetSym();                (* Get past recSy rAtt    *)
     IF f.sSym = falSy THEN
-      INCL(rslt.xAttr, D.isFn);
+      INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
       f.GetSym();
     ELSIF f.sSym = truSy THEN
-      INCL(rslt.xAttr, D.isFn);
-      INCL(rslt.xAttr, D.fnInf);
-      INCL(rslt.xAttr, D.noCpy);
+      INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
+      INCL(rslt.xAttr, D.fnInf); (* This record is an interface *)
+      INCL(rslt.xAttr, D.noCpy); (* Record has no constructor   *)
       f.GetSym();
     END;
    (* 
-	*  Do not override extrnNm values set
-	*  by *Maker.Init for Native* types.
-	*)
+    *  Do not override extrnNm values set
+    *  by *Maker.Init for Native* types.
+    *)
     IF (f.impS.scopeNm # NIL) & (rslt.extrnNm = NIL) THEN
       rslt.extrnNm := f.impS.scopeNm; 
     END;
@@ -1498,10 +1488,10 @@ MODULE NewSymFileRW;
       *  Do not override baseTp values set
       *  by *Maker.Init for Native* types.
       *)
-	  IF rslt.baseTp = NIL THEN
+      IF rslt.baseTp = NIL THEN
         rslt.baseTp := f.typeOf(f.iAtt);
         IF f.iAtt # Ty.anyRec THEN INCL(rslt.xAttr, D.clsTp) END;
-	  END;
+      END;
       f.GetSym();
     END;
     IF f.sSym = iFcSy THEN
@@ -1569,13 +1559,13 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)enumType() : D.Type,NEW;
-  (* Assert: at entry the current symbol is eTpSy.			*)
-  (* Enum  = TypeHeader eTpSy { Constant} endRc.			*)
+  (* Assert: at entry the current symbol is eTpSy.            *)
+  (* Enum  = TypeHeader eTpSy { Constant} endRc.            *)
     VAR rslt : Ty.Enum;
         cnst : D.Idnt;
   BEGIN
     rslt := Ty.newEnuTp();
-    f.GetSym();				(* Get past recSy 	*)
+    f.GetSym();                (* Get past recSy     *)
     WHILE f.sSym = conSy DO
       f.GetSym();
       cnst := f.constant();
@@ -1589,14 +1579,14 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)Type(),NEW;
-  (* Type       = typSy Name TypeOrd.		*)
+  (* Type       = typSy Name TypeOrd.        *)
     VAR newI : Id.TypId;
         oldI : D.Idnt;
         type : D.Type;
   BEGIN
    (* 
     * Post: every previously unknown typId 'id'
-    *	has the property:  id.type.idnt = id.
+    *   has the property:  id.type.idnt = id.
     *   If oldI # newT, then the new typId has
     *   newT.type.idnt = oldI.
     *)
@@ -1606,39 +1596,43 @@ MODULE NewSymFileRW;
     newI.type := f.getTypeFromOrd(); 
     newI.dfScp := f.impS;
     oldI := testInsert(newI, f.impS);
-
     IF oldI # newI THEN 
       f.tArray.a[newI.type.dump - D.tOffset] := oldI.type;
     END;
-
-    IF newI.type.idnt = NIL THEN newI.type.idnt := oldI END;
+   (*
+    * In the case of symbol files created by J2CPS
+    * it is possible that oldI.vMod may be set to the
+    * default value private (0), while the real definition
+    * in newI should be public. ==> override oldI.vMod !
+    *)
+    IF newI.type.idnt = NIL THEN newI.type.idnt := oldI; oldI.SetMode(newI.vMod); END;
   END Type;
 
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)Import(),NEW;
-  (* Import     = impSy Name [String] Key.	*)
-  (*	-- optional string is external name	*)
-  (* first symbol should be namSy here.		*)
+  (* Import     = impSy Name [String] Key.    *)
+  (*    -- optional string is external name    *)
+  (* first symbol should be namSy here.        *)
     VAR impD : Id.BlkId;
         oldS : Id.BlkId;
         oldD : D.Idnt;
   BEGIN
     impD := Id.newImpId();
-    impD.dfScp := impD;			(* ImpId define their own scope *)
+    impD.dfScp := impD;            (* ImpId define their own scope *)
 
     INCL(impD.xAttr, D.weak);
     impD.SetMode(f.iAtt);
     impD.hash := Nh.enterStr(f.strAtt);
     f.ReadPast(namSy); 
-    IF impD.hash = f.modS.hash THEN	(* Importing own imp indirectly	*)
-        				(* Shouldn't this be an error?  *)
+    IF impD.hash = f.modS.hash THEN    (* Importing own imp indirectly    *)
+                        (* Shouldn't this be an error?  *)
       D.AppendScope(f.sArray, f.modS);
       IF f.sSym = strSy THEN 
         (* probably don't need to do anything here ... *)
         f.GetSym();
       END;
-    ELSE				(* Importing some other module.	*)
+    ELSE                (* Importing some other module.    *)
       oldD := testInsert(impD, f.modS);
       IF f.sSym = strSy THEN 
         impD.scopeNm := Lt.arrToCharOpen(f.strAtt, f.strLen);
@@ -1648,9 +1642,9 @@ MODULE NewSymFileRW;
         oldS := oldD(Id.BlkId);
         D.AppendScope(f.sArray, oldS);
         IF (oldS.modKey # 0) & (f.iAtt # oldS.modKey) THEN
-          S.SemError.RepSt1(133,		(* Detected bad KeyVal	*)
-        	Nh.charOpenOfHash(impD.hash)^, 
-        	S.line, S.col);
+          S.SemError.RepSt1(133,        (* Detected bad KeyVal    *)
+            Nh.charOpenOfHash(impD.hash)^, 
+            S.line, S.col);
         END;
       ELSE
         D.AppendScope(f.sArray, impD);
@@ -1663,9 +1657,9 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)constant() : Id.ConId,NEW;
-  (* Constant = conSy Name Literal.		*)
+  (* Constant = conSy Name Literal.        *)
   (* Name     = namSy byte UTFstring.           *)
-  (* Assert: f.sSym = namSy.			*)
+  (* Assert: f.sSym = namSy.            *)
     VAR newC : Id.ConId;
         anyI : D.Idnt;
   BEGIN
@@ -1682,7 +1676,7 @@ MODULE NewSymFileRW;
 (* ============================================ *)
 
   PROCEDURE (f : SymFileReader)variable() : Id.VarId,NEW;
-  (* Variable   = varSy Name TypeOrd.		*)
+  (* Variable   = varSy Name TypeOrd.        *)
     VAR newV : Id.VarId;
         anyI : D.Idnt;
   BEGIN
@@ -1713,10 +1707,10 @@ MODULE NewSymFileRW;
      (* and leave scopeNm = NIL *)
       f.GetSym();
     END;
-    IF f.sSym = truSy THEN	(* ### this is a constructor ### *)
+    IF f.sSym = truSy THEN    (* ### this is a constructor ### *)
       f.GetSym();
       newP.setPrcKind(Id.ctorP);
-    END;			(* ### this is a constructor ### *)
+    END;            (* ### this is a constructor ### *)
     newP.type := f.getFormalType(Ty.newPrcTp(), 0);
     (* IF this is a java module, do some semantic checks *)
     (* ... *)
@@ -1770,7 +1764,7 @@ MODULE NewSymFileRW;
 
   PROCEDURE (f : SymFileReader)TypeList(),NEW;
   (* TypeList   = start { Array | Record | Pointer      *)
-  (*		  | ProcType | Vector} close.           *)
+  (*          | ProcType | Vector} close.           *)
   (* TypeHeader = tDefS Ord [fromS Ord Name].           *)
     VAR modOrd : INTEGER;
         typOrd : INTEGER;
@@ -1786,18 +1780,19 @@ MODULE NewSymFileRW;
 
    (* ================================ *)
     PROCEDURE getDetails(f : SymFileReader; p : D.Type) : D.Type;
+      VAR rslt : D.Type;
     BEGIN
       CASE f.sSym OF
-      | arrSy : RETURN f.arrayType();
-      | vecSy : RETURN f.vectorType();
-      | recSy : RETURN f.recordType(p);
-      | pTpSy : RETURN f.procedureType();
-      | evtSy : RETURN f.eventType();
-      | eTpSy : RETURN f.enumType();
-      | ptrSy : RETURN f.pointerType(p);
-      ELSE 
-                RETURN Ty.newNamTp();
+      | arrSy : rslt := f.arrayType();      
+      | vecSy : rslt := f.vectorType();     
+      | recSy : rslt := f.recordType(p); 
+      | pTpSy : rslt := f.procedureType();
+      | evtSy : rslt := f.eventType();
+      | eTpSy : rslt := f.enumType();
+      | ptrSy : rslt := f.pointerType(p);   
+      ELSE      rslt := Ty.newNamTp();      
       END;
+      RETURN rslt;
     END getDetails;
    (* ================================ *)
   BEGIN
@@ -1904,6 +1899,8 @@ MODULE NewSymFileRW;
       END;
       f.tArray.a[typIdx] := tpDesc;
     END; (* while *)
+
+
     FOR linkIx := 0 TO f.tArray.tide - 1 DO
       tpDesc := f.tArray.a[linkIx];
      (*
@@ -1926,7 +1923,7 @@ MODULE NewSymFileRW;
       *
       *    set = {D.weak}            ==> module must be imported, but is not
       *                                   on the import worklist at this stage
-      *    set = {D.weak, D.need}   ==> module must be imported, and is 
+      *    set = {D.weak, D.need}    ==> module must be imported, and is 
       *                                   already on the import worklist.
       *)
       IF tpDesc # NIL THEN
@@ -1943,7 +1940,7 @@ MODULE NewSymFileRW;
               END;
             END;
           END;
-        ELSE (* skip *)
+        ELSE (* skip other types *)
         END; (* with *)
       END;
     END; (* for linkIx do *)
@@ -1953,7 +1950,7 @@ MODULE NewSymFileRW;
     *)
     NEW(typeFA);
     typeFA.sym := f;
-    f.impS.symTb.Apply(typeFA); 
+    f.impS.symTb.Apply(typeFA); (* Apply a TypeLinker to the sym-tab *)
     f.ReadPast(close);
    (*
     *  Now check that all overloaded ids are necessary
@@ -1969,8 +1966,8 @@ MODULE NewSymFileRW;
   PROCEDURE (f : SymFileReader)SymFile(IN nm : ARRAY OF CHAR),NEW;
    (*
    // SymFile    = Header [String (falSy | truSy | <others>)]
-   //		{Import | Constant | Variable | Type | Procedure} 
-   //		TypeList Key.
+   //        {Import | Constant | Variable | Type | Procedure} 
+   //        TypeList Key.
    // Header     = magic modSy Name.
    //
    //  magic has already been recognized.
@@ -2084,9 +2081,11 @@ MODULE NewSymFileRW;
 (* ============================================================ *)
 
   PROCEDURE (t : TypeLinker)Op*(id : D.Idnt);
+    VAR oldT : D.Type;
   BEGIN
     IF id.type = NIL THEN RETURN
     ELSIF id.type.kind = Ty.tmpTp THEN
+      oldT := id.type;
       id.type := Ty.update(t.sym.tArray, id.type);
     ELSE
       id.type.TypeFix(t.sym.tArray);
@@ -2101,7 +2100,10 @@ MODULE NewSymFileRW;
 
   PROCEDURE (t : ResolveAll)Op*(id : D.Idnt);
   BEGIN
-    IF id.type # NIL THEN id.type := id.type.resolve(1) END;
+    IF id.type # NIL THEN
+      IF id.namStr = NIL THEN id.SetNameFromHash(id.hash) END;
+      id.type := id.type.resolve(1);
+   END;
   END Op;
 
 (* ============================================================ *)
@@ -2154,18 +2156,18 @@ MODULE NewSymFileRW;
       INC(indx);
     END;
    (*
-	* If sysLib has NOT been explicitly imported, then
-	* insert dummy definitions for the native object methods
-	* so that user code may explictly extend RTS.NativeObject
-	* and override these methods.
-	*)
-	IF ~(D.fixd IN CSt.sysLib.xAttr) THEN 
-	  CSt.ImportObjectFeatures();
-	END;
+    * If sysLib has NOT been explicitly imported, then
+    * insert dummy definitions for the native object methods
+    * so that user code may explictly extend RTS.NativeObject
+    * and override these methods.
+    *)
+    IF ~(D.fixd IN CSt.sysLib.xAttr) THEN 
+         CSt.ImportObjectFeatures();
+    END;
     FOR indx := 0 TO fScp.work.tide-1 DO
       blkI := fScp.work.a[indx](Id.BlkId);
       NEW(rAll);
-      blkI.symTb.Apply(rAll);
+      blkI.symTb.Apply(rAll); (* Apply ResolveAll to sym-tab *)
     END;
    (*
     *  Copy the (possibly mutated) sequence out.

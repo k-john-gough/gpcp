@@ -35,7 +35,8 @@ MODULE N2State;
 
   CONST prefix = "PeToCps: ";
         abtMsg = " ... Aborting";
-        usgMsg = 'Usage: "PeToCps [options] filenames"';
+        usgMsg1 = 'Usage: "PeToCps /mscorlib [options]"';
+        usgMsg2 = '       "PeToCps [options] filenames"';
 
  (* ---------------------------------------------------------- *)
 
@@ -52,7 +53,6 @@ MODULE N2State;
         Verbose-  : BOOLEAN;
         superVb-  : BOOLEAN;
         generics- : BOOLEAN;
-        legacy-   : BOOLEAN;
         cpCmpld-  : BOOLEAN;
 
  (* ---------------------------------------------------------- *)
@@ -64,8 +64,10 @@ MODULE N2State;
         initBkt-  : INTEGER;
         srcNam-   : CharOpen;
         basNam-   : CharOpen;
-        impSeq*   : Sy.ScpSeq;
+        impSeq*   : Sy.ScpSeq;   (* All the scopes known to this PE file *)
         typSeq-   : Sy.TypeSeq;
+
+       ignoreBlk* : Id.BlkId; (* symTb for generic classes *)
 
  (* ---------------------------------------------------------- *)
 
@@ -94,10 +96,10 @@ MODULE N2State;
     Nh.InitNameHash(hashSize);
     srcNam := BOX(src$);
     basNam := BOX(bas$);
-    isCorLib := (bas = "mscorlib");
-
     CompState.CreateThisMod;
     thisMod := CompState.thisMod;
+
+    NEW(ignoreBlk);
 
     Sy.ResetScpSeq(impSeq);
     ctorBkt := Nh.enterStr(".ctor");
@@ -113,7 +115,8 @@ MODULE N2State;
     IF Sy.refused(blk, thisMod) THEN 
       AbortMsg("BlkId insert failure -- " + Nh.charOpenOfHash(blk.hash)^);
     END;
-    Sy.AppendScope(impSeq, blk)
+	(* Append this BlkId to the global import sequence *)
+    Sy.AppendScope(impSeq, blk); 
   END BlkIdInit;
 
  (* ------------------------------------- *)
@@ -163,6 +166,7 @@ MODULE N2State;
       impB := impSeq.a[indx];
       IF impB # mod THEN
         impB.SetKind(Id.impId);
+		impB(Id.BlkId).impOrd := 0;
       END;
     END;
   END ResetBlkIdFlags;
@@ -186,6 +190,11 @@ MODULE N2State;
     IF verbose THEN Message(str) END;
   END CondMsg;
 
+  PROCEDURE VerbMsg*(IN str : ARRAY OF CHAR);
+  BEGIN
+    IF Verbose THEN Message(str) END;
+  END VerbMsg;
+
   PROCEDURE AbortMsg*(IN str : ARRAY OF CHAR);
   BEGIN
     Error.WriteString(prefix);
@@ -196,22 +205,19 @@ MODULE N2State;
     
   PROCEDURE Usage();
   BEGIN
-    Message(usgMsg); 
+    Message(usgMsg1); 
+    Message(usgMsg2); 
     Message("filenames should have explicit .EXE or .DLL extension"); 
     IF netDflt THEN
       WLn("Options: /big       ==> allocate huge hash table");
       WLn("         /copyright ==> display copyright notice");
-      WLn("         /generics  ==> enable CLI v2.0 generics");
       WLn("         /help      ==> display this message");
-      WLn("         /legacy    ==> produce compatible symbol file");
       WLn("         /verbose   ==> chatter on about progress"); 
       WLn("         /Verbose   ==> go on and on and on about progress"); 
     ELSE
       WLn("Options: -big       ==> allocate huge hash table");
       WLn("         -copyright ==> display copyright notice");
-      WLn("         -generics  ==> enable CLI v2.0 generics");
       WLn("         -help      ==> display this message");
-      WLn("         -legacy    ==> produce compatible symbol file");
       WLn("         -verbose   ==> chatter on about progress"); 
       WLn("         -Verbose   ==> go on and on and on about progress"); 
     END;
@@ -269,7 +275,10 @@ MODULE N2State;
 
   PROCEDURE ParseOption*(IN arg : ARRAY OF CHAR);
   BEGIN
-    IF    arg = "-big" THEN
+    IF    arg = "-mscorlib" THEN
+	    isCorLib := TRUE;
+		hashSize := 40000; (* for sure, mscorlib *needs* /big *)
+    ELSIF arg = "-big" THEN
         hashSize := 40000;
     ELSIF arg = "-verbose" THEN
         verbose := TRUE;
@@ -279,11 +288,10 @@ MODULE N2State;
         verbose := TRUE;
         Verbose := TRUE;
         superVb := FALSE;
-    ELSIF arg = "-generics" THEN
-        generics := TRUE;
-    ELSIF arg = "-legacy" THEN
-        legacy := TRUE;
-        CompState.legacy := TRUE;
+   (*
+    * ELSIF arg = "-generics" THEN
+    *    generics := TRUE;
+	*)
     ELSIF arg = "-VERBOSE" THEN
         verbose := TRUE;
         Verbose := TRUE;
@@ -315,7 +323,6 @@ BEGIN
   verbose  := FALSE;
   Verbose  := FALSE;
   superVb  := FALSE;
-  legacy   := FALSE;
   cpCmpld  := FALSE; (* pending the custom attribute *)
   hashSize := 5000;
   Sy.InitScpSeq(impSeq, 10);

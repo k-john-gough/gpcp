@@ -8,6 +8,7 @@
 MODULE CPascalErrors;
 
   IMPORT 
+        RTS,
 	GPCPcopyright,
 	GPTextFiles,
 	Console,
@@ -42,12 +43,12 @@ MODULE CPascalErrors;
   VAR
       parsHdlr : ParseHandler;
       semaHdlr : SemanticHdlr;
-      eBuffer  : ErrBuff;	(* Invariant: eBuffer[eTide] = NIL *)
-      eLimit   : INTEGER;	(* High index of dynamic array.    *)
-      eTide    : INTEGER;	(* Next index for insertion in buf *)
-      prompt*  : BOOLEAN;	(* Emit error message immediately  *)
-      nowarn*  : BOOLEAN;	(* Don't store warning messages    *)
-	  no239Err*: BOOLEAN;   (* Don't emit 239 while TRUE       *)
+      eBuffer  : ErrBuff; (* Invariant: eBuffer[eTide] = NIL *)
+      eLimit   : INTEGER; (* High index of dynamic array.    *)
+      eTide    : INTEGER; (* Next index for insertion in buf *)
+      prompt*  : BOOLEAN; (* Emit error message immediately  *)
+      nowarn*  : BOOLEAN; (* Don't store warning messages    *)
+      no239Err*: BOOLEAN; (* Don't emit 239 while TRUE       *)
       srcNam   : FileNames.NameString;
       forVisualStudio* : BOOLEAN;
       xmlErrors* : BOOLEAN;
@@ -419,7 +420,7 @@ MODULE CPascalErrors;
     | 153: str := "Bound type of foreign reference type cannot be value param";
     | 154: str := "It is not possible to extend an interface type";
     | 155: str := "NEW illegal unless foreign supertype has no-arg constructor";
-    | 156: str := "Interfaces can't extend anything. Leave blank or use ANYREC";
+    | 156: str := "Interfaces can only extend ANYREC or the target Object type";
     | 157: str := "Only extensions of Foreign classes can implement interfaces";
     | 158: str := "Additional base types must be interface types";
     | 159: str := "Not all interface methods were implemented";
@@ -594,9 +595,25 @@ MODULE CPascalErrors;
 			+ s1 + "> must be extensible");
     | 121: msg := LitValue.strToCharOpen("Missing methods <" + s1 + '>');
     | 145: msg := LitValue.strToCharOpen("Types on cycle <" + s1 + '>');
-    | 129, 
-      130, 
-      132: msg := LitValue.strToCharOpen("Filename <" + s1 + '>');
+
+    | 129: msg := LitValue.strToCharOpen (
+               "Cannot open symbol file <" + s1 + ">" );
+           StoreError(num,lin,0,msg);    
+           INC(Scnr.errors); 
+           RETURN;
+
+    | 130: msg := LitValue.strToCharOpen(
+               "Bad magic number in symbol file <" + s1 + ">" );
+           StoreError(num,lin,0,msg);    
+           INC(Scnr.errors); 
+           RETURN;
+
+    | 132: msg := LitValue.strToCharOpen(
+               "Corrupted symbol file <" + s1 + ">" );
+           StoreError(num,lin,0,msg);    
+           INC(Scnr.errors); 
+           RETURN;
+
     | 133: msg := LitValue.strToCharOpen("Module <" 
 			+ s1 + "> already imported with different key");
     | 138: msg := LitValue.strToCharOpen('<' 
@@ -646,14 +663,6 @@ MODULE CPascalErrors;
       StoreError(num,lin,0,msg);         (* (1) Store THIS message *)
       h.Report(num,lin,col);             (* (2) Generate other msg *)
     END;
-(*
- *  IF (num # 251) & (num # 252) THEN 
- *    StoreError(num,lin,col,msg); 
- *    h.Report(num,lin,col);
- *  ELSIF ~nowarn THEN
- *    StoreError(num,lin,col,msg); 
- *  END;
- *)
   END RepSt1;
 
 (* ============================================================ *)
@@ -661,12 +670,6 @@ MODULE CPascalErrors;
   PROCEDURE (h : SemanticHdlr)RepSt2*(num      : INTEGER;
 				      IN s1,s2 : ARRAY OF CHAR;
 				      lin,col  : INTEGER); 
-(*
- *  VAR str : ARRAY 128 OF CHAR;
- *      msg : Message;
- *      idx : INTEGER;
- *      len : INTEGER;
- *)
     VAR msg : Message;
   BEGIN
     CASE num OF
@@ -683,6 +686,14 @@ MODULE CPascalErrors;
                   "Inherited retType is " + s1 + ", this retType " + s2);
     | 131: msg := LitValue.strToCharOpen(
                   "Module name in file <" + s1 + ".cps> was <" + s2 + '>');
+    | 156: msg := LitValue.strToCharOpen(
+        "Interfaces can only extend ANYREC or the target Object type" + 
+        RTS.eol^ + "     Interface <" + s1 + "> has invalid base type" + 
+        RTS.eol^ + "     Basetype <" + s2 + "> is not the target Object type");
+        StoreError(156, lin, col, msg);
+        INC(Scnr.errors); 
+        RETURN; 
+
     | 172: msg := LitValue.strToCharOpen(
                   'Name <' + s1 + '> clashes in scope <' + s2 + '>');
     | 230: msg := LitValue.strToCharOpen(
@@ -690,14 +701,6 @@ MODULE CPascalErrors;
     | 309: msg := LitValue.strToCharOpen(
                   'Looking for module "' + s1 + '" in file <' + s2 + '>');
     END;
-(*
- *  len := LEN(str$);
- *  NEW(msg, len+1);
- *  FOR idx := 0 TO len-1 DO
- *    msg[idx] := str[idx];
- *  END;
- *  msg[len] := 0X;
- *)
     StoreError(num,lin,col,msg); 
     h.Report(num,lin,col);
   END RepSt2;

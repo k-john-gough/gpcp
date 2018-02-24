@@ -247,78 +247,88 @@ MODULE CompState;
 
 PrintLn("       $ gpcp [cp-options] file {file}");
 PrintLn("# CP Options ...");
-PrintLn("       /bindir=XXX  ==> Place binary files in directory XXX");
+PrintLn("  General Options ---");
 PrintLn("       /copyright   ==> Display copyright notice");
-PrintLn("       /cpsym=XXX   ==> Use environ. variable XXX instead of CPSYM");
-PrintLn("       /debug       ==> Generate debugging information (default)");
-PrintLn("       /nodebug     ==> Give up debugging for maximum speed");
 PrintLn("       /dostats     ==> Give a statistical summary");
-PrintLn("       /extras      ==> Enable experimental compiler features");
 PrintLn("       /help        ==> Write out this usage message");
-PrintLn("       /hsize=NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
-PrintLn("       /ilasm       ==> Force compilation via ILASM");
 PrintLn("       /list        ==> (default) Create *.lst file if errors");
 PrintLn("       /list+       ==> Unconditionally create *.lst file");
 PrintLn("       /list-       ==> Don't create error *.lst file");
-PrintLn("       /noasm       ==> Don't create asm (or object) files");
-PrintLn("       /nocode      ==> Don't create any object files");
-PrintLn("       /nocheck     ==> Don't perform arithmetic overflow checks");
-PrintLn("       /nosym       ==> Don't create *.sym (or asm or object) files");
-PrintLn("       /perwapi     ==> Force compilation via PERWAPI");
 PrintLn("       /quiet       ==> Compile silently if possible");
-PrintLn("       /strict      ==> Disallow non-standard constructs");
-PrintLn("       /special     ==> Compile dummy symbol file");
-PrintLn("       /symdir=XXX  ==> Place symbol files in directory XXX");
-PrintLn("       /target=XXX  ==> Emit (jvm|net) assembly");
-PrintLn("       /unsafe      ==> Allow unsafe code generation");
-PrintLn("       /vX.X        ==> (v1.0 | v1.1 | v2.0) CLR target version");
 PrintLn("       /verbose     ==> Emit verbose diagnostics");
 PrintLn("       /version     ==> Write out version number");
-PrintLn("       /vserror     ==> Print error messages in Visual Studio format");
 PrintLn("       /warn-       ==> Don't emit warnings");
 PrintLn("       /nowarn      ==> Don't emit warnings");
-PrintLn("       /whidbey     ==> Target code for Whidbey Beta release");
+PrintLn("  Environment Options ---");
+PrintLn("       /cpsym=XXX   ==> Use environ. variable XXX instead of CPSYM");
+PrintLn("       /hsize=NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
+PrintLn("       /special     ==> Compile dummy symbol file");
+PrintLn("       /strict      ==> Disallow non-standard constructs");
+PrintLn("  Output Options ---");
+PrintLn("       /bindir=XXX  ==> Place binary files in directory XXX");
+PrintLn("       /debug       ==> Generate debugging information (default)");
+PrintLn("       /noasm       ==> Don't create asm (or object) files");
+PrintLn("       /nocheck     ==> Don't perform arithmetic overflow checks");
+PrintLn("       /nocode      ==> Don't create any object files");
+PrintLn("       /nodebug     ==> Give up debugging for maximum speed");
+PrintLn("       /nosym       ==> Don't create *.sym (or asm or object) files");
+PrintLn("       /quiet       ==> Compile silently if possible");
+PrintLn("       /symdir=XXX  ==> Place symbol files in directory XXX");
+PrintLn("  Code Generation Options ---");
+PrintLn("       /ilasm       ==> (default) Force compilation via ILASM emitter");
+PrintLn("       /target=XXX  ==> Emit (jvm|net) assembly");
+PrintLn("       /unsafe      ==> Allow unsafe code generation");
+PrintLn("       /vserror     ==> Print error messages in Visual Studio format");
 PrintLn("       /xmlerror    ==> Emit error messages in XML format");
 PrintLn(' Unix-style options: "-option" are recognized also');
 
+(* PrintLn("       /extras      ==> Enable experimental compiler features"); *)
+(* PrintLn("       /perwapi     ==> Force compilation via PERWAPI (Deprecated) "); *)
+(* PrintLn("       /vX.X        ==> (v1.0 | v1.1 | v2.0) CLR target version"); *)
+(* PrintLn("       /whidbey     ==> Target code for Whidbey Beta release"); *)
+
       ELSIF RTS.defaultTarget = "jvm" THEN
 
-PrintLn("       $ cprun gpcp [cp-options] file {file}, OR");
-PrintLn("       $ java [java-options] CP.gpcp.gpcp [cp-options] file {file}");
+PrintLn("       $ gpcp [cp-options] file {file}");
 PrintLn("# CP Options ...");
-PrintLn("       -asm7        ==> Default: Generate class files with V1_7 format");
-PrintLn("       -asmN        ==> Classfiles use V1_N format, N = (5 .. 8)");
-PrintLn("       -clsdir:XXX  ==> Set class tree root in directory XXX");
+PrintLn("  General Options ---");
 PrintLn("       -copyright   ==> Display copyright notice");
-PrintLn("       -cpsym:XXX   ==> Use environ. variable XXX instead of CPSYM");
 PrintLn("       -dostats     ==> Give a statistical summary");
-PrintLn("       -extras      ==> Enable experimental compiler features");
 PrintLn("       -help        ==> Write out this usage message");
-PrintLn("       -hsize:NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
-PrintLn("       -jasmin      ==> Ceate asm files and run Jasmin");
-PrintLn("       -legacy      ==> Use the pre-v1.4 jvm class writer");
 PrintLn("       -list        ==> (default) Create *.lst file if errors");
 PrintLn("       -list+       ==> Unconditionally create *.lst file");
 PrintLn("       -list-       ==> Don't create error *.lst file");
-PrintLn("       -nocode      ==> Don't create any object files");
-PrintLn("       -noasm       ==> Don't create asm (or object) files");
-PrintLn("       -nosym       ==> Don't create *.sym (or asm or object) files");
 PrintLn("       -quiet       ==> Compile silently if possible");
-PrintLn("       -special     ==> Compile dummy symbol file");
-PrintLn("       -strict      ==> Disallow non-standard constructs");
-PrintLn("       -symdir:XXX  ==> Place symbol files in directory XXX");
-PrintLn("       -target:XXX  ==> Emit (jvm|net) assembly");
 PrintLn("       -verbose     ==> Emit verbose diagnostics");
 PrintLn("       -version     ==> Write out version number");
 PrintLn("       -warn-       ==> Don't emit warnings");
 PrintLn("       -nowarn      ==> Don't emit warnings");
+PrintLn("  Environment Options ---");
+PrintLn("       -clsdir:XXX  ==> Set class tree root in directory XXX");
+PrintLn("       -cpsym:XXX   ==> Use environ. variable XXX instead of CPSYM");
+PrintLn("       -hsize:NNN   ==> Set hashtable size >= NNN (0 .. 65000)");
+PrintLn("       -special     ==> Compile dummy symbol file");
+PrintLn("       -strict      ==> Disallow non-standard constructs");
+PrintLn("  Output Options ---");
+PrintLn("       -noasm       ==> Don't create asm (or object) files");
+PrintLn("       -nocode      ==> Don't create any object files");
+PrintLn("       -nosym       ==> Don't create *.sym (or asm or object) files");
+PrintLn("       -symdir:XXX  ==> Place symbol files in directory XXX");
 PrintLn("       -xmlerror    ==> Emit error messages in XML format");
+PrintLn("  Code Generation Options ---");
+PrintLn("       -asm7        ==> Default: Generate class files with V1_7 format");
+PrintLn("       -asmN        ==> Classfiles use V1_N format, N = (5 .. 8)");
+PrintLn("       -jasmin      ==> Create jasmin asm files (but do not run Jasmin)");
+PrintLn("       -legacy      ==> Use the pre-v1.4 jvm class writer");
+PrintLn("       -target:XXX  ==> Emit (jvm|net) assembly");
+
+(* PrintLn("       -extras      ==> Enable experimental compiler features"); *)
 
         IF RTS.defaultTarget = "jvm" THEN
 
 PrintLn("# Java Options ...");
 PrintLn("       -D<name>=<value>  pass <value> to JRE as system property <name>");
-PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JRE");
+PrintLn("       -DCPSYM=%CPSYM%   pass value of CPSYM environment variable to JRE");
 
         END;
       END;
@@ -471,7 +481,7 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           copy[6] := 0X;
           IF copy = "help" THEN
             doHelp := TRUE;
-          ELSIF copy = "hsize=" THEN
+          ELSIF (copy = "hsize=") OR (copy = "hsize:") THEN
             ParseSize(opt);
           ELSE
             Unknown(opt);
@@ -480,6 +490,7 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           IF copy = "ilasm" THEN 
             forceIlasm := TRUE;
             expectedNet := TRUE;
+            Message("ILASM is default emitter for this build");
           ELSE 
             Unknown(opt);
           END;
@@ -528,10 +539,13 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
           ELSE 
             Unknown(opt);
           END;
-          | "p" :
+      | "p" :
           IF copy = "perwapi" THEN
-            forcePerwapi := TRUE;
-            expectedNet := TRUE;
+           (*
+            * forcePerwapi := TRUE;
+            * expectedNet := TRUE;
+            *)
+            Message("PERWAPI is not supported for this build");
           ELSE
             Unknown(opt);
           END;
@@ -655,12 +669,18 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
       *  If gpcp is running on the CLR, then (currently) 
       *  the asm5 emitter is not supported.
       *)
-      IF (RTS.defaultTarget = "net") & doAsm5  THEN
-        Message
-          ("WARNING - gpcp-CLR does not support ASM5, using -legacy emitter"); 
-        doDWC      := TRUE;
-        doCode     := TRUE;
-        doAsm5     := FALSE;
+      IF (RTS.defaultTarget = "net") & (target = "jvm") THEN
+        IF doAsm5  THEN
+          Message
+            ("WARNING - gpcp-CLR does not support ASM5, using -legacy emitter"); 
+          doDWC      := TRUE;
+          doCode     := TRUE;
+          doAsm5     := FALSE;
+        ELSIF ~doDWC THEN
+          Message
+            ("gpcp-CLR will use the -legacy JVM emitter"); 
+          doDWC      := TRUE;
+        END;
       END;
      (* 
       *  If debug is set, for this version, ILASM is used unless /perwapi is explicit
@@ -668,7 +688,9 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
       *)
       IF forceIlasm THEN      doIlasm := TRUE;
       ELSIF forcePerwapi THEN doIlasm := FALSE;
-      ELSE                    doIlasm := debug;
+      ELSE                    
+        (* In version 1.4.0* doIlasm is always true, even with /nodebug *)
+                              doIlasm := TRUE; (* debug; *)
       END;
     END CheckOptionsOK;
 
@@ -744,9 +766,9 @@ PrintLn("       -DCPSYM=$CPSYM    pass value of CPSYM environment variable to JR
     unsafe      := FALSE;
     doStats     := FALSE;
     doJsmn      := FALSE;
-    doIlasm     := TRUE;
+    doIlasm     := TRUE;   (* doIlasm is the default currently *)
     forceIlasm  := FALSE;
-    forcePerwapi := FALSE;
+    forcePerwapi := FALSE; (* and stays false in 1.4.04 *)
     doCode      := TRUE;
     doAsm       := TRUE;
     doAsm5      := (RTS.defaultTarget = "jvm");

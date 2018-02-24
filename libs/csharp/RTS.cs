@@ -6,9 +6,9 @@
  *  Merged version for N2CPS, gpcp etc.  SYChan, KJGough. 19-Aug-2001.
  */
 
-#if !BETA1
-  #define BETA2
-#endif
+using System;
+using System.IO;
+using System.Collections.Generic;
 
 public class RTS
 // Known in ILASM as [RTS]RTS
@@ -24,33 +24,33 @@ public class RTS
 /* ------------------------------------------------------------ */
 
   public static char[] defaultTarget = {'n','e','t','\0'};
-  public static char[] eol = NativeStrings.mkArr(System.Environment.NewLine);
+  public static char[] eol = NativeStrings.mkArr(Environment.NewLine);
 
-  public static double dblPosInfinity = System.Double.PositiveInfinity;
-  public static double dblNegInfinity = System.Double.NegativeInfinity;
-  public static float  fltPosInfinity = System.Single.PositiveInfinity;
-  public static float  fltNegInfinity = System.Single.NegativeInfinity;
+  public static double dblPosInfinity = Double.PositiveInfinity;
+  public static double dblNegInfinity = Double.NegativeInfinity;
+  public static float  fltPosInfinity = Single.PositiveInfinity;
+  public static float  fltNegInfinity = Single.NegativeInfinity;
 
   private static char[] ChrNaN    = {'N','a','N','\0'};
   private static char[] ChrPosInf = {'I','n','f','i','n','i','t','y','\0'};
   private static char[] ChrNegInf = {'-','I','n','f','i','n','i','t','y','\0'};
-  private static System.String StrNaN    = new System.String(ChrNaN); 
-  private static System.String StrPosInf = new System.String(ChrPosInf);
-  private static System.String StrNegInf = new System.String(ChrNegInf);
+  private static String StrNaN    = new String(ChrNaN); 
+  private static String StrPosInf = new String(ChrPosInf);
+  private static String StrNegInf = new String(ChrNegInf);
 
-  private static System.Type typDouble = System.Type.GetType("System.Double");
-  private static System.Type typSingle = System.Type.GetType("System.Single");
+  private static Type typDouble = Type.GetType("System.Double");
+  private static Type typSingle = Type.GetType("System.Single");
 
-  private static System.IFormatProvider invarCulture = 
-             (System.IFormatProvider) new System.Globalization.CultureInfo("");
-  private static System.IFormatProvider currentCulture = 
-      (System.IFormatProvider) System.Globalization.CultureInfo.CurrentCulture;
+  private static IFormatProvider invarCulture = 
+             (IFormatProvider) new System.Globalization.CultureInfo("");
+  private static IFormatProvider currentCulture = 
+      (IFormatProvider) System.Globalization.CultureInfo.CurrentCulture;
 
 /* -------------------------------------------------------------------- */
 //  PROCEDURE getStr*(x : NativeException) : RTS.CharOpen; END getStr;
 //
     	// Known in ILASM as [RTS]RTS::getStr
-	public static char[] getStr(System.Exception inp)
+	public static char[] getStr(Exception inp)
 	{
 	    return CP_rts.strToChO(inp.ToString());
 	}
@@ -65,9 +65,9 @@ public class RTS
 				     out bool  o, 	// OUT param
 				     out bool  r)	// OUT param
 	{
-	    System.String bstr = new System.String(str);
+	    String bstr = new String(str);
 	    try {
-		o = System.Boolean.Parse(bstr);
+		o = Boolean.Parse(bstr);
 		r = true;
 	    } catch {
 		o = false;
@@ -79,7 +79,7 @@ public class RTS
 //   PROCEDURE TypeName(typ : NativeType) : CharOpen
 //  (* Get the name of the argument type *)
 //
-    public static char[] TypeName(System.Type t) { 
+    public static char[] TypeName(Type t) { 
       return NativeStrings.mkArr(t.FullName);
     }
 
@@ -105,9 +105,9 @@ public class RTS
 				     out sbyte  o, 	// OUT param
 				     out bool  r)	// OUT param
 	{
-	    System.String bstr = new System.String(str);
+	    String bstr = new String(str);
 	    try {
-		o = System.SByte.Parse(bstr);
+		o = SByte.Parse(bstr);
 		r = true;
 	    } catch {
 		o = 0;
@@ -125,9 +125,9 @@ public class RTS
 				     out sbyte  o, 	// OUT param
 				     out bool  r)	// OUT param
 	{
-	    System.String bstr = new System.String(str);
+	    String bstr = new String(str);
 	    try {
-		o = (sbyte)System.Byte.Parse(bstr);
+		o = (sbyte)Byte.Parse(bstr);
 		r = true;
 	    } catch {
 		o = (sbyte)0;
@@ -143,9 +143,9 @@ public class RTS
 				     out sbyte  o, 	// OUT param
 				     out bool  r)	// OUT param
 	{
-	    System.String bstr = new System.String(str);
+	    String bstr = new String(str);
 	    try {
-		o = (sbyte)System.Byte.Parse
+		o = (sbyte)Byte.Parse
                            (bstr, System.Globalization.NumberStyles.HexNumber);
 		r = true;
 	    } catch {
@@ -164,9 +164,9 @@ public class RTS
 				     out short  o,	// OUT param
 				     out bool r)	// OUT param
 	{
-	    System.String sstr = new System.String(str);
+	    String sstr = new String(str);
 	    try {
-		o = System.Int16.Parse(sstr);
+		o = Int16.Parse(sstr);
 		r = true;
 	    } catch {
 		o = (short) 0;
@@ -184,9 +184,9 @@ public class RTS
 				     out short  o,	// OUT param
 				     out bool r)	// OUT param
 	{
-	    System.String sstr = new System.String(str);
+	    String sstr = new String(str);
 	    try {
-		o = (short)System.UInt16.Parse(sstr);
+		o = (short)UInt16.Parse(sstr);
 		r = true;
 	    } catch {
 		o = (short) 0;
@@ -204,9 +204,9 @@ public class RTS
 				    out int  o,		// OUT param
 				    out bool r)		// OUT param
 	{
-	    System.String lstr = new System.String(str);
+	    String lstr = new String(str);
 	    try {
-		o = System.Int32.Parse(lstr);
+		o = Int32.Parse(lstr);
 		r = true;
 	    } catch {
 		o = 0;
@@ -224,7 +224,7 @@ public class RTS
 				    out int o,		// OUT param
 				    out bool r)		// OUT param
 	{
-	    System.String lstr = new System.String(str);
+	    String lstr = new String(str);
 	    try {
 		o = (int)System.UInt32.Parse(lstr);
 		r = true;
@@ -471,26 +471,14 @@ public class RTS
         {
             System.String lls;
             if (obj.GetType().IsEnum) {
-#if BETA1
-                lls = obj.ToString();
-#else //BETA2
                 lls = System.Convert.ToString(System.Convert.ToInt64(obj));
-#endif
             }
             else {
                 if (obj.GetType().Equals(typDouble)) {
-#if BETA1
-                    lls = System.Convert.ToDouble(obj).ToString();
-#else //BETA2
                     lls = System.Convert.ToDouble(obj).ToString("R");
-#endif
                 }
                 else if (obj.GetType().Equals(typSingle)) {
-#if BETA1
-                    lls = System.Convert.ToSingle(obj).ToString();
-#else //BETA2
                     lls = System.Convert.ToSingle(obj).ToString("R");
-#endif
                 }
                 else {
                     lls = System.Convert.ToString(obj);
@@ -550,11 +538,7 @@ public class RTS
 	public static void RealToStr(double num,
 				     char[] str)
 	{
-#if BETA1
-	    System.String lls = System.Convert.ToString(num);
-#else //BETA2
             System.String lls = ((System.Double) num).ToString("R");
-#endif
             int    len = lls.Length;
             lls.CopyTo(0, str, 0, len);
             str[len] = '\0';
@@ -747,17 +731,57 @@ public class ProgArgs
  *  Original : kjg December 1999
  */
 {
-	public static System.String[] argList = null;
+    public static string[] argList = null;
 
-	// Known in ILASM as [RTS]ProgArgs::ArgNumber
-	// PROCEDURE ArgNumber*() : INTEGER
-	public static int ArgNumber()
-	{
+    // Known in ILASM as [RTS]ProgArgs::ArgNumber
+    // PROCEDURE ArgNumber*() : INTEGER
+    public static int ArgNumber()
+    {
         if (ProgArgs.argList == null)
-		return 0;
-	    else
-		return argList.Length;
-	}
+            return 0;
+        else
+            return argList.Length;
+    }
+
+    public static void ExpandWildcards(int N) {
+        ProgArgs.argList = ExpandArgs(argList, N);
+    }
+
+    private static bool needsExpansion(string arg) {
+        return (arg.Contains("*") || arg.Contains("?"));
+    }
+
+    private static string[] ExpandArgs(string[] inArgs, int first) {
+        List<string> list = new List<string>();
+        for (int i = 0; i < inArgs.Length; i++) {
+            string arg = inArgs[i];
+            //
+            // Copy args explicitly skipped, any option args 
+            // and eliminate a couple of mis-handled special cases.
+            //
+            if (i < first || arg[0] == '-' || arg[0] == '/' || !needsExpansion(arg)) 
+                list.Add(arg);
+            else {
+                string path = Path.GetDirectoryName(arg);
+                string pattern = Path.GetFileName(arg);
+                try {
+                    if (path == "") {
+                        IEnumerable<string> names = Directory.EnumerateFiles(".", pattern);
+                        foreach (string file in names)
+                            list.Add(Path.GetFileName(file));
+                    }
+                    else {
+                        IEnumerable<string> names = Directory.EnumerateFiles(path, pattern);
+                        foreach (string file in names)
+                            list.Add(file);
+                    }
+                } catch (Exception e) {
+                    System.Console.Error.WriteLine("ProgArgs.ExpandWildcards error\n" + e.Message);
+                }
+            }
+        }
+        return list.ToArray(); 
+    }
 
 	// Known in ILASM as [RTS]ProgArgs::GetArg
 	// PROCEDURE GetArg*(num : INTEGER; OUT arg : ARRAY OF CHAR) 
@@ -781,7 +805,7 @@ public class ProgArgs
 
         public static void GetEnvVar(char[] name, char[] valu) {
             System.String nam = CP_rts.mkStr(name);
-            System.String val = System.Environment.GetEnvironmentVariable(nam, System.EnvironmentVariableTarget.User);
+            System.String val = Environment.GetEnvironmentVariable(nam, EnvironmentVariableTarget.User);
             CP_rts.StrToChF(valu, val);
         }
 
@@ -860,6 +884,8 @@ public class CP_rts
 
 	// Known in ILASM as [RTS]CP_rts::mkStr
 	public static System.String mkStr(char[] arr) {
+            if (arr == null)
+                return null;
 	    int len = chrArrLength(arr);
 	    return new System.String(arr,0,len);
 	}
@@ -1046,6 +1072,8 @@ public class NativeStrings
 /* -------------------------------------------------------------------- */
 	// Known in ILASM as [RTS]NativeStrings::mkStr
 	public static System.String mkStr(char[] arr) {
+            if (arr == null)
+                return null;
 	    int len = CP_rts.chrArrLength(arr);
 	    return new System.String(arr,0,len);
 	}

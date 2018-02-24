@@ -130,13 +130,14 @@ MODULE Builtin;
 (* ============================================================ *)
 
   PROCEDURE MkDummyImport*(IN  nam : ARRAY OF CHAR;
-			   IN  xNm : ARRAY OF CHAR;
-			   OUT blk : IdDesc.BlkId);
+                           IN  xNm : ARRAY OF CHAR;
+                           OUT blk : IdDesc.BlkId);
     VAR jnk : BOOLEAN;
   BEGIN
     blk := IdDesc.newImpId();
     blk.dfScp   := blk;
     blk.hash    := NameHash.enterStr(nam);
+	blk.SetNameFromHash(blk.hash);
     IF LEN(xNm) > 1 THEN blk.scopeNm := LitValue.strToCharOpen(xNm) END;
     jnk := CompState.thisMod.symTb.enter(blk.hash, blk);
     INCL(blk.xAttr, Symbols.isFn);
@@ -167,6 +168,12 @@ MODULE Builtin;
 	tId.SetNameFromHash(tId.hash);
     jnk := blk.symTb.enter(tId.hash, tId);
   END MkDummyClass;
+
+  PROCEDURE AddDummyBaseTp*(typId : IdDesc.TypId; basId : IdDesc.TypId);
+  BEGIN
+    typId.type(Typ.Pointer).boundTp(Typ.Record).baseTp := 
+                                       basId.type(Typ.Pointer).boundTp;
+  END AddDummyBaseTp;
 
 (* ------------------------------------------------------------	*)
 

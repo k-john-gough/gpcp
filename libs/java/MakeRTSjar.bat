@@ -1,7 +1,6 @@
 
 REM @echo off
 REM this compiles all of the standard java-sourced libraries for GPCP
-REM and collects then together in a JAR file. New for gpcp-JVM v1.4.*
 mkdir dest
 javac -d dest Console.java
 javac -d dest CPJ.java

@@ -20,7 +20,7 @@ MODULE MsilMaker;
         GPFiles,
         GPBinFiles,
         GPTextFiles,
-        PeUtil,
+        (* PeUtil, *)
         IlasmUtil,
         Nh  := NameHash,
         Scn := CPascalS,
@@ -122,8 +122,10 @@ MODULE MsilMaker;
 (* ============================================================ *)
 
   PROCEDURE (this : MsilEmitter)Init*();
-    VAR tId : Id.TypId;
-        blk : Id.BlkId;
+    VAR sysBlk : Id.BlkId;  (* mscorlib_System            *)
+        rflBlk : Id.BlkId;  (* mscorlib_System_Reflection *)
+        tmpBlk : Id.BlkId;  (* temporary BlkId object     *)
+        mem : Id.TypId;     (* Reflection.MemberInfo      *)
         obj : Id.TypId;
         str : Id.TypId;
         exc : Id.TypId;
@@ -134,33 +136,44 @@ MODULE MsilMaker;
    (*
     *  Create import descriptor for [mscorlib]System
     *)
-    Bi.MkDummyImport("mscorlib_System", "[mscorlib]System", blk);
-	CSt.SetSysLib(blk);
+    Bi.MkDummyImport("mscorlib_System", "[mscorlib]System", sysBlk);
+    Bi.MkDummyImport("mscorlib_System_Reflection", 
+                     "[mscorlib]System.Reflection", rflBlk);
+    CSt.SetSysLib(sysBlk);
    (*
     *  Create various classes.
     *)
-    Bi.MkDummyClass("Object", blk, Ty.isAbs, obj);
+    Bi.MkDummyClass("Object", sysBlk, Ty.isAbs, obj);
     CSt.ntvObj := obj.type;
-    Bi.MkDummyClass("String", blk, Ty.noAtt, str);
+    Bi.MkDummyClass("String", sysBlk, Ty.noAtt, str);
     Bi.SetPtrBase(str, obj);
     CSt.ntvStr := str.type;
     CSt.ntvStrArr := Ty.mkArrayOf(str.type);
-    Bi.MkDummyClass("Exception", blk, Ty.extns, exc);
+    Bi.MkDummyClass("Exception", sysBlk, Ty.extns, exc);
     Bi.SetPtrBase(exc, obj);
     CSt.ntvExc := exc.type;
-    Bi.MkDummyClass("Type", blk, Ty.isAbs, typ);
-    Bi.SetPtrBase(typ, obj);
+ 
+   (*
+    *  It is necessary to leave the base type of mscorlib_System.Type
+    *  undefined.  If it *is* defined it will not be overridden by
+    *  an import of mscorlib_System_Reflection which needs to set
+    *  the base type to mscorlib_System_Reflection.MemberInfo.
+    *)
+    Bi.MkDummyClass("MemberInfo", rflBlk, Ty.isAbs, mem);
+    Bi.SetPtrBase(mem, obj);
+    Bi.MkDummyClass("Type", sysBlk, Ty.isAbs, typ);
+    Bi.SetPtrBase(typ, mem);
     CSt.ntvTyp := typ.type;
 
-    Bi.MkDummyClass("Delegate", blk, Ty.extns, del);
+    Bi.MkDummyClass("Delegate", sysBlk, Ty.extns, del);
     Bi.SetPtrBase(del, obj);
-    Bi.MkDummyClass("MulticastDelegate", blk, Ty.extns, evt);
+    Bi.MkDummyClass("MulticastDelegate", sysBlk, Ty.extns, evt);
     Bi.SetPtrBase(evt, del);
     CSt.ntvEvt := evt.type;
 
     (* NEED SOME WORK HERE?? *)
 
-    Bi.MkDummyClass("ValueType", blk, Ty.extns, del);
+    Bi.MkDummyClass("ValueType", sysBlk, Ty.extns, del);
     Bi.SetPtrBase(del, obj);
     CSt.ntvVal := del.type.boundRecTp();
 
@@ -169,34 +182,34 @@ MODULE MsilMaker;
    (*
     *  Create import descriptor for [RTS]RTS
     *)
-    Bi.MkDummyImport("RTS", "[RTS]", blk);
-    Bi.MkDummyAlias("NativeType", blk, typ.type, CSt.clsId);
-    Bi.MkDummyAlias("NativeObject", blk, obj.type, CSt.objId);
-    Bi.MkDummyAlias("NativeString", blk, str.type, CSt.strId);
-    Bi.MkDummyAlias("NativeException", blk, exc.type, CSt.excId);
-    INCL(blk.xAttr, Sy.need);
-    CSt.rtsBlk := blk;
+    Bi.MkDummyImport("RTS", "[RTS]", tmpBlk);
+    Bi.MkDummyAlias("NativeType", tmpBlk, typ.type, CSt.clsId);
+    Bi.MkDummyAlias("NativeObject", tmpBlk, obj.type, CSt.objId);
+    Bi.MkDummyAlias("NativeString", tmpBlk, str.type, CSt.strId);
+    Bi.MkDummyAlias("NativeException", tmpBlk, exc.type, CSt.excId);
+    INCL(tmpBlk.xAttr, Sy.need);
+    CSt.rtsBlk := tmpBlk;
    (*
     *  Uplevel addressing stuff. This is part of RTS assembly.
     *)
-    Bi.MkDummyClass("XHR", blk, Ty.isAbs, typ);
+    Bi.MkDummyClass("XHR", tmpBlk, Ty.isAbs, typ);
     CSt.rtsXHR := typ.type;
     CSt.xhrId.recTyp := CSt.rtsXHR.boundRecTp();
     CSt.xhrId.type   := CSt.rtsXHR;
    (*
     *  Access to [RTS]RTS::dblPosInfinity, etc.
     *)
-    Bi.MkDummyVar("dblPosInfinity", blk, Bi.realTp, CSt.dblInf);
-    Bi.MkDummyVar("dblNegInfinity", blk, Bi.realTp, CSt.dblNInf);
-    Bi.MkDummyVar("fltPosInfinity", blk, Bi.sReaTp, CSt.fltInf);
-    Bi.MkDummyVar("fltNegInfinity", blk, Bi.sReaTp, CSt.fltNInf);
+    Bi.MkDummyVar("dblPosInfinity", tmpBlk, Bi.realTp, CSt.dblInf);
+    Bi.MkDummyVar("dblNegInfinity", tmpBlk, Bi.realTp, CSt.dblNInf);
+    Bi.MkDummyVar("fltPosInfinity", tmpBlk, Bi.sReaTp, CSt.fltInf);
+    Bi.MkDummyVar("fltNegInfinity", tmpBlk, Bi.sReaTp, CSt.fltNInf);
    (*
     *  Access to [RTS]ProgArgs::argList
     *)
-    Bi.MkDummyImport("ProgArgs", "", blk);
-    Bi.MkDummyVar("argList", blk, Ty.mkArrayOf(CSt.ntvStr), CSt.argLst);
-    INCL(blk.xAttr, Sy.rtsMd);
-    CSt.prgArg := blk;
+    Bi.MkDummyImport("ProgArgs", "", tmpBlk);
+    Bi.MkDummyVar("argList", tmpBlk, Ty.mkArrayOf(CSt.ntvStr), CSt.argLst);
+    INCL(tmpBlk.xAttr, Sy.rtsMd);
+    CSt.prgArg := tmpBlk;
   END Init;
 
 (* ============================================================ *)
@@ -741,17 +754,21 @@ MODULE MsilMaker;
         classIx   : INTEGER;
         idDesc    : Sy.Idnt;
         impElem   : Id.BlkId;
-        callApi   : BOOLEAN;
+        callApi   : BOOLEAN; 
   BEGIN
-(*
- *  callApi := CSt.doCode & ~CSt.debug;
- *)
+  (* callApi will become relevant again when we have the Reflection.Emit backend *)
     callApi := CSt.doCode & ~CSt.doIlasm;
     Mu.MkBlkName(this.mod);
     IF callApi THEN
-      out := PeUtil.newPeFile(this.mod.pkgNm, ~this.mod.main);
-      this.outF := out;
+      ASSERT(FALSE);
+      out := NIL;
+     (*
+      * CSt.emitNam := BOX("PERWAPI");
+      * out := PeUtil.newPeFile(this.mod.pkgNm, ~this.mod.main);
+      * this.outF := out;
+      *)
     ELSE (* just produce a textual IL file *)
+      CSt.emitNam := BOX("Ilasm-emit");
       out := IlasmUtil.newIlasmFile(this.mod.pkgNm);
       this.outF := out;
     END;
@@ -1582,7 +1599,6 @@ MODULE MsilMaker;
 	    *)
         out.Code(Asm.opc_shr);
 	  ELSE (* ==> kind = lshInt *)
-	  (* FIXME *)
 	    out.Code(Asm.opc_dup);            (* TOS: rOp, rOp, lOp, ...       *)
 	    out.StoreLocal(temp);             (* TOS: rOp, lOp, ...            *)
 	    out.PushInt(maskSz+1);            (* TOS: 32, rOp, lOp, ...        *)

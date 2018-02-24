@@ -18,4 +18,6 @@ SYSTEM MODULE ProgArgs;
 
   PROCEDURE GetEnvVar*(IN name : ARRAY OF CHAR; OUT valu : ARRAY OF CHAR); 
 
+  PROCEDURE ExpandWildcards*(argsToSkip : INTEGER);
+
 END ProgArgs.

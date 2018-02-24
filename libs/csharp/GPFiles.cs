@@ -19,9 +19,16 @@ public abstract class GPFiles {
     int  ix = 0;
     char ch;
     do {
-	ch = arr[ix]; ix++;
+	  ch = arr[ix]; ix++;
     } while (ch != '\0');
     return new System.String(arr,0,ix-1);
+  }
+
+  private static char[] mkArr(System.String str) {
+    char[] rslt = new char[str.Length + 1];
+    str.CopyTo(0, rslt, 0, str.Length);
+    rslt[str.Length] = '\0';
+    return rslt;
   }
 
   /* ----------------------------------	*/
@@ -40,7 +47,7 @@ public abstract class GPFiles {
     }
 
   public static char[] CurrentDirectory() {
-        return System.IO.Directory.GetCurrentDirectory().ToCharArray();
+        return mkArr(System.IO.Directory.GetCurrentDirectory());
   }
   
   public static bool exists(char[] filName) {
@@ -48,6 +55,17 @@ public abstract class GPFiles {
 	return System.IO.File.Exists(path);
     }
 
+   public static char[][] FileList(char[] dirPath) {
+       string dirStr = mkStr(dirPath);
+       string[] files = System.IO.Directory.GetFiles(dirStr);
+       if (files == null || files.Length ==0) return null;
+       else {
+           char[][] rslt = new char[files.Length][];
+           for (int i = 0; i < files.Length; i++)
+               rslt[i] = mkArr(System.IO.Path.GetFileName(files[i]));
+	   return rslt;
+       }
+   } 
   } // end of class GPFiles
 
 /* ------------------------------------------------------------ */

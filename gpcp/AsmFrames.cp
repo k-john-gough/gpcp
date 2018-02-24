@@ -159,7 +159,7 @@ MODULE AsmFrames;
 (*
  *PROCEDURE^ ( mFrm : MethodFrame )DiagFrame*( ),NEW;
  *PROCEDURE^ ( mFrm : MethodFrame )DiagEvalStack*(),NEW;
- *PROCEDURE^ (mFrm : MethodFrame )Diag*(code : INTEGER),NEW;
+ *PROCEDURE^ ( mFrm : MethodFrame )Diag*(code : INTEGER),NEW;
  *PROCEDURE^ ( fs : FrameSave )Diag*( ),NEW;
  *)
   PROCEDURE^ ( mFrm : MethodFrame )GetLocalArrStr*() : RTS.NativeString,NEW;
@@ -239,6 +239,13 @@ MODULE AsmFrames;
         pars : Id.ParSeq;
         parX : Id.ParId;
   BEGIN
+   (* ------------------ *
+    *  Allocate a method frame slot for the XHR if this is needed.  
+    * ------------------ *)
+    IF Id.hasXHR IN prc.pAttr THEN
+        frm.AddLocal( prc.xhrType );
+    END; 
+    
     pars := prc.type(Ty.Procedure).formals;
     FOR idx := 0 TO pars.tide-1 DO
       parX := pars.a[idx];

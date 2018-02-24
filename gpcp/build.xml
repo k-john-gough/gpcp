@@ -37,7 +37,6 @@
     <target name="-buildgpcp" depends="init" description="Compile gpcp compiler sources"> 
 	    <!-- Ensure that we have the JVM-specific source variants -->
 	    <copy file="JavaTargetForJVM.cp" tofile="JavaTarget.cp" overwrite="true"/>
-	    <copy file="PeUtilForJVM.cp" tofile="PeUtil.cp" overwrite="true"/>
 	    <!-- Compile all the source files of gpcp in dependency order -->
 	    <java jar="${JRoot}/jars/cpmake.jar" failonerror="true" fork="true" dir=".">
                 <jvmarg value="-DCPSYM=${CPSYM}"/>

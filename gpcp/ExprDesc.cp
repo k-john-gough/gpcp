@@ -972,14 +972,14 @@ MODULE ExprDesc;
           ELSE
             IF ~arg0.isIntExpr() THEN arg0.ExprError(37) END;
             IF ~arg1.isIntExpr() THEN arg1.ExprError(37) END;
-			(* FIXME, no folding yet ... *)
-			IF arg0.type = Builtin.lIntTp THEN
-			  dstT := Builtin.lIntTp;
-			ELSE
+           (* FIXME, no folding yet ... *)
+            IF arg0.type = Builtin.lIntTp THEN
+              dstT := Builtin.lIntTp;
+            ELSE
               IF arg0.type # Builtin.intTp THEN
                 arg0 := convert(arg0, Builtin.intTp);
-			  END;
-			  dstT := Builtin.intTp;
+              END;
+              dstT := Builtin.intTp;
             END;
             IF arg1.type # Builtin.intTp THEN
               arg1 := convert(arg1, Builtin.intTp);
@@ -2173,10 +2173,14 @@ MODULE ExprDesc;
         (x.ident.dfScp = scp) &
         ~x.ident.isIn(lIn) THEN 
       IF x.isPointerExpr() THEN
+       (*
+        * For v1.4.04 + this is an error rather than a warning
+        *)
         x.ExprError(316);
+        x.ExprError(135);
       ELSE
         x.ExprError(135);
-      END;
+      END; 
     END;
     RETURN lIn;
   END checkLive;

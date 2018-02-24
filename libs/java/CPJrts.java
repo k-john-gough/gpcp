@@ -98,6 +98,20 @@ public class CPJrts
 
 /* -------------------------------------------------------------------- */
 
+	public static int ChrArrActiveLength(char[] src)
+	{
+            int  ix;
+	    char ch;
+	    for (ix = 0; ix < src.length; ix++) {
+		ch = src[ix];
+		if (ch == '\0') 
+			return ix;
+	    } 
+	    return ix;
+	}
+
+/* -------------------------------------------------------------------- */
+
 	public static int ChrArrLplus1(char[] src)
 	{
 	    int  ix = 0;
@@ -139,7 +153,7 @@ public class CPJrts
 	    //
             // This truncation makes semantics same as .NET version
 	    //
-            int len = ChrArrLength(arr);
+            int len = ChrArrActiveLength(arr);
 	    return new String(arr, 0, len);
 	}
 
@@ -264,22 +278,22 @@ public class CPJrts
 
 	public static String ArrArrToString(char[] l, char[] r)
 	{
-	    int llen = ChrArrLength(l);
-	    int rlen = ChrArrLength(r);
+	    int llen = ChrArrActiveLength(l);
+	    int rlen = ChrArrActiveLength(r);
 	    StringBuffer buff = new StringBuffer(llen + rlen);
 	    return buff.append(l,0,llen).append(r,0,rlen).toString();
 	}
 
 	public static String ArrStrToString(char[] l, String r)
 	{
-	    int llen = ChrArrLength(l);
+	    int llen = ChrArrActiveLength(l);
 	    StringBuffer buff = new StringBuffer(3 * llen);
 	    return buff.append(l,0,llen).append(r).toString();
 	}
 
 	public static String StrArrToString(String l, char[] r)
 	{
-	    int rlen = ChrArrLength(r);
+	    int rlen = ChrArrActiveLength(r);
 	    StringBuffer buff = new StringBuffer(3 * rlen);
 	    return buff.append(l).append(r,0,rlen).toString();
 	}

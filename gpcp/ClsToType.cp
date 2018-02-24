@@ -16,13 +16,14 @@
 
 MODULE ClsToType;
   IMPORT
-(*
- *  Rfl := mscorlib_System_Reflection,  (* temporary *)
- *  Sio := mscorlib_System_IO,          (* temporary *)
- *)
+   (* ################ *)
+   (* Util := PeToCpsUtils_, only needed while bootstrapping v1.4.05 *)
+   (* ################ *)
+
+    Rfl := "[mscorlib]System.Reflection",
+    Sys := "[mscorlib]System",
     FNm := FileNames,
     Mng := ForeignName,
-    Per := "[QUT.PERWAPI]QUT.PERWAPI",
     Glb := N2State,
     Ltv := LitValue,
     Cst := CompState,
@@ -45,7 +46,8 @@ MODULE ClsToType;
         enuCls*  =  3; evtCls*  =  4; dlgCls*  =  5;
         primTyp* =  6; arrTyp*  =  7; voidTyp* =  8;
         strTyp*  =  9; objTyp*  = 10; sysValT* = 11;
-        sysEnuT* = 12; sysDelT* = 13; sysExcT* = 14; voidStar* = 15;
+        sysEnuT* = 12; sysDelT* = 13; sysExcT* = 14; 
+        genTyp*  = 15; voidStar* = 16;
 
   CONST (* type attribute enumeration bits   *)
         absTp = 7; intTp = 5; sldTp = 8;
@@ -59,17 +61,14 @@ MODULE ClsToType;
  (* ------------------------------------------------------------ *)
 
   TYPE  Namespace*    = POINTER TO ABSTRACT RECORD
+                          nStr  : RTS.NativeString;
                           hash  : INTEGER;
                           bloc* : Id.BlkId;
                           tIds  : VECTOR OF Id.TypId;
                         END;
 
         DefNamespace* = POINTER TO RECORD (Namespace)
-                          clss  : VECTOR OF Per.ClassDef;
-                        END;
-
-        RefNamespace* = POINTER TO RECORD (Namespace)
-                          clss  : VECTOR OF Per.ClassRef;
+                          clss  : VECTOR OF Sys.Type;
                         END;
 
  (* ------------------------------------------------------------ *)
@@ -98,11 +97,12 @@ MODULE ClsToType;
  (*                   Utilities and Predicates                   *)
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE^ cpTypeFromCTS(peT : Per.Type; spc : DefNamespace) : Sy.Type;
+  PROCEDURE^ cpTypeFromCTS(peT : Sys.Type; spc : DefNamespace) : Sy.Type;
+  PROCEDURE^ AddTypeToId(thsC : Sys.Type; thsN : DefNamespace); 
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isExportedType(attr : Per.TypeAttr) : BOOLEAN;
+  PROCEDURE isExportedType(attr : Rfl.TypeAttributes) : BOOLEAN;
     VAR bits : SET;
   BEGIN
     bits := BITS(attr) * {0..2};
@@ -114,7 +114,7 @@ MODULE ClsToType;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isProtectedType(attr : Per.TypeAttr) : BOOLEAN;
+  PROCEDURE isProtectedType(attr : Rfl.TypeAttributes) : BOOLEAN;
     VAR bits : SET;
   BEGIN
     bits := BITS(attr) * {0..2};
@@ -126,48 +126,57 @@ MODULE ClsToType;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isGenericClass(cls : Per.ClassDesc) : BOOLEAN;
+  PROCEDURE isGenericClass(cls : Sys.Type) : BOOLEAN;
   BEGIN
-    RETURN LEN(cls.GetGenericParams()) > 0;
+    RETURN cls.get_IsGenericType();
   END isGenericClass;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isGenericType(typ : Per.Type) : BOOLEAN;
-  BEGIN
-    WITH typ : Per.ClassSpec DO RETURN TRUE;
-       | typ : Per.ClassDesc DO RETURN isGenericClass(typ);
-       | typ : Per.Array     DO RETURN isGenericType(typ.ElemType());
-    ELSE RETURN FALSE;
+  PROCEDURE isGenericType(typ : Sys.Type) : BOOLEAN;
+  BEGIN 
+    IF typ.get_IsArray() THEN 
+      RETURN isGenericType(typ.GetElementType());
+    ELSE
+      RETURN typ.get_IsGenericType();
     END;
   END isGenericType;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isPublicClass(cls : Per.Class) : BOOLEAN;
+  PROCEDURE isPublicClass(cls : Sys.Type) : BOOLEAN;
   BEGIN
-    WITH cls : Per.NestedClassDef DO
-      RETURN isExportedType(cls.GetAttributes()) &
-             ~isGenericType(cls) &
-             isPublicClass(cls.GetParentClass());
-    |    cls : Per.ClassDef DO
-      RETURN isExportedType(cls.GetAttributes()) & 
-             ~isGenericType(cls);
-    ELSE (* cls : Per.ClassRef ==> exported *)
+    IF isGenericType(cls) THEN 
+      RETURN FALSE;
+    ELSIF cls.get_IsNested() THEN
+      RETURN isExportedType(cls.get_Attributes())
+           & isPublicClass(cls.get_DeclaringType());
+    ELSE 
       RETURN TRUE;
     END;
   END isPublicClass;
 
+   (* ------------------------------------------------ *)
+
+  PROCEDURE MthReturnType(mth : Rfl.MethodBase) : Sys.Type;
+  BEGIN
+    WITH mth : Rfl.MethodInfo DO 
+        RETURN mth.get_ReturnType();
+    | mth : Rfl.ConstructorInfo DO 
+        RETURN mth.get_DeclaringType();
+    END;
+  END MthReturnType;
+
  (* ------------------------------------------------ *)
 
-  PROCEDURE hasGenericArg(mth : Per.Method) : BOOLEAN;
+  PROCEDURE hasGenericArg(mth : Rfl.MethodBase) : BOOLEAN;
     VAR idx : INTEGER;
-        par : Per.Type;
-        prs : POINTER TO ARRAY OF Per.Type;
+        par : Sys.Type;
+        prs : POINTER TO ARRAY OF Rfl.ParameterInfo;
   BEGIN
-    prs := mth.GetParTypes();
+    prs := mth.GetParameters();
     FOR idx := 0 TO LEN(prs) - 1 DO
-      par := prs[idx];
+      par := prs[idx].get_ParameterType();
       IF isGenericType(par) THEN RETURN TRUE END;
     END;
     RETURN FALSE;
@@ -175,150 +184,101 @@ MODULE ClsToType;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isGenericMethod(mth : Per.Method) : BOOLEAN;
+  PROCEDURE isGenericMethod(mth : Rfl.MethodBase) : BOOLEAN;
   BEGIN
-    RETURN (mth.GetGenericParam(0) # NIL) OR hasGenericArg(mth);
+    RETURN mth.get_IsGenericMethod() OR 
+           hasGenericArg(mth) OR 
+           isGenericType(MthReturnType(mth));
   END isGenericMethod;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE isVarargMethod(mth : Per.Method) : BOOLEAN;
+  PROCEDURE isVarargMethod(mth : Rfl.MethodBase) : BOOLEAN;
   BEGIN
-    RETURN mth.GetCallConv() = Per.CallConv.Vararg;
+    RETURN mth.get_CallingConvention() = Rfl.CallingConventions.VarArgs;
   END isVarargMethod;
 
  (* ------------------------------------------------ *)
- (*
-  PROCEDURE isNestedType(attr : Per.TypeAttr) : BOOLEAN;
-    VAR bits : INTEGER;
+
+  PROCEDURE gpInt(num : INTEGER) : RTS.NativeString;
   BEGIN
-    bits := ORD(BITS(attr) * {0..2});
-    RETURN (bits >= 2) & (bits <= 7);
-  END isNestedType;
-  *)
+    RETURN Sys.Convert.ToString(num);
+  END gpInt;
+
+  PROCEDURE typName(typ : Sys.Type) : RTS.NativeString;
+  BEGIN
+    RETURN typ.get_Name();
+(*
+    RETURN Util.Utils.typName(typ);
+ *)
+  END typName;
+
  (* ------------------------------------------------ *)
 
-  PROCEDURE gpName(typ : Per.Class) : RTS.NativeString;
+  PROCEDURE gpName(typ : Sys.Type) : RTS.NativeString;
+    VAR name : RTS.NativeString;
+   (* ----- Trim the trailing '&' ----- *)
+    PROCEDURE trimAmp(n : RTS.NativeString) : RTS.NativeString;
+    BEGIN
+      RETURN n.Substring(0, n.get_Length()-1);
+    END trimAmp;
+   (* --------------------------------- *)
   BEGIN
-    WITH typ : Per.NestedClassDef DO
-        RETURN gpName(typ.GetParentClass()) + "$" + typ.Name();
-    | typ : Per.NestedClassRef DO
-        RETURN gpName(typ.GetParentClass()) + "$" + typ.Name();
+    name := typName(typ);
+    IF typ.get_IsByRef() THEN name := trimAmp(name) END;
+    IF typ.get_IsNested() THEN
+      RETURN gpName(typ.get_DeclaringType()) + "$" + name;
     ELSE
-      RETURN typ.Name();
+      RETURN name;
     END;
   END gpName;
 
- (* ------------------------------------------------ *)
+(* ------------------------------------------------ *)
 
-  PROCEDURE gpSpce(typ : Per.Class) : RTS.NativeString;
+  PROCEDURE gpSpce(typ : Sys.Type) : RTS.NativeString;
   BEGIN
-    WITH typ : Per.NestedClassDef DO
-        RETURN gpSpce(typ.GetParentClass());
-    | typ : Per.NestedClassRef DO
-        RETURN gpSpce(typ.GetParentClass());
-    ELSE
-      RETURN typ.NameSpace();
-    END;
+    RETURN typ.get_Namespace();
   END gpSpce;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE ilName(mth : Per.Method) : RTS.NativeString;
-    VAR cls : Per.Class;
-  BEGIN
-    cls := mth.GetParent()(Per.Class);
-    RETURN gpSpce(cls) + "." + gpName(cls) + "::'" + mth.Name() + "'";
-  END ilName;
-
- (* ------------------------------------------------ *)
-
-  PROCEDURE isCorLibRef(res : Per.ResolutionScope) : BOOLEAN;
+  PROCEDURE isCorLibRef(res : Rfl.Assembly) : BOOLEAN;
     VAR str : RTS.NativeString;
   BEGIN
-    IF Glb.isCorLib THEN 
-      RETURN FALSE; (* ==> this is corlib DEFINITION! *)
-    ELSIF res = NIL THEN 
+
+    IF res = NIL THEN
       RETURN FALSE;
     ELSE
-      str := res.Name();
+      str := res.GetName().get_Name();
       RETURN ((str = "mscorlib") OR (str = "CommonLanguageRuntimeLibrary"));
     END;
   END isCorLibRef;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE SayWhy(cls : Per.Class);
+  PROCEDURE SayWhy(cls : Sys.Type);
     VAR str : Glb.CharOpen;
   BEGIN
-    WITH cls : Per.ClassSpec DO
-      str := BOX(" Hiding generic class -- "); 
-    |   cls : Per.NestedClassDef DO
-      IF ~isExportedType(cls.GetAttributes()) THEN RETURN; (* just private! *)
-      ELSIF isGenericType(cls) THEN
-        str := BOX(" Hiding generic class -- "); 
-      ELSE (* ~isPublicClass(cls.GetParentClass()); *)
-        str := BOX(" Hiding public child of private class -- "); 
+    IF isGenericClass(cls) THEN str := BOX(" Hiding generic class -- "); 
+    ELSIF cls.get_IsNested() THEN
+      IF ~isExportedType(cls.get_Attributes()) THEN RETURN; (* just private! *)
+      ELSIF ~isPublicClass(cls.get_DeclaringType()) THEN
+        str := BOX(" Hiding public child of private class -- ");
+      ELSE RETURN; 
       END;
-    |   cls : Per.ClassDef DO
-      IF ~isExportedType(cls.GetAttributes()) THEN RETURN; (* just private! *)
-      ELSE (* isGenericType(cls) *)
-        str := BOX(" Hiding generic class -- "); 
-      END;
+    ELSE RETURN;
     END;
     Glb.Message(str^ + gpSpce(cls) + "." + gpName(cls));
   END SayWhy;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE getKind(typ : Per.Type) : INTEGER;
-    VAR pEnu : INTEGER;
-        pTyp : Per.Class;
-        name : RTS.NativeString;
-        rScp : Per.ResolutionScope;
+  PROCEDURE getBaseKind(typ : Sys.Type) : INTEGER;
+    VAR name : RTS.NativeString;
+        rScp : Rfl.Assembly;
   BEGIN
-    WITH typ : Per.Array DO (* --------------- *) RETURN arrTyp;
-    | typ : Per.UnmanagedPointer DO (* ------- *) RETURN voidStar;
-    | typ : Per.PrimitiveType DO
-        IF    typ = Per.PrimitiveType.Object THEN RETURN objTyp;
-        ELSIF typ = Per.PrimitiveType.String THEN RETURN strTyp;
-        ELSIF typ = Per.PrimitiveType.Void   THEN RETURN voidTyp;
-        ELSE                                      RETURN primTyp;
-        END;
-    | typ : Per.ClassDef DO
-        rScp := typ.GetScope();
-        pTyp := typ.get_SuperType();
-       (*
-        *  If this is *not* mscorlib, then check the kind of the parent.
-        *)
-        IF ~Glb.isCorLib THEN
-          pEnu := getKind(pTyp);
-          name := gpName(typ);
-       (*
-        *  If it has no parent, then it must be Object, or some ref class.
-        *)
-        ELSIF pTyp = NIL THEN                     RETURN refCls;
-       (*
-        *  Since "ntvObj" and the others have not been initialized
-        *  for the special case of processing mscorlib, we must look
-        *  at the names of the parents.
-        *)
-        ELSE 
-          name := gpName(pTyp);
-          IF    name = "ValueType"               THEN RETURN valCls;
-          ELSIF name = "Enum"                    THEN RETURN enuCls;
-          ELSIF name = "MulticastDelegate"       THEN RETURN dlgCls;
-          ELSE (* -------------------------------- *) RETURN refCls;
-          END;
-        END;
-    | typ : Per.ClassRef DO
-        rScp := typ.GetScope();
-        name := gpName(typ);
-        pEnu := default;
-    ELSE (* ---------------------------------- *) RETURN default; 
-    END;
-
-    IF isCorLibRef(rScp) THEN
+    name := gpName(typ);
+    IF isCorLibRef(typ.get_Assembly()) THEN
       IF    name = "Object"                  THEN RETURN objTyp;
       ELSIF name = "ValueType"               THEN RETURN sysValT;
       ELSIF name = "Enum"                    THEN RETURN sysEnuT;
@@ -326,12 +286,60 @@ MODULE ClsToType;
       ELSIF name = "Exception"               THEN RETURN sysExcT;
       END;
     END;
+    (* -------------------------------------- *) RETURN refCls;      
+  END getBaseKind;
 
-    IF    pEnu = sysValT                     THEN RETURN valCls;
-    ELSIF pEnu = sysDelT                     THEN RETURN dlgCls;
-    ELSIF pEnu = sysEnuT                     THEN RETURN enuCls;
-    ELSE (* ---------------------------------- *) RETURN refCls;
+ (* ------------------------------------------------ *)
+  PROCEDURE getSysKind(name : RTS.NativeString) : INTEGER;
+  BEGIN
+    (* ASSERT: isCorLibRef(asm) is true *)
+    IF    name = "Object"                  THEN RETURN objTyp;
+    ELSIF name = "String"                  THEN RETURN strTyp;
+    ELSIF name = "ValueType"               THEN RETURN sysValT;
+    ELSIF name = "Enum"                    THEN RETURN sysEnuT;
+    ELSIF name = "MulticastDelegate"       THEN RETURN sysDelT;
+    ELSIF name = "Exception"               THEN RETURN sysExcT;
+    ELSE (* -------------------------------- *) RETURN refCls;
+    END;      
+  END getSysKind;
+
+ (* ------------------------------------------------ *)
+
+  PROCEDURE getKind(typ : Sys.Type) : INTEGER;
+    VAR pEnu : INTEGER;
+        pTyp : Sys.Type;
+        name : RTS.NativeString;
+  BEGIN
+    name := gpName(typ);
+    IF typ.get_HasElementType() THEN
+      IF typ.get_IsArray()      THEN RETURN arrTyp;
+      ELSIF typ.get_IsPointer() THEN RETURN voidStar; (* ???? *)
+      ELSIF typ.get_IsClass()   THEN RETURN refCls;
+      END;
     END;
+    IF    typ.get_IsGenericType()  THEN RETURN genTyp;
+    ELSIF typ.get_IsPrimitive() THEN RETURN primTyp;
+    ELSIF typ.get_IsEnum()      THEN RETURN enuCls;
+    ELSIF typ.get_IsClass() OR 
+          typ.get_IsInterface()THEN
+      pTyp := typ.get_BaseType();
+      IF pTyp # NIL THEN 
+        pEnu := getBaseKind(pTyp);
+        IF    pEnu = refCls     THEN RETURN refCls;
+        ELSIF pEnu = sysDelT    THEN RETURN dlgCls;
+        ELSIF isCorLibRef(typ.get_Assembly()) 
+                                THEN RETURN getSysKind(name);
+        ELSE (* ----------------- *) RETURN refCls;
+        END;
+      ELSIF name = "Object"     THEN RETURN objTyp;
+      ELSE  (* ------------------ *) RETURN refCls;
+      END;
+    ELSIF typ.get_IsValueType() THEN
+      IF name = "Void"          THEN RETURN voidTyp;
+      ELSE (* ------------------- *) RETURN valCls;
+      END;
+    ELSE (* --------------------- *) RETURN default; 
+    END;        
   END getKind;
 
  (* ------------------------------------------------ *)
@@ -354,6 +362,7 @@ MODULE ClsToType;
     | sysEnuT  : RETURN BOX("Sys.Enum Type        ");
     | sysDelT  : RETURN BOX("Sys.MulticastDelegate");
     | sysExcT  : RETURN BOX("Sys.Exception        ");
+    | genTyp   : RETURN BOX("<genericTp>          ");
     | voidStar : RETURN BOX("Sys.Void*            ");
     ELSE         RETURN BOX("unknown              ");
     END;
@@ -361,24 +370,29 @@ MODULE ClsToType;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE mapPrimitive(peT : Per.Type) : Sy.Type;
+  PROCEDURE mapPrimitive(peT : Sys.Type) : Sy.Type;
+    VAR name : RTS.NativeString;
   BEGIN
-    IF    peT = Per.PrimitiveType.Int32    THEN RETURN Bi.intTp;
-    ELSIF peT = Per.PrimitiveType.Char     THEN RETURN Bi.charTp;
-    ELSIF peT = Per.PrimitiveType.Boolean  THEN RETURN Bi.boolTp;
-    ELSIF peT = Per.PrimitiveType.Int16    THEN RETURN Bi.sIntTp;
-    ELSIF peT = Per.PrimitiveType.Float64  THEN RETURN Bi.realTp;
-    ELSIF peT = Per.PrimitiveType.Int64    THEN RETURN Bi.lIntTp;
-    ELSIF peT = Per.PrimitiveType.Float32  THEN RETURN Bi.sReaTp;
-    ELSIF peT = Per.PrimitiveType.Int8     THEN RETURN Bi.byteTp;
-    ELSIF peT = Per.PrimitiveType.UInt8    THEN RETURN Bi.uBytTp;
-    ELSIF peT = Per.PrimitiveType.UInt16   THEN RETURN sysU16;
-    ELSIF peT = Per.PrimitiveType.UInt32   THEN RETURN sysU32;
-    ELSIF peT = Per.PrimitiveType.UInt64   THEN RETURN sysU64;
-    ELSIF peT = Per.PrimitiveType.IntPtr   THEN RETURN intPtr;
-    ELSIF peT = Per.PrimitiveType.UIntPtr  THEN RETURN uIntPt;
-    ELSIF peT = Per.PrimitiveType.TypedRef THEN RETURN tpdRef;
-    ELSE (* ------------------------------- *) RETURN NIL;
+    name := typName(peT);
+    IF    name = "Char"    THEN RETURN Bi.charTp;
+    ELSIF name = "Int32"   THEN RETURN Bi.intTp;
+    ELSIF name = "Int16"   THEN RETURN Bi.sIntTp;
+    ELSIF name = "Int64"   THEN RETURN Bi.lIntTp;
+    ELSIF name = "SByte"   THEN RETURN Bi.byteTp;
+    ELSIF name = "UInt8"   THEN RETURN Bi.uBytTp;
+    ELSIF name = "Byte"   THEN RETURN Bi.uBytTp;
+    ELSIF name = "Single"  THEN RETURN Bi.intTp;
+    ELSIF name = "Double"  THEN RETURN Bi.realTp;
+    ELSIF name = "Boolean" THEN RETURN Bi.boolTp;
+
+    ELSIF name = "UInt16"  THEN RETURN sysU16;
+    ELSIF name = "UInt32"  THEN RETURN sysU32;
+    ELSIF name = "UInt64"  THEN RETURN sysU64;
+    ELSIF name = "IntPtr"  THEN RETURN intPtr;
+    ELSIF name = "UIntPtr" THEN RETURN uIntPt;
+    ELSIF name = "TypeRef" THEN RETURN tpdRef;
+
+    ELSE RTS.Throw("Unimplemented Method Branch " + name); RETURN NIL;
     END;
   END mapPrimitive;
 
@@ -393,102 +407,15 @@ MODULE ClsToType;
     tId.type.idnt := tId;
     tId.SetMode(Sy.pubMode);
     Glb.ListTy(tId.type);
-    IF Sy.refused(tId, blk) THEN Glb.AbortMsg("bad TypId insert") END;
+    IF Sy.refused(tId, blk) THEN 
+      Glb.AbortMsg("bad TypId insert");
+    ELSIF tId.namStr = NIL THEN 
+      tId.SetNameFromHash(hsh);
+    END;
     RETURN tId;
   END makeNameType;
 
- (* ------------------------------------------------ *)
-
-  PROCEDURE lookup(peT : Per.Class; nSp : DefNamespace) : Sy.Type;
-    VAR asm : Glb.CharOpen;  (* assembly file name *)
-        spc : Glb.CharOpen;  (* namespace name str *)
-        mNm : Glb.CharOpen;  (* CP module name     *)
-        cNm : Glb.CharOpen;  (* PE file class name *)
-        blk : Sy.Idnt;       (* The Blk descriptor *)
-        bId : Id.BlkId;      (* The Blk descriptor *)
-        tId : Sy.Idnt;       (* TypId descriptor   *)
-        hsh : INTEGER;       (* Class name hash    *)
-   (* -------------------------------------------- *)
-    PROCEDURE NoteImport(spc : DefNamespace; imp : Id.BlkId);
-    BEGIN
-      IF (spc # NIL) & (spc.bloc # imp) THEN
-        IF ~Sy.refused(imp, spc.bloc) THEN
-          IF Glb.superVb THEN
-            Console.WriteString("Inserting import <");
-            Console.WriteString(Nh.charOpenOfHash(imp.hash));
-            Console.WriteString("> in Namespace ");
-            Console.WriteString(Nh.charOpenOfHash(spc.bloc.hash));
-            Console.WriteLn;
-          END;
-        END;
-      END; 
-    END NoteImport;
-   (* -------------------------------------------- *)
-  BEGIN
-    bId := NIL;
-   (*
-    *  First we establish the (mangled) name of the defining scope.
-    *)
-    WITH peT : Per.ClassDef DO
-        asm := BOX(Glb.basNam^); (* Must do a value copy *)
-    | peT : Per.ClassRef DO
-        asm := BOX(peT.GetScope().Name());
-    ELSE 
-        RETURN NIL;
-    END;
-(*
- *  FNm.StripExt(asm, asm);
- *  spc := BOX(peT.NameSpace());
- *)
-    spc := BOX(gpSpce(peT));
-    mNm := Mng.MangledName(asm, spc);
-   (*
-    *  Check if this name is already known to PeToCps
-    *)
-    blk := Glb.thisMod.symTb.lookup(Nh.enterStr(mNm));
-    cNm := BOX(gpName(peT));
-    hsh := Nh.enterStr(cNm);
-    WITH blk : Id.BlkId DO
-       (*
-        *  The module name is known to PeToCps.
-        *  However, it may not have been listed as an import
-        *  into the current namespace, in the case of multiple
-        *  namespaces defined in the same source PEFile.
-        *)
-        NoteImport(nSp, blk);
-
-        tId := blk.symTb.lookup(hsh);
-        IF (tId # NIL) & (tId IS Id.TypId) THEN 
-          RETURN tId.type;
-        ELSE
-          bId := blk;
-        END;
-    ELSE 
-    END;
-   (*
-    *  Could not find the type identifier descriptor.
-    *)
-    IF bId = NIL THEN
-     (*
-      *  Create a BlkId for the namespace.
-      *)
-      NEW(bId);
-      INCL(bId.xAttr, Sy.need);
-      Glb.BlkIdInit(bId, asm, spc);
-     (*
-      *  ... and in any case, this new BlkId is an
-      *  import into the current namespace scope.
-      *)
-      NoteImport(nSp, bId);
-    END;
-   (*
-    *  Now create a TypId, and insert in block symTab.
-    *)
-    tId := makeNameType(bId, hsh);
-    RETURN tId.type;
-  END lookup;
-
- (* ------------------------------------------------ *)
+  (* ------------------------------------------------ *)
 
   PROCEDURE ptrToArrayOf(elTp : Sy.Type) : Sy.Type;
     VAR ptrT : Sy.Type;
@@ -513,35 +440,156 @@ MODULE ClsToType;
     RETURN ptrT;
   END ptrToArrayOf;
 
+(* ------------------------------------------------ *)
+
+  PROCEDURE lookup(peT : Sys.Type; nSp : DefNamespace) : Sy.Type;
+    VAR asm : Glb.CharOpen;  (* assembly file name *)
+        spc : Glb.CharOpen;  (* namespace name str *)
+        mNm : Glb.CharOpen;  (* CP module name     *)
+        blk : Sy.Idnt;       (* The Blk descriptor *)
+        bId : Id.BlkId;      (* The Blk descriptor *)
+        tId : Sy.Idnt;       (* TypId descriptor   *)
+        hsh : INTEGER;       (* Class name hash    *)
+        cNm : RTS.NativeString;  (* PE file class name *)
+        byRefArray : BOOLEAN;    (* byRef AND an array *)
+   (* -------------------------------------------- *)
+    PROCEDURE NoteImport(spc : DefNamespace; imp : Id.BlkId);
+    BEGIN
+      IF (spc # NIL) & (spc.bloc # imp) THEN
+        (* IF ~Sy.trackedRefused(imp, spc.bloc) THEN *)
+        IF ~Sy.refused(imp, spc.bloc) THEN
+          IF Glb.superVb THEN
+            Console.WriteString("Inserting import <");
+            Console.WriteString(Nh.charOpenOfHash(imp.hash));
+            Console.WriteString("> in Namespace ");
+            Console.WriteString(Nh.charOpenOfHash(spc.bloc.hash));
+            Console.WriteLn;
+          END;
+        END;
+      END; 
+    END NoteImport;
+   (* -------------------------------------------- *
+   // Here is an ugly kludge.
+   // We ignore generic types as found in the original
+   // list of exported types in PeToCps::Process.
+   // However, at least one formal param in the API
+   // is of this type and the param type is NOT 
+   // marked as generic. Thus before we insert this
+   // wrongly classified type into our type list we
+   // must check if it is already known as generic.
+   * -------------------------------------------- *)
+    PROCEDURE OnIgnoreList(nSp : Glb.CharOpen; tNm : Glb.CharOpen) : BOOLEAN;
+      VAR qualHash : INTEGER;
+          foundId  : Sy.Idnt;
+    BEGIN
+      qualHash := Nh.enterStr(nSp^ + "." + tNm^);
+      foundId := Glb.ignoreBlk.symTb.lookup(qualHash);
+      RETURN foundId # NIL;
+    END OnIgnoreList;
+  (* -------------------------------------------- *)
+  BEGIN
+    bId := NIL;
+    byRefArray := FALSE;
+   (*
+    *  First we establish the (mangled) name of the defining scope.
+    *)
+    asm := BOX(peT.get_Assembly().GetName().get_Name());
+    spc := BOX(gpSpce(peT));
+    mNm := Mng.MangledName(asm, spc);
+   (*
+    *  Check if this name is already known to PeToCps
+    *)
+    blk := Glb.thisMod.symTb.lookup(Nh.enterStr(mNm));
+    cNm := gpName(peT);
+    IF cNm.EndsWith("[]") THEN
+      cNm := cNm.Substring(0, cNm.get_Length()-2);
+      byRefArray := TRUE;
+    ELSIF cNm.EndsWith("*") THEN 
+      RETURN voidSt;
+    END;
+    hsh := Nh.enterStr(cNm);
+    WITH blk : Id.BlkId DO
+        tId := blk.symTb.lookup(hsh);
+       (*
+        *  The module name is known to PeToCps.
+        *  However, it may not have been listed as an import
+        *  into the current namespace, in the case of multiple
+        *  namespaces defined in the same source PEFile.
+        *)
+        NoteImport(nSp, blk);
+        IF (tId # NIL) & (tId IS Id.TypId) THEN
+          IF byRefArray THEN
+            RETURN ptrToArrayOf(tId.type);
+          ELSE
+            RETURN tId.type;
+          END;
+        ELSE 
+          bId := blk;
+        END;
+    ELSE 
+    END;
+   (*
+    *  Could not find the type identifier descriptor.
+    *)
+    IF bId = NIL THEN
+     (*
+      *  Create a BlkId for the namespace.
+      *)
+      NEW(bId);
+      INCL(bId.xAttr, Sy.need);
+	  bId.SetNameFromString(spc);
+      Glb.BlkIdInit(bId, asm, spc);
+     (*
+      *  ... and in any case, this new BlkId is an
+      *  import into the current namespace scope.
+      *)
+      NoteImport(nSp, bId);
+    END;
+   (*
+    *  Now create a TypId, and insert in block symTab.
+    *)
+    IF OnIgnoreList(spc, BOX(cNm)) THEN
+      RETURN NIL;
+    ELSE
+      tId := makeNameType(bId, hsh);
+    END;
+    RETURN tId.type;
+  END lookup;
+
  (* ------------------------------------------------ *)
 
-  PROCEDURE cpTypeFromCTS(peT : Per.Type; spc : DefNamespace) : Sy.Type;
+  PROCEDURE cpTypeFromCTS(peT : Sys.Type; spc : DefNamespace) : Sy.Type;
     VAR kind : INTEGER;
+        rslt : Sy.Type;
   BEGIN
     kind := getKind(peT);
     CASE kind OF
-    | voidTyp  : RETURN NIL;
-    | arrTyp   : RETURN ptrToArrayOf(
-                             cpTypeFromCTS(peT(Per.Array).ElemType(), spc));
-    | primTyp  : RETURN mapPrimitive(peT);
-    | strTyp   : RETURN ntvStr;
-    | objTyp   : RETURN ntvObj;
-    | sysValT  : RETURN ntvVal;
-    | sysEnuT  : RETURN ntvEnu;
-    | sysDelT  : RETURN ntvEvt;
-    | voidStar : RETURN voidSt;
-
+    | voidTyp  : rslt := NIL;
+    | arrTyp   : rslt := ptrToArrayOf(
+                             cpTypeFromCTS(peT.GetElementType(), spc));
+    | primTyp  : rslt := mapPrimitive(peT);
+    | strTyp   : rslt := ntvStr;
+    | objTyp   : rslt := ntvObj;
+    | sysValT  : rslt := ntvVal;
+    | sysEnuT  : rslt := ntvEnu;
+    | sysDelT  : rslt := ntvEvt;
+    (* There is no CP type corresonding to unmanaged pointers (voidSt;) *)
+    | voidStar : rslt := voidSt; 
     ELSE (* default, refCls, valCls, enuCls, evtCls, dlgCls *)  
-      WITH peT : Per.Class DO
-        RETURN lookup(peT, spc);
+      IF peT.get_IsClass() OR peT.get_IsInterface() OR peT.get_IsValueType() THEN        
+        rslt := lookup(peT, spc);
       ELSE
         IF peT # NIL THEN
           Console.WriteString("Not a class -- ");
           Console.WriteLn;
         END;
-        RETURN NIL;
+        rslt := NIL;
       END;
     END;
+    IF (rslt IS Ty.Opaque) THEN
+      ASSERT((rslt.idnt # NIL) & (rslt.idnt.dfScp # NIL));
+    END;
+    RETURN rslt;
   END cpTypeFromCTS;
 
  (* ------------------------------------------------ *)
@@ -567,13 +615,14 @@ MODULE ClsToType;
     par.parMod := mod;
     par.type   := typ;
     par.hash   := Nh.enterStr(nam);
+    par.SetNameFromHash(par.hash);
     par.isRcv  := rcv;
     RETURN par;
   END mkParam;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE isValClass(cls : Per.Type) : BOOLEAN;
+  PROCEDURE isValClass(cls : Sys.Type) : BOOLEAN;
   BEGIN
     RETURN getKind(cls) = valCls;
   END isValClass;
@@ -583,105 +632,154 @@ MODULE ClsToType;
  (* ------------------------------------------------------------ *)
 
   PROCEDURE (spc : DefNamespace)AddRecFld(rec : Ty.Record; 
-                                          fld : Per.FieldDef), NEW;
+                                          fld : Rfl.FieldInfo), NEW;
     VAR   mod : INTEGER;
           hsh : INTEGER;
           bts : SET;
           res : BOOLEAN;
+          typ : Sys.Type;
           fId : Id.FldId;
           vId : Id.VarId;
           cId : Id.ConId;
+		  raw : Sys.Object;
    (* ------------------------------------ *)
-    PROCEDURE conExp(val : Per.Constant) : Sy.Expr;
+   (* ------------------------------------ *)
+
+    PROCEDURE conExp(val : Sys.Object) : Sy.Expr;
       VAR byts : POINTER TO ARRAY OF UBYTE;
           chrs : POINTER TO ARRAY OF CHAR;
           indx : INTEGER;
-    BEGIN
-      WITH val : Per.DoubleConst DO
-          RETURN Xp.mkRealLt(val.GetDouble());
-      | val : Per.FloatConst DO
-          RETURN Xp.mkRealLt(val.GetDouble());
-      | val : Per.CharConst DO
-          RETURN Xp.mkCharLt(val.GetChar());
-      | val : Per.IntConst DO
-          RETURN Xp.mkNumLt(val.GetLong());
-      | val : Per.UIntConst DO
-          RETURN Xp.mkNumLt(val.GetULongAsLong());
-      | val : Per.StringConst DO
-          byts := val.GetStringBytes();
-          NEW(chrs, LEN(byts) DIV 2 + 1);
-          FOR indx := 0 TO (LEN(byts) DIV 2)-1 DO
-            chrs[indx] := CHR(byts[indx*2] + byts[indx*2 + 1] * 256);
-          END;
-          (* RETURN Xp.mkStrLt(chrs); *)
-          RETURN Xp.mkStrLenLt(chrs, LEN(chrs) - 1); (* CHECK THIS! *)
+          type : RTS.NativeType;
+          tNam : RTS.NativeString;
+    BEGIN [UNCHECKED_ARITHMETIC]
+      type := val.GetType();
+      tNam := typName(type);
+      IF (tNam = "Double") OR (tNam = "UInt64") THEN
+        RETURN Xp.mkRealLt(Sys.Convert.ToDouble(val));
+      ELSIF tNam = "Single" THEN
+        RETURN Xp.mkRealLt(Sys.Convert.ToDouble(val));
+      ELSIF tNam = "Char" THEN
+        RETURN Xp.mkCharLt(Sys.Convert.ToChar(val));
+      ELSIF (tNam = "Int16") OR (tNam = "Int32") OR(tNam = "Int64") OR
+            (* (tNam = "UInt64") OR*) (tNam = "UInt32") OR (tNam = "UInt16") OR
+            (tNam = "SByte") OR (tNam = "Byte") THEN
+        RETURN Xp.mkNumLt(Sys.Convert.ToInt64(val));
+      ELSIF tNam = "String" THEN
+        RETURN Xp.mkStrLt(Sys.Convert.ToString(val));
+      ELSE
+        RTS.Throw("Unimplemented Method conExp " + tNam);
+        RETURN NIL;
       END;
     END conExp;
    (* ------------------------------------ *)
   BEGIN
-    bts := BITS(fld.GetFieldAttr());
+    bts := BITS(fld.get_Attributes());
     mod := modeFromMbrAtt(bts);
+    typ := fld.get_FieldType();
+    IF isGenericType(typ) THEN RETURN END;
     IF mod > Sy.prvMode THEN
-      hsh := Nh.enterStr(fld.Name());
+      hsh := Nh.enterStr(fld.get_Name());
       IF ltFld IN bts THEN                 (* literal field  *)
         cId := Id.newConId();
         cId.hash := hsh;
+        cId.SetNameFromHash(hsh);
         cId.SetMode(mod);
         cId.recTyp := rec;
-        cId.type := cpTypeFromCTS(fld.GetFieldType(), spc);
-        cId.conExp := conExp(fld.GetValue());
+        cId.type := cpTypeFromCTS(typ, spc);
+
+		raw := fld.GetRawConstantValue();
+
+        cId.conExp := conExp(raw);
         res := rec.symTb.enter(hsh, cId);
         Sy.AppendIdnt(rec.statics, cId);
       ELSIF stFld IN bts THEN              (* static field   *)
         vId := Id.newVarId();
         vId.hash := hsh;
+        vId.SetNameFromHash(hsh);
         vId.SetMode(mod);
         vId.recTyp := rec;
-        vId.type := cpTypeFromCTS(fld.GetFieldType(), spc);
+        vId.type := cpTypeFromCTS(typ, spc);
         res := rec.symTb.enter(hsh, vId);
         Sy.AppendIdnt(rec.statics, vId);
       ELSE                                 (* instance field *)
         fId := Id.newFldId();
         fId.hash := hsh;
+        fId.SetNameFromHash(hsh);
         fId.SetMode(mod);
         fId.recTyp := rec;
-        fId.type := cpTypeFromCTS(fld.GetFieldType(), spc);
+        fId.type := cpTypeFromCTS(typ, spc);
         res := rec.symTb.enter(hsh, fId);
         Sy.AppendIdnt(rec.fields, fId);
       END;
     END;
   END AddRecFld;
 
- (* ------------------------------------------------------------ *)
-
+ (* ------------------------------------------------------------ *
   PROCEDURE (spc : DefNamespace)AddFormals(typ : Ty.Procedure; 
-                                           mth : Per.MethodDef), NEW;
+                                           mth : Rfl.MethodBase), NEW;
     VAR indx : INTEGER;
         pMod : INTEGER;
-        thsP : Per.Param;
-        thsT : Per.Type;
+        thsP : Rfl.ParameterInfo;
+        thsT : Sys.Type;
+        cpTp : Sy.Type;
         pPar : Id.ParId;
-        pars : POINTER TO ARRAY OF Per.Param;
+        pars : POINTER TO ARRAY OF Rfl.ParameterInfo;
 
   BEGIN
-    typ.retType := cpTypeFromCTS(mth.GetRetType(), spc);
-    pars := mth.GetParams();
+    typ.retType := cpTypeFromCTS(MthReturnType(mth), spc);  
+    pars := mth.GetParameters();
     FOR indx := 0 TO LEN(pars) - 1 DO
       pMod := Sy.val;
       thsP := pars[indx];
-      thsT := thsP.GetParType();
-      IF thsT IS Per.ManagedPointer THEN
-        thsT := thsT(Per.PtrType).GetBaseType(); pMod := Sy.var;
-      END;
-      pPar := mkParam(thsP.GetName(), pMod, cpTypeFromCTS(thsT, spc), FALSE);
+      thsT := thsP.get_ParameterType();
+      IF thsT.get_IsByRef() THEN pMod := Sy.var END;
+      cpTp := cpTypeFromCTS(thsT, spc);
+
+      pPar := mkParam(thsP.get_Name(), pMod, cpTp, FALSE);
+      (* pPar := mkParam(thsP.get_Name(), pMod, cpTypeFromCTS(thsT, spc), FALSE); *)
       Id.AppendParam(typ.formals, pPar);
     END;
   END AddFormals;
+  *)
+
+ (* ------------------------------------------------------------ *)
+
+  PROCEDURE (spc : DefNamespace)AddFormalsOK(typ : Ty.Procedure; 
+                                             mth : Rfl.MethodBase) : BOOLEAN, NEW;
+    VAR indx : INTEGER;
+        pMod : INTEGER;
+        thsP : Rfl.ParameterInfo;
+        thsT : Sys.Type;
+        cpTp : Sy.Type;
+        pPar : Id.ParId;
+        pars : POINTER TO ARRAY OF Rfl.ParameterInfo;
+
+  BEGIN
+    typ.retType := cpTypeFromCTS(MthReturnType(mth), spc);  
+    pars := mth.GetParameters();
+    FOR indx := 0 TO LEN(pars) - 1 DO
+      pMod := Sy.val;
+      thsP := pars[indx];
+      thsT := thsP.get_ParameterType();
+      IF thsT.get_IsByRef() THEN
+        IF thsP.get_IsOut() THEN
+          pMod := Sy.out;
+        ELSE
+          pMod := Sy.var;
+        END;
+      END;
+      cpTp := cpTypeFromCTS(thsT, spc);
+      IF cpTp = NIL THEN RETURN FALSE END;
+      pPar := mkParam(thsP.get_Name(), pMod, cpTp, FALSE);
+      Id.AppendParam(typ.formals, pPar);
+    END;
+    RETURN TRUE;
+  END AddFormalsOK;
 
  (* ------------------------------------------------------------ *)
 
   PROCEDURE (spc : DefNamespace)AddRecMth(rec : Ty.Record; 
-                                          mth : Per.MethodDef), NEW;
+                                          mth : Rfl.MethodBase), NEW;
     VAR   mod : INTEGER;
           hsh : INTEGER;
           pMd : INTEGER;
@@ -689,31 +787,33 @@ MODULE ClsToType;
           res : BOOLEAN;
           pId : Id.PrcId;
           mId : Id.MthId;
-          rcv : Per.Type;        (* Receiver type *)
+          dnR : Sys.Type;        (* .NET Receiver type *)
+          cpR : Sy.Type;         (*   CP Receiver type *)  
           pTp : Ty.Procedure;
   BEGIN
    (* SPECIAL FOR PRE 1.4 VERSION *)
     IF isGenericMethod(mth) THEN
-      Glb.CondMsg(" Hiding generic method -- " + ilName(mth));
+      Glb.CondMsg(" Hiding generic method -- " + mth.ToString());
       RETURN;
     ELSIF isVarargMethod(mth) THEN
-      Glb.CondMsg(" Hiding Vararg call method -- " + ilName(mth));
+      Glb.CondMsg(" Hiding Vararg call method -- " + mth.ToString());
       RETURN;
     END;
-    bts := BITS(mth.GetMethAttributes());
+    bts := BITS(mth.get_Attributes());
     mod := modeFromMbrAtt(bts);
     IF mod > Sy.prvMode THEN
-      hsh := Nh.enterStr(mth.Name());
+      hsh := Nh.enterStr(mth.get_Name());
 
       IF stMth IN bts THEN                (* static method *)
         pId := Id.newPrcId(); 
         pId.SetKind(Id.conPrc);
         pId.hash := hsh;
         pId.SetMode(mod);
+        pId.SetNameFromHash(hsh);
         pTp := Ty.newPrcTp();
         pTp.idnt := pId;
         pId.type := pTp;
-        spc.AddFormals(pTp, mth);
+        IF ~spc.AddFormalsOK(pTp, mth) THEN RETURN END;
         res := rec.symTb.enter(hsh, pId);
         Sy.AppendIdnt(rec.statics, pId);
         Glb.ListTy(pTp);
@@ -724,12 +824,11 @@ MODULE ClsToType;
         pId.hash := Glb.initBkt;
         pId.prcNm := BOX(".ctor");
         pId.SetMode(mod);
+        pId.SetNameFromHash(Glb.initBkt);
         pTp := Ty.newPrcTp();
         pTp.idnt := pId;
         pId.type := pTp;
-        spc.AddFormals(pTp, mth);
-        rcv := mth.GetParent()(Per.Type);
-        pTp.retType := cpTypeFromCTS(rcv, spc);
+        IF ~spc.AddFormalsOK(pTp, mth) THEN RETURN END;
         res := rec.symTb.enter(Glb.initBkt, pId);
         Sy.AppendIdnt(rec.statics, pId);
         Glb.ListTy(pTp);
@@ -739,18 +838,20 @@ MODULE ClsToType;
         mId.SetKind(Id.conMth);
         mId.hash := hsh;
         mId.SetMode(mod);
+        mId.SetNameFromHash(hsh);
 
         pMd := Sy.val;
-        rcv := mth.GetParent()(Per.Type);
-        IF isValClass(rcv) THEN pMd := Sy.var END;
+        dnR := mth.get_DeclaringType();
+        cpR := cpTypeFromCTS(dnR, spc);
+        IF cpR = NIL THEN RETURN END;
 
-        mId.rcvFrm := mkParam("this", pMd, cpTypeFromCTS(rcv, spc), TRUE);
+        IF isValClass(dnR) THEN pMd := Sy.var END;
+        mId.rcvFrm := mkParam("this", pMd, cpR, TRUE);
         pTp := Ty.newPrcTp();
         pTp.idnt := mId;
         mId.type := pTp;
         pTp.receiver := rec;
-        spc.AddFormals(pTp, mth);
-
+        IF ~spc.AddFormalsOK(pTp, mth) THEN RETURN END;
         IF    abMth IN bts    THEN 
           mId.mthAtt := Id.isAbs;
         ELSIF (vrMth IN bts) & ~(fnMth IN bts) THEN 
@@ -759,9 +860,6 @@ MODULE ClsToType;
         IF ~(vrMth IN bts) OR (nwMth IN bts) THEN 
           INCL(mId.mthAtt, Id.newBit);
         END;
-
-(* FIXME -- boxRcv flag needs to be set ... *)
-
         res := rec.symTb.enter(hsh, mId);
         Sy.AppendIdnt(rec.methods, mId);
       END;
@@ -771,18 +869,20 @@ MODULE ClsToType;
  (* ------------------------------------------------------------ *)
 
   PROCEDURE (spc : DefNamespace)AddRecEvt(rec : Ty.Record; 
-                                          evt : Per.Event), NEW;
-    VAR   eTp : Per.Type;
+                                          evt : Rfl.EventInfo), NEW;
+    VAR   eTp : Sys.Type;
           nam : RTS.NativeString;
           hsh : INTEGER;
           fId : Id.FldId;
           res : BOOLEAN;
   BEGIN
-    eTp := evt.GetEventType();
-    nam := evt.Name();
+    eTp := evt.get_EventHandlerType();
+    IF isGenericType(eTp) THEN RETURN END;
+    nam := evt.get_Name();
     hsh := Nh.enterStr(nam);
     fId := Id.newFldId();
     fId.hash := hsh;
+    fId.SetNameFromHash(hsh);
     fId.SetMode(Sy.pubMode);
     fId.recTyp := rec;
     fId.type := cpTypeFromCTS(eTp, spc);
@@ -792,41 +892,20 @@ MODULE ClsToType;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE MakeRefCls(cls : Per.ClassDef; 
+  PROCEDURE MakeRefCls(cls : Sys.Type; 
                        spc : DefNamespace;
-                       att : Per.TypeAttr;
-                   OUT tId : Id.TypId);
+                       att : Rfl.TypeAttributes;
+                       tId : Id.TypId);
     VAR ptr  : Ty.Pointer;
    (* ------------------------------------------------- *)
-    PROCEDURE mkRecord(cls : Per.ClassDef; 
+    PROCEDURE mkRecord(cls : Sys.Type;
                        spc : DefNamespace;
-                       att : Per.TypeAttr) : Ty.Record;
+                       att : Rfl.TypeAttributes) : Ty.Record;
       VAR rec : Ty.Record;
-          spr : Per.Class;
-          knd : INTEGER;
           bts : SET;
-          idx : INTEGER;
-          ifE : Per.Class;
-          ifA : POINTER TO ARRAY OF Per.Class;
     BEGIN
       bts := BITS(att);
       rec := Ty.newRecTp();
-      spr := cls.get_SuperType();
-
-      ifA := cls.GetInterfaces();
-      IF ifA # NIL THEN
-        FOR idx := 0 TO LEN(ifA) - 1 DO
-          ifE := ifA[idx];
-          IF ~(ifE IS Per.ClassSpec) & isPublicClass(ifE) THEN
-            Sy.AppendType(rec.interfaces, cpTypeFromCTS(ifE, spc));
-          ELSIF Glb.verbose THEN 
-            SayWhy(ifE);
-          END;
-        END;
-      END;
-
-      IF spr = NIL THEN knd := objTyp ELSE knd := getKind(spr) END;
-      IF knd # objTyp THEN rec.baseTp := cpTypeFromCTS(spr, spc) END;
      (*
       *  The INTERFACE test must come first, since
       *  these have the ABSTRACT bit set as well.
@@ -858,81 +937,165 @@ MODULE ClsToType;
     *  Create the descriptors.
     *)
     ptr := Ty.newPtrTp();
-    tId := Id.newTypId(ptr);
+    tId.type := ptr;
     ptr.idnt := tId;
     ptr.boundTp := mkRecord(cls, spc, att);
     ptr.boundTp(Ty.Record).bindTp := ptr;
-    tId.hash := Nh.enterStr(gpName(cls));
     Glb.ListTy(ptr);
   END MakeRefCls;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE MakeEnumTp(cls : Per.ClassDef; 
-                   OUT tId : Id.TypId);
+  PROCEDURE MakeEnumTp(cls : Sys.Type; 
+                       tId : Id.TypId);
     VAR enu : Ty.Enum;
   BEGIN
    (*
     *  Create the descriptors.
     *)
     enu := Ty.newEnuTp();
-    tId := Id.newTypId(enu);
-    tId.hash := Nh.enterStr(gpName(cls));
+    tId.type := enu;
     enu.idnt := tId;
     Glb.ListTy(enu);
   END MakeEnumTp;
 
  (* ------------------------------------------------ *)
 
-  PROCEDURE MakeValCls(cls : Per.ClassDef; 
-                   OUT tId : Id.TypId);
+  PROCEDURE MakeValCls(cls : Sys.Type; 
+                       tId : Id.TypId);
     VAR rec  : Ty.Record;
   BEGIN
    (*
     *  Create the descriptors.
     *)
     rec := Ty.newRecTp();
-    tId := Id.newTypId(rec);
+    tId.type := rec;
     rec.idnt := tId;
-    tId.hash := Nh.enterStr(gpName(cls));
     IF ~Glb.cpCmpld THEN INCL(rec.xAttr, Sy.isFn) END;
     Glb.ListTy(rec);
   END MakeValCls;
 
+  PROCEDURE MakePrimitiveHost(cls : Sys.Type; tId : Id.TypId);
+  BEGIN
+    MakeValCls(cls, tId);
+    tId.type(Ty.Record).recAtt := Ty.isAbs;
+  END MakePrimitiveHost;
+
  (* ------------------------------------------------ *)
 
-  PROCEDURE MakePrcCls(cls : Per.ClassDef; 
-                   OUT tId : Id.TypId);
+  PROCEDURE MakePrcCls(cls : Sys.Type; 
+                       tId : Id.TypId);
     VAR prc  : Ty.Procedure;
   BEGIN
    (*
-    *  Create the descriptors.
+   (*  Create the descriptor.                 *)
+   (* We have no way of distinguishing between *)
+   (* CP EVENT and CP PROCEDURE types from the *)
+   (* PE-file.  So, default to EVENT meantime. *)
     *)
-(*                          (* We have no way of distinguishing between *)
- *   prc := Ty.newPrcTp();  (* CP EVENT and CP PROCEDURE types from the *)
- *)                         (* PE-file.  So, default to EVENT meantime. *)
     prc := Ty.newEvtTp();
-    tId := Id.newTypId(prc);
     prc.idnt := tId;
-    tId.hash := Nh.enterStr(gpName(cls));
+    tId.type := prc;
     Glb.ListTy(prc);
   END MakePrcCls;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE (spc : DefNamespace)DefineRec(cls : Per.ClassDef; 
-                                          rec : Ty.Record), NEW;
+  PROCEDURE (spc : DefNamespace)DefinePrimary(cls : Sys.Type;
+                                              rec : Ty.Record), NEW;
     VAR indx : INTEGER;
-        flds : POINTER TO ARRAY OF Per.FieldDef;
-        evts : POINTER TO ARRAY OF Per.Event;
-        mths : POINTER TO ARRAY OF Per.MethodDef;
+        flds : POINTER TO ARRAY OF Rfl.FieldInfo;
+        mths : POINTER TO ARRAY OF Rfl.MethodInfo;
+        mthI : Rfl.MethodInfo;
+        fldI : Rfl.FieldInfo;
+		btsI : SET;
+   (* ----------------------------------------------- *)
   BEGIN
    (*
     *  Now fill in record fields ...
     *)
     flds := cls.GetFields();
     FOR indx := 0 TO LEN(flds) - 1 DO
-      spc.AddRecFld(rec, flds[indx]);
+      fldI := flds[indx];
+	  btsI := BITS(fldI.get_Attributes());
+     (*
+      *  Don't emit inherited or instance fields.
+      *)
+      IF (fldI.get_DeclaringType() = cls) & (stFld IN btsI) THEN 
+        spc.AddRecFld(rec, fldI);
+      END;
+    END;
+   (*
+    *  Now fill in record methods ...
+    *)
+    mths := cls.GetMethods();
+    FOR indx := 0 TO LEN(mths) - 1 DO
+      mthI := mths[indx];
+	  btsI := BITS(mthI.get_Attributes());
+     (*
+      *  Don't emit inherited or instance methods.
+      *)
+      IF (mthI.get_DeclaringType() = cls) & (stMth IN btsI) THEN 
+        spc.AddRecMth(rec, mths[indx]);
+      END;
+    END;
+  END DefinePrimary;
+
+ (* ------------------------------------------------------------ *)
+
+  PROCEDURE (spc : DefNamespace)DefineRec(cls : Sys.Type;
+                                          rec : Ty.Record), NEW;
+    VAR indx : INTEGER;
+        flds : POINTER TO ARRAY OF Rfl.FieldInfo;
+        evts : POINTER TO ARRAY OF Rfl.EventInfo;
+        mths : POINTER TO ARRAY OF Rfl.MethodInfo;
+        cons : POINTER TO ARRAY OF Rfl.ConstructorInfo;
+        nTps : POINTER TO ARRAY OF Sys.Type;
+        mthI : Rfl.MethodInfo;
+        fldI : Rfl.FieldInfo;
+   (* ----------------------------------------------- *)
+    PROCEDURE FixBaseAndInterfaces(spc : DefNamespace; 
+                                   cls : Sys.Type; 
+                                   rec : Ty.Record);
+      VAR index : INTEGER;
+          super : Sys.Type;
+          ifElm : Sys.Type;
+          cpTyp : Sy.Type;
+          ifArr : POINTER TO ARRAY OF Sys.Type;
+    BEGIN
+      super := cls.get_BaseType();
+      ifArr := cls.GetInterfaces();
+      IF super # NIL THEN rec.baseTp := cpTypeFromCTS(super, spc) END;
+      IF ifArr # NIL THEN
+        FOR index := 0 TO LEN(ifArr) - 1 DO
+          ifElm := ifArr[index];
+          IF ~ifElm.get_IsGenericType() & isPublicClass(ifElm) THEN
+            cpTyp := cpTypeFromCTS(ifElm, spc);
+            Sy.AppendType(rec.interfaces, cpTyp);
+          ELSIF Glb.verbose THEN 
+            SayWhy(ifElm);
+          END;
+        END;
+      END;
+    END FixBaseAndInterfaces;
+   (* ----------------------------------------------- *)
+  BEGIN
+   (*
+    *  First we must add resolved base and interface types.
+    *)
+    FixBaseAndInterfaces(spc, cls, rec);
+   (*
+    *  Now fill in record fields ...
+    *)
+    flds := cls.GetFields();
+    FOR indx := 0 TO LEN(flds) - 1 DO
+      fldI := flds[indx];
+     (*
+      *  Don't emit inherited fields.
+      *)
+      IF fldI.get_DeclaringType() = cls THEN 
+        spc.AddRecFld(rec, fldI);
+      END;
     END;
    (*
     *  Now fill in record events ...
@@ -946,40 +1109,70 @@ MODULE ClsToType;
     *)
     mths := cls.GetMethods();
     FOR indx := 0 TO LEN(mths) - 1 DO
-      spc.AddRecMth(rec, mths[indx]);
+      mthI := mths[indx];
+      IF cls = mthI.get_DeclaringType() THEN (* ONLY IF NOT GENERIC ARGUMENTS *)
+        spc.AddRecMth(rec, mths[indx]);
+      END;
     END;
+   (*
+    *  Now fill in constructors ...
+    *  even if there are no instance members.
+    *)
+    cons := cls.GetConstructors();
+    FOR indx := 0 TO LEN(cons) - 1 DO 
+      spc.AddRecMth(rec, cons[indx]);
+    END;
+    Glb.VerbMsg(gpName(cls) + " " + gpInt(LEN(mths)) + " methods");
   END DefineRec;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE (spc : DefNamespace)DefineEnu(cls : Per.ClassDef; 
+  PROCEDURE (spc : DefNamespace)DefineEnu(cls : Sys.Type; 
                                           enu : Ty.Enum), NEW;
     CONST litB = 6; (* 40H *)
     VAR   indx : INTEGER;
           valu : LONGINT;
-          flds : POINTER TO ARRAY OF Per.FieldDef;
-          thsF : Per.FieldDef;
+          flds : POINTER TO ARRAY OF Rfl.FieldInfo;
+          thsF : Rfl.FieldInfo;
           thsC : Id.ConId;
           mode : INTEGER;
           bits : SET;
-          sCon : Per.SimpleConstant;
+          sCon : Sys.Object;
+   (* ------------------------------------ *)
+    PROCEDURE conExp(val : Sys.Object) : LONGINT;
+      VAR type : RTS.NativeType;
+          tNam : RTS.NativeString;
+    BEGIN
+      type := val.GetType();
+      tNam := typName(type);
+      IF (tNam = "Int16") OR 
+         (tNam = "Int32") OR
+         (tNam = "Int64") OR 
+         (tNam = "Byte") THEN
+        RETURN Sys.Convert.ToInt64(val);
+      ELSE
+        RTS.Throw("Unimplemented Method conExp type " + tNam);
+        RETURN 0;
+      END;
+    END conExp;
+   (* ------------------------------------ *)
   BEGIN
    (*
     *  Now fill in record details ...
     *)
+    valu := 0;
     flds := cls.GetFields();
     FOR indx := 0 TO LEN(flds) - 1 DO
       thsF := flds[indx];
-      bits := BITS(thsF.GetFieldAttr());
+      bits := BITS(thsF.get_Attributes());
       mode := modeFromMbrAtt(bits);
       IF (mode > Sy.prvMode) & (litB IN bits) THEN
-        sCon := thsF.GetValue()(Per.SimpleConstant);
-        WITH sCon : Per.IntConst DO valu := sCon.GetLong();
-           | sCon : Per.UIntConst DO valu := sCon.GetULongAsLong();
-        END;
+        sCon := thsF.GetRawConstantValue();
+        valu := conExp(sCon);
         thsC := Id.newConId();
         thsC.SetMode(mode);
-        thsC.hash := Nh.enterStr(thsF.Name());
+        thsC.hash := Nh.enterStr(thsF.get_Name());
+        thsC.SetNameFromHash(thsC.hash);
         thsC.conExp := Xp.mkNumLt(valu);
         thsC.type := Bi.intTp;
         Sy.AppendIdnt(enu.statics, thsC);
@@ -989,120 +1182,91 @@ MODULE ClsToType;
 
  (* ------------------------------------------------------------ *)
 
-  PROCEDURE (spc : DefNamespace)DefinePrc(cls : Per.ClassDef; 
+  PROCEDURE (spc : DefNamespace)DefinePrc(cls : Sys.Type; 
                                           prc : Ty.Procedure), NEW;
-    VAR indx : INTEGER;
-        valu : INTEGER;
-        invk : Per.MethodDef;
+    VAR invk : Rfl.MethodInfo;
+        junk : BOOLEAN;
   BEGIN
    (*
     *  Now fill in parameter details ...
     *)
     invk := cls.GetMethod(MKSTR("Invoke"));
-    spc.AddFormals(prc, invk);
-    RETURN;
+    junk := spc.AddFormalsOK(prc, invk);
   END DefinePrc;
 
  (* ------------------------------------------------------------ *)
-
-  PROCEDURE MakeTypIds*(thsN : DefNamespace);
-    VAR indx : INTEGER;
-        thsC : Per.ClassDef;
-        attr : Per.TypeAttr;
-        tEnu : INTEGER;
+ (*                         Not exported                         *)
+ (* ------------------------------------------------------------ *)
+  PROCEDURE AddTypeToId(thsC : Sys.Type; thsN : DefNamespace); 
+    VAR tEnu : INTEGER;
+        hash : INTEGER;
         tpId : Id.TypId;
         clsh : Sy.Idnt;
+        attr : Rfl.TypeAttributes;
+  BEGIN
+    hash := Nh.enterStr(gpName(thsC));
+    tpId := thsN.bloc.symTb.lookup(hash)(Id.TypId);
+    tEnu := getKind(thsC);
+    attr := thsC.get_Attributes();
+
+    Glb.VerbMsg(kindStr(tEnu)^ + " " + gpName(thsC)); 
+
+    CASE tEnu OF
+    | primTyp, voidTyp : 
+         MakePrimitiveHost(thsC, tpId);
+    | refCls, objTyp, strTyp, 
+     (* 
+      * All of the follwing types are reference types
+      * even although all of their derived types are not.
+      *)
+      sysDelT, sysExcT, sysEnuT, sysValT  : 
+         MakeRefCls(thsC, thsN, attr, tpId);
+    | valCls  : MakeValCls(thsC, tpId);
+    | enuCls  : MakeEnumTp(thsC, tpId);
+    | dlgCls  : MakePrcCls(thsC, tpId);
+    ELSE
+      RTS.Throw("Unknown sub-type");
+      RETURN; 
+    END;
+   (* 
+    *  Set the access mode for tpId 
+    *)
+    IF isProtectedType(attr) THEN
+      tpId.SetMode(Sy.protect);
+    ELSE
+      tpId.SetMode(Sy.pubMode);
+    END;
+  END AddTypeToId;
+
+ (* ------------------------------------------------------------ *)
+
+  PROCEDURE AddTypesToIds*(thsN : DefNamespace);
+    VAR indx : INTEGER;
   BEGIN
    (*
-    *  For every namespace, define gpcp descriptors 
-    *  for each class, method, field and constant.
+    *  For every namespace, define gpcp descriptors for
+    *  each class on this namespace's class vector.
+	*  All the descriptors are added to the tIds vector.
     *)
     Glb.CondMsg(" CP Module name - " + Nh.charOpenOfHash(thsN.bloc.hash)^);
     Glb.CondMsg(' Alternative import name - "' + thsN.bloc.scopeNm^ + '"');
     FOR indx := 0 TO LEN(thsN.clss) - 1 DO
-      thsC := thsN.clss[indx];
-      attr := thsC.GetAttributes();
-      tEnu := getKind(thsC);
-
-      IF Glb.Verbose THEN
-        Console.WriteString("        ");
-        Console.WriteString(kindStr(tEnu)); Console.Write(ASCII.HT);
-        Console.WriteString(gpName(thsC));
-        Console.WriteLn;
-      END;
-      
-      CASE tEnu OF
-      | refCls  : MakeRefCls(thsC, thsN, attr, tpId);
-      | valCls  : MakeValCls(thsC, tpId);
-      | enuCls  : MakeEnumTp(thsC, tpId);
-(*
- *    | evtCls  : MakeEvtCls(thsC, tpId);
- *)
-      | dlgCls  : MakePrcCls(thsC, tpId);
-      ELSE tpId := NIL;
-      END;
-(* ---- temporary ---- *)
-IF tpId # NIL THEN
-(* ---- temporary ---- *)
-      IF isProtectedType(attr) THEN
-        tpId.SetMode(Sy.protect);
-      ELSE
-        tpId.SetMode(Sy.pubMode);
-      END;
-      tpId.dfScp := thsN.bloc;
-      IF ~thsN.bloc.symTb.enter(tpId.hash, tpId) THEN
-       (*
-        *  Just a sanity check!
-        *)
-        clsh := thsN.bloc.symTb.lookup(tpId.hash);
-        ASSERT((clsh IS Id.TypId) & (clsh.type IS Ty.Opaque));
-
-        thsN.bloc.symTb.Overwrite(tpId.hash, tpId);
-      END;
-(* ---- temporary ---- *)
-END;
-(* ---- temporary ---- *)
-      APPEND(thsN.tIds, tpId);
+      AddTypeToId(thsN.clss[indx], thsN);
     END;
-  END MakeTypIds;
+  END AddTypesToIds;
 
  (* ------------------------------------------------ *)
- (* ------------------------------------------------ * 
-
-  PROCEDURE MakeRefIds(thsN : RefNamespace);
-    VAR indx : INTEGER;
-        thsC : Per.ClassRef;
-        tEnu : INTEGER;
-        tpId : Id.TypId;
-  BEGIN
-   (*
-    *  For every namespace, define gpcp TypId descriptors for each class
-    *)
-    IF Glb.verbose THEN
-      Glb.Message(" GPCP-Module name - " + Nh.charOpenOfHash(thsN.bloc.hash)^);
-    END;
-    FOR indx := 0 TO LEN(thsN.clss) - 1 DO
-      thsC := thsN.clss[indx];
-      IF Glb.Verbose THEN
-        Console.WriteString("        class rfrnce ");
-        Console.WriteString(gpName(thsC));
-        Console.WriteLn;
-      END;
-      tpId := makeNameType(thsN.bloc, Nh.enterStr(gpName(thsC)));
-      APPEND(thsN.tIds, tpId);
-    END;
-  END MakeRefIds;
-
-  * ------------------------------------------------ *)
  (* ------------------------------------------------ *)
 
   PROCEDURE MakeBlkId*(spc : Namespace; aNm : Glb.CharOpen);
+    VAR name : Glb.CharOpen;
   BEGIN
     NEW(spc.bloc);
     INCL(spc.bloc.xAttr, Sy.need);
-    Glb.BlkIdInit(spc.bloc, aNm, Nh.charOpenOfHash(spc.hash));
-    IF Glb.superVb THEN Glb.Message("Creating blk - " +
-                                     Nh.charOpenOfHash(spc.bloc.hash)^) END;
+    name := Nh.charOpenOfHash(spc.hash);
+    spc.bloc.SetNameFromHash(spc.hash);
+    Glb.BlkIdInit(spc.bloc, aNm, name);
+    IF Glb.superVb THEN Glb.Message("Creating blk - " + name^) END;
   END MakeBlkId;
 
  (* ------------------------------------------------ *)
@@ -1112,26 +1276,31 @@ END;
         tEnu : INTEGER;
         thsT : Sy.Type;
         thsI : Id.TypId;
-        thsC : Per.ClassDef;
+        thsC : Sys.Type;
   BEGIN
    (*
     *  For every namespace, define gpcp descriptors 
     *  for each class, method, field and constant.
     *)
+    indx := 0;
     FOR indx := 0 TO LEN(thsN.clss) - 1 DO
       thsC := thsN.clss[indx];
       thsI := thsN.tIds[indx];
       tEnu := getKind(thsC);
-
       CASE tEnu OF
       | valCls  : thsN.DefineRec(thsC, thsI.type(Ty.Record));
       | enuCls  : thsN.DefineEnu(thsC, thsI.type(Ty.Enum));
+   (* | evtCls  : (* Can't distinguish from dlgCls! *) *)
       | dlgCls  : thsN.DefinePrc(thsC, thsI.type(Ty.Procedure));
-      | refCls  : thsT := thsI.type(Ty.Pointer).boundTp;
+      | primTyp : thsN.DefinePrimary(thsC, thsI.type(Ty.Record));
+      | refCls, objTyp, strTyp, 
+      (* 
+       * All of the follwing types are reference types
+       * even although all of their derived types are not.
+       *)
+        sysDelT, sysExcT, sysEnuT, sysValT  : 
+                  thsT := thsI.type(Ty.Pointer).boundTp;
                   thsN.DefineRec(thsC, thsT(Ty.Record));
-(*
- *    | evtCls  : thsN.MakeEvtCls(thsC, ); (* Can't distinguish from dlgCls! *)
- *)
       ELSE (* skip *)
       END;
     END;
@@ -1140,30 +1309,42 @@ END;
  (* ------------------------------------------------------------ *)
  (*    Separate flat class-list into lists for each namespace    *)
  (* ------------------------------------------------------------ *)
-
-  PROCEDURE Classify*(IN  clss : ARRAY OF Per.ClassDef;
+  PROCEDURE Classify*(IN  tVec : ARRAY OF Sys.Type;
                       OUT nVec : VECTOR OF DefNamespace);
     VAR indx : INTEGER;
-        thsC : Per.ClassDef;
-        attr : Per.TypeAttr;
+        thsC : Sys.Type;
+        (* attr : Rfl.TypeAttributes; *)
    (* ======================================= *)
     PROCEDURE Insert(nVec : VECTOR OF DefNamespace; 
-                     thsC : Per.ClassDef);
+                     thsC : Sys.Type);
       VAR thsH : INTEGER;
           jndx : INTEGER;
           nSpc : RTS.NativeString;
           cNam : RTS.NativeString;
           newN : DefNamespace;
+          idxN : DefNamespace;
+          tpId : Id.TypId;
     BEGIN
       nSpc := gpSpce(thsC);
       cNam := gpName(thsC);
-      IF nSpc = "" THEN thsH := anon ELSE thsH := Nh.enterStr(nSpc) END;
+      tpId := Id.newTypId(NIL);
+      tpId.hash := Nh.enterStr(cNam);
+      tpId.SetNameFromHash(tpId.hash);
+
+      IF (nSpc = NIL) OR 
+         (nSpc = "") THEN thsH := anon ELSE thsH := Nh.enterStr(nSpc) END;
      (*
-      *  See if already a Namespace for this hash bucket
+      *  See if there is already a Namespace for this hash bucket
+      *  Linear search is slow, but LEN(nVec) is usually short
       *)
       FOR jndx := 0 TO LEN(nVec) - 1 DO
-        IF nVec[jndx].hash = thsH THEN
-          APPEND(nVec[jndx].clss, thsC); RETURN;    (* FORCED EXIT! *)
+        idxN := nVec[jndx];
+        IF idxN.hash = thsH THEN
+          APPEND(idxN.clss, thsC); 
+          APPEND(idxN.tIds, tpId);
+          ASSERT(idxN.bloc.symTb.enter(tpId.hash, tpId));
+          tpId.dfScp := idxN.bloc; 
+          RETURN;    (* FORCED EXIT! *)
         END;
       END;
      (*
@@ -1172,31 +1353,46 @@ END;
       NEW(newN);                  (* Create new DefNamespace object    *)
       NEW(newN.clss, 8);          (* Create new vector of ClassDef     *)
       NEW(newN.tIds, 8);          (* Create new vector of Id.TypId     *)
-      newN.hash := thsH;
-      APPEND(newN.clss, thsC);    (* Append class to new class vector  *)
+      IF thsH = anon THEN
+        newN.nStr := MKSTR("<UnNamed>");
+      ELSE 
+        newN.nStr := nSpc;
+        newN.hash := thsH;
+      END;      
+      MakeBlkId(newN, Glb.basNam);
       APPEND(nVec, newN);         (* Append new DefNamespace to result *)
+      APPEND(newN.clss, thsC);    (* Append class to new clss vector  *)
+      APPEND(newN.tIds, tpId);    (* Append typId to new tIds vector  *)
+      ASSERT(newN.bloc.symTb.enter(tpId.hash, tpId));
+      tpId.dfScp := newN.bloc;
     END Insert;
+   (* ======================================= *)
+    PROCEDURE AddToIgnoreTypes(thsC : Sys.Type);
+      VAR typeId : Id.TypId;
+          qualNm : Glb.CharOpen;
+          hashIx : INTEGER;
+    BEGIN
+      typeId := Id.newTypId(Ty.newNamTp());
+
+      qualNm := BOX(BOX(gpSpce(thsC))^ + "." + BOX(gpName(thsC))^);
+      typeId.hash := Nh.enterStr(qualNm^);
+      (*
+      // ignoreBlk has a table of types known to be 
+      // generic so we will not mistakenly add them 
+      // to the typelist if a used occurrence is found.
+      *)
+      ASSERT(Glb.ignoreBlk.symTb.enter(typeId.hash, typeId));
+    END AddToIgnoreTypes;
    (* ======================================= *)
   BEGIN
     NEW(nVec, 8);
-    FOR indx := 0 TO LEN(clss) - 1 DO
-      thsC := clss[indx];
-      IF isPublicClass(thsC) THEN 
+    FOR indx := 0 TO LEN(tVec) - 1 DO
+      thsC := tVec[indx];
+      IF isPublicClass(thsC) THEN
         Insert(nVec, thsC);
-      ELSIF Glb.verbose THEN
-        SayWhy(thsC);
+      ELSE
+        AddToIgnoreTypes(thsC);
       END;
-(* ------------------------------------- *
- *    attr := thsC.GetAttributes();
- *    IF isExportedType(attr) THEN 
- *      IF ~isGenericClass(thsC) THEN (* SPECIAL FOR PRE 1.4 VERSION *)
- *        Insert(nVec, thsC);
- *      ELSIF Glb.verbose THEN
- *        Glb.Message(" Hiding generic class -- " + 
- *                         gpSpce(thsC) + "." + gpName(thsC));
- *      END;
- *    END;
- * ------------------------------------- *)
     END;
     IF Glb.verbose THEN
       IF LEN(nVec) = 1 THEN
@@ -1239,14 +1435,6 @@ END;
   END InitCorLibTypes;
 
 (* ------------------------------------------------------------- *)
-(*
-  PROCEDURE ImportCorlib*();
-  BEGIN
-    Glb.InsertImport(corLib);
-    INCL(corLib.xAttr, Sy.need);
-  END ImportCorlib;
- *)
-(* ------------------------------------------------------------- *)
 
   PROCEDURE ImportCorlib*(spc : DefNamespace);
   BEGIN
@@ -1262,6 +1450,7 @@ END;
       END; 
     END;
     INCL(corLib.xAttr, Sy.need);
+    EXCL(corLib.xAttr, Sy.weak);
   END ImportCorlib;
 
 (* ------------------------------------------------------------- *)
