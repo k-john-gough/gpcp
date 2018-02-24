@@ -466,6 +466,8 @@ MODULE JsmnUtil;
   PROCEDURE (os : JsmnFile)CopyProcHead*(rec : Ty.Record);
   BEGIN
     os.proc := newProcInfo(NIL);
+    os.proc.lNum := 2; (* p0 ~ this, p1 ~ src-arg *)
+    os.proc.lMax := 2;
     os.Comment("standard record copy method");
     os.DirectiveIS(Jvm.dot_method, Jvm.att_public, 
 				"__copy__(" + rec.scopeNm^ + ")V");

@@ -56,14 +56,34 @@ csc /t:library /r:GPFiles.dll /debug /nologo GPBinFiles.cs
 if errorlevel 1 goto :fail
 csc /t:library /r:GPFiles.dll /debug /nologo GPTextFiles.cs
 if errorlevel 1 goto :fail
+REM ===================================
+echo moving PE files to TRGT\bin
+REM ===================================
 move *.dll %TRGT%\bin
 move *.pdb %TRGT%\bin
 CD %HOME%\libs\csharp
+REM ===================================
+echo compiling MsilAsm 
+REM ===================================
 csc /t:library /debug /nologo MsilAsm.cs
 if errorlevel 1 goto :fail
 move MsilAsm.dll %TRGT%\bin
 move MsilAsm.pdb %TRGT%\bin
-
+REM
+REM The source of PeToCpsUtils.cp is included.
+REM It is required to allow PeToCps v1.4.06 to be
+REM compiled using the gpcp v1.4.04 executables. 
+REM It is not required when re-compiling with gpcp 1.4.06
+REM
+REM csc /t:library /debug /nologo PeToCpsUtils.cs
+REM PeToCps PeToCpsUtils.dll
+REM move PeToCpsUtils.dll %TRGT%\bin
+REM move PeToCpsUtils.pdb %TRGT%\bin
+REM move PeToCpsUtils_.cps %TRGT%\symfiles
+REM if errorlevel 1 goto :fail
+REM move MsilAsm.dll %TRGT%\bin
+REM move MsilAsm.pdb %TRGT%\bin
+REM 
 REM ===================================
 echo Compiling CP library sources
 REM ===================================
@@ -75,6 +95,13 @@ if errorlevel 1 goto :fail
 if errorlevel 1 goto :fail
 move *.cps %TRGT%\symfiles
 del *.il /q
+
+REM ===================================
+echo NOT Copying the PERWAPI symbol files
+REM  Have to leave this in until PERWAPI is removed from distro
+REM ===================================
+REM CD %CROOT%\symfiles
+REM copy QUT_*.cps %TRGT%\symfiles
 
 REM ===================================
 echo Copying the NetSystem symbol files
@@ -131,11 +158,11 @@ REM  This is only necessary until the new PeToCps
 REM  uses System.Reflection to build symbol files.
 REM ===================================
 REM ===================================
-echo Copying PERWAPI to gpcp-NET\bin
+echo NOT Copying PERWAPI to gpcp-NET\bin
 REM ===================================
-CD %CROOT%\bin
-copy QUT*.* %TRGT%\bin
-copy CopyNetLibs.bat %TRGT%\bin
+REM CD %CROOT%\bin
+REM copy QUT*.* %TRGT%\bin
+REM ===================================
 
 REM ===================================
 echo Copying the documentation
@@ -166,6 +193,14 @@ copy sources\gpcp\libs\java\MsilAsm.java %TRGT%\sources\gpcp\libs\java
 copy sources\gpcp\libs\csharp\MsilAsm.cs %TRGT%\sources\gpcp\libs\csharp
 
 REM ===================================
+echo Copy helper files for .NET bin directory
+REM ===================================
+copy sources\gpcp\CopyNetLibs.bat %TRGT%\bin
+copy sources\gpcp\_README-NET.txt %TRGT%\bin
+copy sources\gpcp\CopyNetLibs.bat %TRGT%\sources\gpcp
+copy sources\gpcp\_README-NET.txt %TRGT%\sources\gpcp
+
+REM ===================================
 echo Copying CP library sources
 REM ===================================
 copy sources\libs\cpascal\*.cp %TRGT%\sources\libs\cpascal
@@ -182,7 +217,7 @@ REM ===================================
 copy sources\libs\java\*.* %TRGT%\sources\libs\java
 
 REM ===================================
-echo Copying PERWAPI-project.zip to gpcp-NET\sources
+echo (Still) Copying PERWAPI-project.zip to gpcp-NET\sources
 REM ===================================
 copy sources\PERWAPI-project.zip %TRGT%\sources
 

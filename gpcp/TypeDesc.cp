@@ -268,6 +268,26 @@ MODULE TypeDesc;
                  END;
 
 (* ============================================================ *)
+
+  PROCEDURE kindStr*(t : Sy.Type) : Lv.CharOpen;
+  BEGIN
+    CASE t.kind OF
+    | basTp : RETURN BOX("basTp");
+    | tmpTp : RETURN BOX("tmpTp");
+    | namTp : RETURN BOX("namTp");
+    | arrTp : RETURN BOX("arrTp");
+    | recTp : RETURN BOX("recTp");
+    | ptrTp : RETURN BOX("ptrTp");
+    | prcTp : RETURN BOX("prcTp");
+    | enuTp : RETURN BOX("enuTp");
+    | evtTp : RETURN BOX("evtTp");
+    | ovlTp : RETURN BOX("ovlTp");
+    | vecTp : RETURN BOX("vecTp");
+    ELSE      RETURN BOX("?typ?");
+    END;
+  END kindStr;
+
+(* ============================================================ *)
 (*               Predicates on Type extensions                  *)
 (* ============================================================ *)
 
@@ -1513,6 +1533,9 @@ MODULE TypeDesc;
       *  do not find it, the type just stays opaque.
       *)
       i.depth := finishMark;
+	  IF (i.idnt # NIL) & (i.idnt.namStr = NIL) THEN
+	    i.idnt.SetNameFromHash(i.idnt.hash);
+	  END;
       oldTpId := i.idnt;
       newTpId := oldTpId.dfScp.symTb.lookup(oldTpId.hash);
       IF newTpId = NIL THEN

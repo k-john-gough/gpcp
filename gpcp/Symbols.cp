@@ -327,6 +327,11 @@ MODULE Symbols;
 
 (* -------------------------------------------- *)
 
+  PROCEDURE (s : Idnt)isNeeded*() : BOOLEAN,NEW,EXTENSIBLE;
+  BEGIN RETURN FALSE END isNeeded;
+
+(* -------------------------------------------- *)
+
   PROCEDURE (s : Idnt)isWeak*() : BOOLEAN,NEW,EXTENSIBLE;
   BEGIN RETURN FALSE END isWeak;
 
@@ -1253,6 +1258,39 @@ MODULE Symbols;
 (* ============================================================ *)
 (*      Public static methods on symbol-tables                  *)
 (* ============================================================ *)
+
+  PROCEDURE trackedRefused*(id : Idnt; scp : Scope) : BOOLEAN;
+    VAR fail  : BOOLEAN;
+        clash : Idnt;
+  BEGIN
+    fail := ~scp.symTb.enter(id.hash, id);
+    IF fail THEN
+      Console.WriteString("Trial insert of ");
+      Console.WriteString(NameHash.charOpenOfHash(id.hash));
+      Console.Write('{');
+      IF id.isWeak() THEN Console.WriteString("weak,") END;
+      IF id.isNeeded() THEN Console.WriteString("need,") END;
+      Console.Write('}');
+      Console.WriteString(" clashes in scope ");
+      Console.WriteString(NameHash.charOpenOfHash(scp.hash));
+      Console.WriteLn;
+
+      clash := scp.symTb.lookup(id.hash);
+      IF clash.isImport() & clash.isWeak() THEN
+
+        Console.WriteString("Existing symTab entry is ");
+        Console.WriteString(NameHash.charOpenOfHash(clash.hash));
+        Console.Write('{');
+        IF clash.isWeak() THEN Console.WriteString("weak,") END;
+        IF clash.isNeeded() THEN Console.WriteString("need,") END;
+        Console.Write('}');
+        Console.WriteLn;
+
+        scp.symTb.Overwrite(id.hash, id); fail := FALSE;
+      END;
+    END;
+    RETURN fail;
+  END trackedRefused;
 
   PROCEDURE refused*(id : Idnt; scp : Scope) : BOOLEAN;
     VAR fail  : BOOLEAN;

@@ -173,9 +173,9 @@ MODULE Browse;
            END;
 
     Pointer = POINTER TO EXTENSIBLE RECORD (Type)
-                baseNum : INTEGER;
+                boundOrd  : INTEGER;
+                boundType : Type;
                 isAnonPointer : BOOLEAN;
-                baseType : Type;
               END;
 
     Record = POINTER TO EXTENSIBLE RECORD (Type)
@@ -183,7 +183,7 @@ MODULE Browse;
                baseType  : Type;
                ptrType   : Pointer;
                isAnonRec : BOOLEAN;
-               baseNum   : INTEGER;
+               baseOrd   : INTEGER;
                intrFaces : DescList; 
                fields    : DescList; 
                methods   : DescList; 
@@ -260,7 +260,7 @@ MODULE Browse;
                 list : POINTER TO ARRAY OF Module;
               END;
 
-    Module = POINTER TO RECORD
+    Module = POINTER TO RECORD 
                name      : CharOpen;
                symName   : CharOpen;
                fName     : CharOpen;
@@ -316,11 +316,7 @@ MODULE Browse;
 (* ============================================================ *)
 (* ============================================================ *)
 
-  PROCEDURE QuickSortDescs(lo, hi : INTEGER; dLst : DescList);
-    VAR i,j : INTEGER;
-        dsc : Desc;
-	tmp : Desc;
-   (* -------------------------------------------------- *)
+ (* ---------------------------------------------------- *)
     PROCEDURE canonLT(l,r : ARRAY OF CHAR) : BOOLEAN;
       VAR i : INTEGER;
     BEGIN
@@ -337,7 +333,14 @@ MODULE Browse;
       FOR i := 0 TO LEN(r) - 1 DO r[i] := CAP(r[i]) END;
       RETURN l > r;
     END canonGT;
-   (* -------------------------------------------------- *)
+ (* ---------------------------------------------------- *)
+
+ (* ---------------------------------------------------- *)
+  PROCEDURE QuickSortDescs(lo, hi : INTEGER; dLst : DescList);
+    VAR i,j : INTEGER;
+        dsc : Desc;
+	tmp : Desc;
+ (* ---------------------------------------------------- *)
   BEGIN
     i := lo; j := hi;
     dsc := dLst.list[(lo+hi) DIV 2];
@@ -350,12 +353,38 @@ MODULE Browse;
       WHILE canonGT(dLst.list[j].name$, dsc.name$) DO DEC(j) END;
       IF i <= j THEN
         tmp := dLst.list[i]; dLst.list[i] := dLst.list[j]; dLst.list[j] := tmp; 
-	INC(i); DEC(j);
+        INC(i); DEC(j);
       END;
     UNTIL i > j;
     IF lo < j THEN QuickSortDescs(lo, j,  dLst) END;
     IF i < hi THEN QuickSortDescs(i,  hi, dLst) END;
   END QuickSortDescs;
+ (* ---------------------------------------------------- *)
+
+ (* ---------------------------------------------------- *)
+  PROCEDURE QuickSortMods(lo, hi : INTEGER; dLst : ModList);
+    VAR i,j : INTEGER;
+        dsc : Module;
+	tmp : Module;
+ (* ---------------------------------------------------- *)
+  BEGIN
+    i := lo; j := hi;
+    dsc := dLst.list[(lo+hi) DIV 2];
+    REPEAT
+   (*
+    * WHILE dLst.list[i].name < dsc.name DO INC(i) END;
+    * WHILE dLst.list[j].name > dsc.name DO DEC(j) END;
+    *)
+      WHILE canonLT(dLst.list[i].name$, dsc.name$) DO INC(i) END;
+      WHILE canonGT(dLst.list[j].name$, dsc.name$) DO DEC(j) END;
+      IF i <= j THEN
+        tmp := dLst.list[i]; dLst.list[i] := dLst.list[j]; dLst.list[j] := tmp; 
+        INC(i); DEC(j);
+      END;
+    UNTIL i > j;
+    IF lo < j THEN QuickSortMods(lo, j,  dLst) END;
+    IF i < hi THEN QuickSortMods(i,  hi, dLst) END;
+  END QuickSortMods;
 
 (* ============================================================ *)
 (* ============================================================ *)
@@ -762,7 +791,7 @@ MODULE Browse;
       ptr : Pointer;
   BEGIN
     NEW(ptr);
-    ptr.baseNum := readOrd();
+    ptr.boundOrd := readOrd();
     ptr.isAnonPointer := FALSE;
     GetSym();
     RETURN ptr;
@@ -879,10 +908,10 @@ MODULE Browse;
       GetSym();
     END;
     IF sSym = basSy THEN
-      rec.baseNum := iAtt;
+      rec.baseOrd := iAtt;
       GetSym();
     ELSE
-      rec.baseNum := 0;
+      rec.baseOrd := 0;
     END;
     IF sSym = iFcSy THEN
       GetSym();
@@ -1011,7 +1040,7 @@ MODULE Browse;
       | eTpSy : typ := enumType();
       ELSE 
         NEW(namedType);
-	typ := namedType;
+	    typ := namedType;
       END;
       IF typ # NIL THEN
         AddType(typeList,typ,typOrd);
@@ -1030,8 +1059,8 @@ MODULE Browse;
         typ(Vector).elemType := typeList[typ(Vector).elemTypeNum];
       ELSIF typ IS Record THEN
         rec := typ(Record);
-        IF (rec.baseNum > 0) THEN
-          rec.baseType := typeList[rec.baseNum];
+        IF (rec.baseOrd > 0) THEN
+          rec.baseType := typeList[rec.baseOrd];
         END;
         FOR j := 0 TO rec.fields.tide-1 DO
           f := rec.fields.list[j](VarDesc);
@@ -1049,7 +1078,7 @@ MODULE Browse;
           END;
         END;
       ELSIF typ IS Pointer THEN
-        typ(Pointer).baseType := typeList[typ(Pointer).baseNum];
+        typ(Pointer).boundType := typeList[typ(Pointer).boundOrd];
       ELSIF typ IS Proc THEN
         ResolveProc(typ(Proc));
       END;
@@ -1079,11 +1108,11 @@ MODULE Browse;
         IF typ.declarer = NIL THEN (* anon record *)
           typ(Record).isAnonRec := TRUE;
         END;
-      ELSIF (typ IS Pointer) & (typ(Pointer).baseType IS Record) THEN
+      ELSIF (typ IS Pointer) & (typ(Pointer).boundType IS Record) THEN
         IF (typ.declarer = NIL) & (typ.importedFrom = NIL) THEN 
           typ(Pointer).isAnonPointer := TRUE; 
         END;
-        r := typ(Pointer).baseType(Record);
+        r := typ(Pointer).boundType(Record);
         IF (r.declarer = NIL) THEN  (* anon record *)
           r.isAnonRec := TRUE;
           r.ptrType := typ(Pointer);
@@ -1332,7 +1361,7 @@ MODULE Browse;
 	    mod.pathName := mod.symName;
 	  END;
 	  IF verbose THEN
-	    Error.WriteString("Opened " + mod.pathName^); Error.WriteLn;
+	    Console.WriteString("Opened " + mod.pathName^); Console.WriteLn;
 	  END;
       marker := readInt();
       IF marker = RTS.loInt(magic) THEN
@@ -1347,7 +1376,7 @@ MODULE Browse;
       mod.print := TRUE;
       GetSym();
       IF verbose THEN
-        Error.WriteString("Reading " + mod.name^); Error.WriteLn;
+        Console.WriteString("Reading " + mod.name^); Console.WriteLn;
       END;
       SymFile(mod);
       GPBinFiles.CloseFile(file);
@@ -1442,6 +1471,7 @@ END WriteTypeDecl;
 (* FIXME *)
 PROCEDURE (o : Output) MethRef(IN nam : ARRAY OF CHAR),NEW,EMPTY;
 PROCEDURE (o : Output) MethAnchor(IN nam : ARRAY OF CHAR),NEW,EMPTY;
+PROCEDURE (o : Output) WriteLinefold(indent : INTEGER),NEW,EMPTY;
 (* FIXME *)
 
 (* ------------------------------------------------------------------- *)
@@ -1626,13 +1656,18 @@ END WriteTypeDecl;
 (* FIXME *)
 PROCEDURE (h : HtmlOutput) MethRef(IN nam : ARRAY OF CHAR);
 BEGIN
-  GPText.WriteString(h.file, '    <a href="#meths-');;
+  GPText.WriteString(h.file,"<b> (* </b>");
+  GPText.WriteString(h.file, '<a href="#meths-');;
   GPText.WriteString(h.file, nam);
   GPText.WriteString(h.file, '">');
+  GPText.WriteString(h.file, "Typebound Procedures");
+(*
   GPText.WriteString(h.file, '<font color="#cc0033">');
-  GPText.WriteString(h.file, "(* Typebound Procedures *)");
+  GPText.WriteString(h.file, "Typebound Procedures");
   GPText.WriteString(h.file, "</font>");
+ *)
   GPText.WriteString(h.file, '</a>');
+  GPText.WriteString(h.file,"<b> *)</b>");
 END MethRef;
 
 PROCEDURE (h : HtmlOutput) MethAnchor(IN nam : ARRAY OF CHAR);
@@ -1641,6 +1676,12 @@ BEGIN
   GPText.WriteString(h.file, nam);
   GPText.WriteString(h.file, '"></a>');
 END MethAnchor;
+
+PROCEDURE (o : HtmlOutput) WriteLinefold(indent : INTEGER);
+BEGIN
+  o.WriteLn;
+  o.Indent(indent);
+END WriteLinefold;
 (* FIXME *)
 
 (* ==================================================================== *)
@@ -1993,7 +2034,7 @@ END MethAnchor;
      (* ##### *)
       FOR i := 0 TO r.intrFaces.tide-1 DO
         output.WriteString(" + ");
-	iTyp := r.intrFaces.list[i](TypeDesc).type;
+        iTyp := r.intrFaces.list[i](TypeDesc).type;
         IF (iTyp IS Record) & (iTyp(Record).ptrType # NIL) THEN
           iTyp(Record).ptrType.Print(0,FALSE);
         ELSE
@@ -2005,7 +2046,10 @@ END MethAnchor;
     END;
 
 (* FIXME *)
-    IF r.methods.tide > 0 THEN
+    IF r.methods.tide > 0 THEN (* If interfaces, then newline + indent? *)
+      IF r.intrFaces.tide > 1 THEN
+        output.WriteLinefold(indent);
+      END;
       IF r.declarer # NIL THEN 
         output.MethRef(r.declarer.name);
       ELSIF (r.ptrType # NIL) & (r.ptrType.declarer # NIL) THEN
@@ -2196,7 +2240,7 @@ END MethAnchor;
   PROCEDURE (p : Pointer) PrintType(indent : INTEGER),EXTENSIBLE;
   BEGIN
     output.WriteKeyword("POINTER TO ");
-    p.baseType.Print(indent,FALSE);
+    p.boundType.Print(indent,FALSE);
   END PrintType;
 
   PROCEDURE (p : Event) PrintType(indent : INTEGER);
@@ -2369,6 +2413,11 @@ END MethAnchor;
     END;
    (*  end optional strong name.  *)
     output.WriteLn; output.WriteLn;
+
+    IF (mod.imports.tide > 1) & alpha THEN
+      QuickSortMods(1, mod.imports.tide-1, mod.imports);
+    END;
+
     IF mod.imports.tide > 1 THEN
       output.WriteKeyword("IMPORT"); output.WriteLn;
       output.Indent(4);
@@ -2406,7 +2455,7 @@ END MethAnchor;
     output.WriteLn;
     FOR i := 0 TO mod.types.tide -1 DO 
       ty := mod.types.list[i](UserTypeDesc).type;
-      IF ty IS Pointer THEN ty := ty(Pointer).baseType; END;
+      IF ty IS Pointer THEN ty := ty(Pointer).boundType; END;
       IF ty IS Record THEN
         rec := ty(Record);
 
@@ -2680,8 +2729,8 @@ END ParseOptions;
               GPTextFiles.createPath(fNamePtr);
           END;
           IF verbose THEN
-            Error.WriteString("Creating " + fNamePtr^);
-            Error.WriteLn;
+            Console.WriteString("Creating " + fNamePtr^);
+            Console.WriteLn;
           END;
         END;
         PrintModule(modList.list[i]); 

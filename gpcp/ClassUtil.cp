@@ -851,7 +851,7 @@ MODULE ClassUtil;
     NEW(m);
     m.methId := meth;
     IF meth = NIL THEN
-      m.localNum := 0;
+      m.localNum := 2;
       m.maxLocals := 2; (* need 2 for __copy__  'this' + 'arg'*)
     ELSE        (* Id.BlkId *)
       m.localNum := meth.rtsFram;

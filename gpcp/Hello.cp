@@ -1,8 +1,10 @@
 
 MODULE Hello;
   IMPORT CPmain, Console, 
+  GF := GPFiles,
   BF := GPBinFiles,
-  RTS;
+  RTS,
+  Sys := mscorlib_System;
 
   CONST greet = "Hello ASM World";
   VAR   file : BF.FILE;
@@ -16,7 +18,6 @@ MODULE Hello;
     VAR indx : INTEGER;
         char : CHAR;
   BEGIN
-    Console.Write(char);
     FOR indx := 0 TO LEN(a) - 1 DO
       char := a[indx];
       Console.WriteInt(indx, 2);

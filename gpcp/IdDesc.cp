@@ -136,7 +136,7 @@ MODULE IdDesc;
     uplevW* = 2;  (* This bit set if local is uplevel written   *)
     uplevA* = 3;  (* This bit is set if Any uplevel access      *)
     cpVarP* = 4;  (* This bit denotes uplevel access to var-par *)
-    xMark* = -1;  (* varOrd is set to xMark is local is uplevel *)
+    xMark* = -1;  (* varOrd is set to xMark if local is uplevel *)
                   (* BUT ... not until after flow attribution!  *)
 
   TYPE
@@ -425,6 +425,10 @@ MODULE IdDesc;
   (** Determine if this block is an indirect module-import. *
    *  Overrides isWeak() for Symbols.Scope.     *)
   BEGIN RETURN D.weak IN s.xAttr END isWeak;
+(* -------------------------------------------- *)
+
+  PROCEDURE (s : BlkId)isNeeded*() : BOOLEAN;
+  BEGIN RETURN D.need IN s.xAttr END isNeeded;
 
 (* -------------------------------------------- *)
 

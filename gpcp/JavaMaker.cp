@@ -534,7 +534,7 @@ MODULE JavaMaker;
           Ju.MkProcName(method);
           Ju.RenumberLocals(method);
         END;
-        this.EmitProc(method)
+        this.EmitProc(method);
       END;
     END;
   END EmitBody;
@@ -570,19 +570,6 @@ MODULE JavaMaker;
       varId := this.mod.locals.a[index](Id.VarId);
       out.EmitField(varId);  
     END;
-    (*
-    FOR index := 0 TO this.mod.procs.tide-1 DO
-     (*
-      *  Create the mangled name for all non-forward procedures
-      *)
-      proc := this.mod.procs.a[index];
-      IF (proc.kind = Id.conPrc) OR 
-         (proc.kind = Id.conMth) THEN
-        Ju.MkProcName(proc);
-        Ju.RenumberLocals(proc);
-      END;
-    END;
-    *)
    (* 
     *  Do all the procs, including <init> and <clinit> 
     *)
@@ -592,18 +579,32 @@ MODULE JavaMaker;
     out.InitVars(this.mod);
     IF this.mod.main THEN
      (*
-      *   Emit <clinit>, and module body as main() 
+      *   This module imports CPmain, so ...
+      *   end emission of <clinit>, and then
+      *   emit module body as main() 
       *)
       out.VoidTail();
       out.MainHead();
       this.EmitStat(this.mod.modBody, returned);
       IF returned THEN
+       (*
+        * The following code is a workaround for a tricky
+        * corner case specific to stack frames in SE 7+.
+        * If the normal return does not reach module end
+        * due to an unterminated loop being the last 
+        * statement, then emission of dead code "return"
+        * will fail verification - as there is no possible
+        * correct stack-frame at that program point.
+        *)
         this.EmitStat(this.mod.modClose, returned);
+        out.VoidTail();
+      ELSE
+        out.EndProc();
       END;
-      out.VoidTail();
     ELSE
      (*
-      *   Emit single <clinit> incorporating module body
+      *   This module does not import CPmain, so ...
+      *   module body is emitted as <clinit>
       *)
       this.EmitStat(this.mod.modBody, returned);
       out.VoidTail();
