@@ -112,6 +112,7 @@ MODULE NewSymFileRW;
         arrSy = ORD('['); endAr = ORD(']'); pTpSy = ORD('%');
         ptrSy = ORD('^'); basSy = ORD('+'); eTpSy = ORD('e');
         iFcSy = ORD('~'); evtSy = ORD('v'); vecSy = ORD('*');
+        eofSy = -1;
 
   CONST
         magic   = 0DEADD0D0H;
@@ -720,7 +721,7 @@ MODULE NewSymFileRW;
     IF ~f.isImportedRecord(t) THEN
       f.Write(recSy);
       index := t.recAtt; 
-      IF D.noNew IN t.xAttr THEN INC(index, Ty.noNew) END;
+      IF D.valTp IN t.xAttr THEN INC(index, Ty.valRc) END;
       IF D.clsTp IN t.xAttr THEN INC(index, Ty.clsRc) END;
       f.Write(index);
    (* ########## *)
@@ -851,8 +852,8 @@ MODULE NewSymFileRW;
 
 (* ======================================= *)
 
-  PROCEDURE EmitSymfile*(m : Id.BlkId);
 
+  PROCEDURE EmitSymfileAndComment*(m : Id.BlkId; cmnt1, cmnt2 : Lt.CharOpen);
     VAR symVisit : SymFileSFA;
         symfile  : SymFile;
         marker   : INTEGER;
@@ -945,8 +946,16 @@ MODULE NewSymFileRW;
       symfile.Write(keySy);
       lastKey := symfile.cSum;
       IF CSt.special THEN symfile.Write4B(0) ELSE symfile.Write4B(lastKey) END;
+      IF cmnt1 # NIL THEN symfile.WriteStringForLit(cmnt1);
+		IF cmnt2 # NIL THEN symfile.WriteStringForLit(cmnt2) END;
+      END;
       BF.CloseFile(symfile.file);
     END;
+  END EmitSymfileAndComment;
+
+  PROCEDURE EmitSymfile*(m : Id.BlkId);
+  BEGIN
+    EmitSymfileAndComment(m, NIL, NIL);
   END EmitSymfile;
 
 (* ============================================================ *)
@@ -1461,18 +1470,23 @@ MODULE NewSymFileRW;
     *  and is stripped off here.  The valRc field is used to lock
     *  in foreign value classes, even though they have basTp # NIL.
     *)
-    IF attr >= Ty.clsRc THEN DEC(attr,Ty.clsRc); INCL(rslt.xAttr,D.clsTp) END;
-    IF attr >= Ty.noNew THEN DEC(attr,Ty.noNew); INCL(rslt.xAttr,D.noNew) END;
+    IF attr >= Ty.clsRc THEN 
+      DEC(attr,Ty.clsRc); INCL(rslt.xAttr,D.clsTp);
+    ELSIF attr >= Ty.valRc THEN 
+      DEC(attr,Ty.valRc); INCL(rslt.xAttr,D.valTp);
+    END;
 
-    rslt.recAtt := attr;
+    rslt.recAtt := attr MOD 8;
     f.GetSym();                (* Get past recSy rAtt    *)
     IF f.sSym = falSy THEN
       INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
+      INCL(rslt.xAttr, D.noNew); (* Remove if ctor found later  *)
       f.GetSym();
     ELSIF f.sSym = truSy THEN
       INCL(rslt.xAttr, D.isFn);  (* This record type is foreign *)
       INCL(rslt.xAttr, D.fnInf); (* This record is an interface *)
-      INCL(rslt.xAttr, D.noCpy); (* Record has no constructor   *)
+      INCL(rslt.xAttr, D.noCpy); (* Record has no __copy__      *)
+      INCL(rslt.xAttr, D.noNew); (* Record has no constructor   *)
       f.GetSym();
     END;
    (* 
@@ -1490,7 +1504,9 @@ MODULE NewSymFileRW;
       *)
       IF rslt.baseTp = NIL THEN
         rslt.baseTp := f.typeOf(f.iAtt);
-        IF f.iAtt # Ty.anyRec THEN INCL(rslt.xAttr, D.clsTp) END;
+        IF (f.iAtt # Ty.anyRec) & ~(D.valTp IN rslt.xAttr) THEN 
+		    INCL(rslt.xAttr, D.clsTp);
+		END;
       END;
       f.GetSym();
     END;
@@ -1532,6 +1548,13 @@ MODULE NewSymFileRW;
         prcD.bndType := rslt;
         InsertInRec(prcD,rslt,f);
         D.AppendIdnt(rslt.statics, prcD);
+	    IF prcD.kind = Id.ctorP THEN
+	      IF prcD.type(Ty.Procedure).formals.tide = 0 THEN 
+	        EXCL(rslt.xAttr, D.noNew);
+	      ELSE
+	        INCL(rslt.xAttr, D.xCtor);
+	     END;
+	    END;
       ELSIF oldS = varSy THEN
         varD := f.variable();
         varD.recTyp := rslt;
@@ -1545,13 +1568,8 @@ MODULE NewSymFileRW;
         Abandon(f);
       END;
     END;
-(* #### *)
-    IF attr >= Ty.valRc THEN 
-      DEC(attr, Ty.valRc); 
-      EXCL(rslt.xAttr, D.clsTp);
-      EXCL(rslt.xAttr, D.noCpy);
-    END;
-(* #### *)
+(* #### *
+ * #### *)
     f.ReadPast(endRc); 
     RETURN rslt;
   END recordType;
@@ -1593,6 +1611,7 @@ MODULE NewSymFileRW;
     newI := Id.newTypId(NIL);
     newI.SetMode(f.iAtt);
     newI.hash := Nh.enterStr(f.strAtt);
+	newI.SetNameFromHash(newI.hash);
     newI.type := f.getTypeFromOrd(); 
     newI.dfScp := f.impS;
     oldI := testInsert(newI, f.impS);
@@ -2056,6 +2075,13 @@ MODULE NewSymFileRW;
       END;
     ELSE RTS.Throw("Missing keySy");
     END; 
+    (* FIXME -- parse optional comment 
+    f.GetSym();
+    IF f.sSym = strSy THEN
+      Console.WriteString(f.strAtt);
+      Console.WriteLn;
+    END;
+	*)
   END SymFile;
 
 (* ============================================================ *)

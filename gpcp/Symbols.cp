@@ -45,7 +45,7 @@ MODULE Symbols;
     mMsk*  = { 0 ..  7};  main*   =  0; weak*  =  1; need*  =  2;
                           fixd*   =  3; rtsMd* =  4; anon*  =  5;
                           clsTp*  =  6; frnMd* =  7;
-    rMsk*  = { 8 .. 15};  noNew*  =  8; asgnd* =  9; noCpy* = 10;
+    rMsk*  = { 8 .. 15};  noNew*  =  8; valTp* =  9; noCpy* = 10;
                           spshl*  = 11; xCtor* = 12;
     fMsk*  = {16 .. 23};  isFn*   = 16; extFn* = 17; fnInf* = 18;
     dMsk*  = {24 .. 31};  cMain*  = 24; wMain* = 25; sta*   = 26;
@@ -267,7 +267,7 @@ MODULE Symbols;
 	ELSE RETURN MKSTR(NameHash.charOpenOfHash(t.hash)^);
 	END;
   END toString;
- * ============================================================ *) 
+ * ============================================================ *)
 (* ============================================================ *)
 
  

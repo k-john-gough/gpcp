@@ -37,6 +37,7 @@
     <target name="-buildgpcp" depends="init" description="Compile gpcp compiler sources"> 
 	    <!-- Ensure that we have the JVM-specific source variants -->
 	    <copy file="JavaTargetForJVM.cp" tofile="JavaTarget.cp" overwrite="true"/>
+	    <copy file="PeTargetForJVM.cp" tofile="PeTarget.cp" overwrite="true"/>
 	    <!-- Compile all the source files of gpcp in dependency order -->
 	    <java jar="${JRoot}/jars/cpmake.jar" failonerror="true" fork="true" dir=".">
                 <jvmarg value="-DCPSYM=${CPSYM}"/>
@@ -69,6 +70,8 @@
                 <arg value="-nowarn"/>
                 <arg value="-asm8"/>
 		<arg value="-clsdir:staging/browse"/>
+                <arg value="BrowseLookup.cp"/>
+                <arg value="BrowsePopups.cp"/>
                 <arg value="Browse.cp"/>
 	    </java>
     </target>

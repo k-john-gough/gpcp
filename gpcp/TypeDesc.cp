@@ -48,9 +48,13 @@ MODULE TypeDesc;
     metaN*  = 16;
 
   CONST (* record attributes *)
-    noAtt* = 0; isAbs* = 1; limit* = 2;
-    extns* = 3; iFace* = 4;
-    cmpnd* = 5;   (* Marker for Compound Types                  *)
+    noAtt* = 0; 
+    isAbs* = 1;   (* Abstract record type   *)
+    limit* = 2;   (* Limited record type    *)
+    extns* = 3;   (* Extensible record type *)
+    iFace* = 4;   (* Interface record type  *)
+    cmpnd* = 5;   (* Marker for Compound Types      *)
+    (* All of the previous attributes are exclusive *)
     noNew* = 8;   (* These two attributes are really for xAttr, *)
     valRc* = 16;  (* but piggy-back on recAtt in the symbolfile *)
     clsRc* = 32;  (* but piggy-back on recAtt in the symbolfile *)
@@ -718,6 +722,9 @@ MODULE TypeDesc;
 
   PROCEDURE (t : Record)valCopyOK*() : BOOLEAN;
   BEGIN
+  (* Value copies should be allowed for foreign  *)
+  (* value types that are inextensible with      *)
+  (* base type equal to System.ValueType.        *)
     RETURN ~(Sy.noCpy IN t.xAttr);
   END valCopyOK;
 

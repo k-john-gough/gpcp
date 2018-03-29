@@ -11,7 +11,9 @@ import j2cpsfiles.j2cpsfiles;
 
 public class j2cps {
 
+    static String pkgOrJar;
     static String argString;
+    static final String versionStr = "j2cps version 1.4.07 (March 2018)";
   /**
    * Main program. Takes a package name as a parameter, produces the 
    * Component Pascal symbol file.  The class-files of the package must
@@ -27,18 +29,7 @@ public class j2cps {
     MkArgString(args);
     TypeDesc.InitTypes();
     if (argLen == 0) {
-        System.err.println("j2cps version 1.4.0.2 (March 2017)");
-        System.err.println("Usage:");
-        System.err.println("java [VM-opts] j2cps.j2cps [options] PackageNameOrJarFile");
-        System.err.println("java [VM-opts] -jar j2cps.jar [options] PackageNameOrJarFile");
-        System.err.println("J2cps options may be in any order.");
-        System.err.println("  -d[st] dir => symbol file destination directory");
-        System.err.println("  -p[kg] dir => package-root directory");
-        System.err.println("  -jar       => process the named jar file");
-        System.err.println("  -s[ummary] => summary of progress");
-        System.err.println("  -v[erbose] => verbose diagnostic messages");
-        System.err.println("  -nocpsym   => only use sym-files from destination,");
-        System.err.println("                (overrides any CPSYM path setting)");
+	ShowHelp();
         System.exit(0);
     }
     else {
@@ -49,7 +40,10 @@ public class j2cps {
             /* parse options here */
             switch (argStr.charAt(1)) {
                 case 'V':
-                    if ("VERBOSE".startsWith(optString)) {
+                    if (optString.equalsIgnoreCase("version")) {
+                        System.out.println(versionStr);
+		    }
+		    else if ("VERBOSE".startsWith(optString)) {
                         ClassDesc.VERBOSE = true;
                         ClassDesc.verbose = true;
                         ClassDesc.summary = true;
@@ -57,7 +51,10 @@ public class j2cps {
                         BadOption(argStr);  
                     break;
                 case 'v':
-                    if ("verbose".startsWith(optString)) {
+                    if ("version".equals(optString)) {
+                        System.out.println(versionStr);
+		    }
+		    else if ("verbose".startsWith(optString)) {
                         ClassDesc.verbose = true;
                         ClassDesc.summary = true;
                         j2cpsfiles.SetVerbose( true );
@@ -92,6 +89,13 @@ public class j2cps {
                     } else
                         System.err.println(
                             "-p option is missing package-root directory name");    
+                    break;
+                case 'h':
+                case 'H':
+                    if (optString.equalsIgnoreCase("help")) {
+                        ShowHelp();
+                    } else
+                        BadOption(argStr);
                     break;
                 case 'j':
                     if (optString.equalsIgnoreCase("jar")) {
@@ -132,11 +136,13 @@ public class j2cps {
                 System.err.println("After -jar, filename must end \".jar\"");
                 System.exit(1);
             }
+            pkgOrJar = "jar-file " + argStr;
             JarFile jf = new JarFile(argStr);
             JarHandler jh = new JarHandler();
             jh.ProcessJar(jf);
             PackageDesc.ProcessJarDependencies();           
         } else {
+            pkgOrJar = "java package " + argStr;
             PackageDesc.MakeRootPackageDescriptor(argStr, anonPack);
             PackageDesc.ProcessPkgWorklist();
         }
@@ -151,10 +157,6 @@ public class j2cps {
     }
   }
   
-  static private void BadOption(String s) {
-      System.err.println("Unknown option " + s);
-  }
-   
   static void MkArgString( String[] args ) {
       StringBuilder bldr = new StringBuilder( "J2cps args>");
       for (String arg : args) {
@@ -164,5 +166,24 @@ public class j2cps {
       argString = bldr.toString();
   }
 
+  static private void BadOption(String s) {
+      System.out.println("Unknown option " + s);
+  }
+   
+  static private void ShowHelp( ) {
+        System.err.println(versionStr);
+        System.err.println("Usage:");
+        System.err.println("java [VM-opts] j2cps.j2cps [options] PackageNameOrJarFile");
+        System.err.println("java [VM-opts] -jar j2cps.jar [options] PackageNameOrJarFile");
+        System.err.println("J2cps options may be in any order.");
+        System.err.println("  -d[st] dir => symbol file destination directory");
+        System.err.println("  -p[kg] dir => package-root directory");
+        System.err.println("  -jar       => process the named jar file");
+        System.err.println("  -s[ummary] => summary of progress");
+        System.err.println("  -v[erbose] => verbose diagnostic messages");
+        System.err.println("  -version   => show version string");
+        System.err.println("  -nocpsym   => only use sym-files from destination,");
+        System.err.println("                (overrides any CPSYM path setting)");
+  }
 }
 

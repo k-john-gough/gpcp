@@ -276,7 +276,7 @@ MODULE IdDesc;
               * locals*  : IdSeq;       (* varId sequence *)
               * scopeNm* : L.CharOpen   (* external name  *)
               * ----------------------------------------- *)
-			    aliasMod* : BlkId;
+                aliasMod* : BlkId;
                 modBody*  : D.Stmt;     (* mod init-stmts *)
                 modClose* : D.Stmt;     (* mod finaliz'n  *)
                 impOrd*   : INTEGER;    (* implement ord. *)

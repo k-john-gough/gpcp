@@ -212,6 +212,7 @@ public class j2cpsfiles /*implements FilenameFilter*/ {
       }
       return null;
     } else {
+        //char[] arr = inFile.getPath().toCharArray();
         return inFile;
     }
   }

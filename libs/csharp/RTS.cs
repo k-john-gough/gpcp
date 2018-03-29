@@ -519,11 +519,39 @@ public class RTS
 				     char[] str)
 	{
 	 // System.String lls = System.Convert.ToString(num);
-#if BETA1
-            System.String lls = ((System.Single) num).ToString();
-#else //BETA2
             System.String lls = ((System.Single) num).ToString("R");
-#endif
+            int    len = lls.Length;
+            lls.CopyTo(0, str, 0, len);
+            str[len] = '\0';
+	}
+
+/* ------------------------------------------------------------ */
+//  PROCEDURE SRealToStrInvar*(r : SHORTREAL; OUT s : ARRAY OF CHAR);
+//  (** Decode a CP REAL into an array *)
+//  BEGIN END SRealToStr;
+//
+	// Known in ILASM as [RTS]RTS::SRealToStr
+	public static void SRealToStr(float num,
+				     char[] str)
+	{
+	 // System.String lls = System.Convert.ToString(num);
+            System.String lls = ((System.Single) num).ToString("R", invarCulture);
+            int    len = lls.Length;
+            lls.CopyTo(0, str, 0, len);
+            str[len] = '\0';
+	}
+
+/* ------------------------------------------------------------ */
+//  PROCEDURE SRealToStrLocal*(r : SHORTREAL; OUT s : ARRAY OF CHAR);
+//  (** Decode a CP REAL into an array *)
+//  BEGIN END SRealToStr;
+//
+	// Known in ILASM as [RTS]RTS::SRealToStr
+	public static void SRealToStr(float num,
+				     char[] str)
+	{
+	 // System.String lls = System.Convert.ToString(num);
+            System.String lls = ((System.Single) num).ToString("R", currentCulture);
             int    len = lls.Length;
             lls.CopyTo(0, str, 0, len);
             str[len] = '\0';
@@ -553,12 +581,8 @@ public class RTS
 	public static void RealToStrInvar(double num,
 				          char[] str)
 	{
-#if BETA1
-	    System.String lls = System.Convert.ToString(num);
-#else //BETA2
             System.String lls = 
                         ((System.Double) num).ToString("R", invarCulture);
-#endif
             int    len = lls.Length;
             lls.CopyTo(0, str, 0, len);
             str[len] = '\0';
@@ -573,12 +597,8 @@ public class RTS
 	public static void RealToStrLocal(double num,
 				          char[] str)
 	{
-#if BETA1
-	    System.String lls = System.Convert.ToString(num);
-#else //BETA2
             System.String lls = 
                         ((System.Double) num).ToString("R", currentCulture);
-#endif
             int    len = lls.Length;
             lls.CopyTo(0, str, 0, len);
             str[len] = '\0';

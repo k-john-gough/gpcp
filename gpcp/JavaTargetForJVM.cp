@@ -1,15 +1,15 @@
 
 (* ============================================================ *)
-(*  Target is the module which selects the target ClassMaker.	*)
-(*  Copyright (c) John Gough 1999, 2017.			*)
+(*  Target is the module which selects the target ClassMaker.   *)
+(*  Copyright (c) John Gough 1999, 2017.                        *)
 (* ============================================================ *)
 
 MODULE JavaTarget; (* JavaTargetForJVM.cp *)
 
   IMPORT 
         RTS,
-	GPCPcopyright,
-	CompState,
+        GPCPcopyright,
+        CompState,
         AsmUtil,
         JavaUtil,
         ClassUtil;

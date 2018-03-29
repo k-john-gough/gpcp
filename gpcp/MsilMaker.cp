@@ -20,7 +20,7 @@ MODULE MsilMaker;
         GPFiles,
         GPBinFiles,
         GPTextFiles,
-        (* PeUtil, *)
+        PeTarget,
         IlasmUtil,
         Nh  := NameHash,
         Scn := CPascalS,
@@ -534,8 +534,8 @@ MODULE MsilMaker;
     | Ty.limit : attSet := Asm.att_empty;
     | Ty.extns : attSet := Asm.att_empty;
     | Ty.iFace : attSet := Asm.att_interface;
-     mkInit := FALSE;
-     mkCopy := FALSE;
+                 mkInit := FALSE;
+                 mkCopy := FALSE;
     END;
    (*
     *   Account for the identifier visibility.
@@ -760,13 +760,11 @@ MODULE MsilMaker;
     callApi := CSt.doCode & ~CSt.doIlasm;
     Mu.MkBlkName(this.mod);
     IF callApi THEN
-      ASSERT(FALSE);
-      out := NIL;
-     (*
-      * CSt.emitNam := BOX("PERWAPI");
-      * out := PeUtil.newPeFile(this.mod.pkgNm, ~this.mod.main);
-      * this.outF := out;
-      *)
+     (* ------------------- *)
+      CSt.emitNam := BOX("Reflection-emit");
+      out := PeTarget.newPeFile(this.mod.pkgNm, ~this.mod.main);
+      this.outF := out;
+     (* ------------------- *)
     ELSE (* just produce a textual IL file *)
       CSt.emitNam := BOX("Ilasm-emit");
       out := IlasmUtil.newIlasmFile(this.mod.pkgNm);
@@ -779,7 +777,7 @@ MODULE MsilMaker;
       Error.WriteLn;
       RETURN;
     END;
-    IF CSt.verbose THEN CSt.Message("Created "+ out.outN^) END;
+    IF CSt.verbose THEN CSt.Message("Creating "+ out.outN^) END;
     out.Header(CSt.srcNam);
     IF this.mod.main THEN out.Comment("This module implements CPmain") END;
     out.Blank();

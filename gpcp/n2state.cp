@@ -2,7 +2,8 @@
 (* ================================================================ *)
 (*                                                                  *)
 (*  Module of the V1.4+ gpcp tool to create symbol files from       *)
-(*  the metadata of .NET assemblies, using the PERWAPI interface.   *)
+(*  the metadata of .NET assemblies, originally using the PERWAPI   *)
+(*  interface but since v1.4.06 using System.Reflection library.    *)
 (*                                                                  *)
 (*  Copyright QUT 2004 - 2005.                                      *)
 (*                                                                  *)
@@ -37,6 +38,7 @@ MODULE N2State;
         abtMsg = " ... Aborting";
         usgMsg1 = 'Usage: "PeToCps /mscorlib [options]"';
         usgMsg2 = '       "PeToCps [options] filenames"';
+		comment = "Creator PeToCps " + GPCPcopyright.verStr;
 
  (* ---------------------------------------------------------- *)
 
@@ -308,11 +310,10 @@ MODULE N2State;
  (* ---------------------------------------------------------- *)
 
   PROCEDURE EmitSymbolfile*(blk : Id.BlkId);
+    CONST suffix = "Executable code is found in ";
   BEGIN
-    RW.EmitSymfile(blk);
-    Message(" Output file <" +
-            Nh.charOpenOfHash(blk.hash)^ + 
-            ".cps> created");
+    RW.EmitSymfileAndComment(blk, BOX(comment), BOX(suffix + srcNam^));
+    Message(" Output file <" + Nh.charOpenOfHash(blk.hash)^ + ".cps> created");
   END EmitSymbolfile;
 
  (* ---------------------------------------------------------- *)

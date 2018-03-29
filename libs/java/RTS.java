@@ -277,7 +277,7 @@ public final class RTS
 //  (* Three versions for different cultures.  *Invar uses invariant culture *)
 //  (*                                         *Local uses current locale    *)
 //  (* StrToReal & RealToStr do not behave the same on JVM and CLR.          *)
-//  (* They is provided for compatability with versions < 1.3.1              *)
+//  (* They are provided for compatability with versions < 1.3.1              *)
 //  (* ------------------- Low-level String Conversions -------------------- *)
 //  
 //    PROCEDURE StrToReal*(IN  s  : ARRAY OF CHAR; 

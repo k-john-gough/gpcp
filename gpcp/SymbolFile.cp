@@ -1,7 +1,8 @@
 (* ==================================================================== *)
 (*                                                                      *)
 (*  SymFileRW:  Symbol-file reading and writing for GPCP.               *)
-(*      Copyright (c) John Gough 1999, 2000.                            *)
+(*      Currently only used by the CPMake tool.                         *)
+(*      Copyright (c) John Gough 1999, 2018.                            *)
 (*                                                                      *)
 (* ==================================================================== *)
 

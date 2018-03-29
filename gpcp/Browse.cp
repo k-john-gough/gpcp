@@ -1,4 +1,11 @@
 
+(* ==================================================================== *)
+(*									*)
+(*      Module for the Gardens Point Component Symbol File Browser      *)
+(*	Copyright (c) John Gough 2018.                                  *)
+(*									*)
+(* ==================================================================== *)
+
 MODULE Browse;
 
   IMPORT 
@@ -11,56 +18,59 @@ MODULE Browse;
         LitValue,
         ProgArgs,
         Symbols,
-        IdDesc,
+        TypeDesc,
         GPText,
         GPTextFiles,
         GPCPcopyright,
+        BrowsePopups,
+        BrowseLookup,
+        NameHash,
         FileNames;
 
 (* ========================================================================= *
 // Collected syntax ---
 // 
-// SymFile    = Header [String (falSy | truSy | <other attribute>)]
-//		{Import | Constant | Variable | Type | Procedure} 
-//		TypeList Key.
-//	-- optional String is external name.
-//	-- falSy ==> Java class
-//	-- truSy ==> Java interface
-//	-- others ...
+// SymFile    = Header [String (falSy | truSy | <other attribute> )]
+//    {Import | Constant | Variable | Type | Procedure} 
+//        TypeList Key.
+//    -- optional String is external name.
+//    -- falSy ==> Java class
+//    -- truSy ==> Java interface
+//    -- others ...
 // Header     = magic modSy Name.
 // Import     = impSy Name [String] Key.
-//	-- optional string is explicit external name of class
+//    -- optional string is explicit external name of class
 // Constant   = conSy Name Literal.
 // Variable   = varSy Name TypeOrd.
 // Type       = typSy Name TypeOrd.
 // Procedure  = prcSy Name [String] FormalType.
-//	-- optional string is explicit external name of procedure
+//    -- optional string is explicit external name of procedure
 // Method     = mthSy Name byte byte TypeOrd [String][Name] FormalType.
-//	-- optional string is explicit external name of method
+//    -- optional string is explicit external name of method
 // FormalType = [retSy TypeOrd] frmSy {parSy byte TypeOrd [String]} endFm.
-//	-- optional phrase is return type for proper procedures
+//    -- optional phrase is return type for proper procedures
 // TypeOrd    = ordinal.
 // TypeHeader = tDefS Ord [fromS Ord Name].
-//	-- optional phrase occurs if:
-//	-- type not from this module, i.e. indirect export
+//    -- optional phrase occurs if:
+//    -- type not from this module, i.e. indirect export
 // TypeList   = start { Array | Record | Pointer | ProcType | 
 //                      NamedType | Enum | Vector } close.
 // Array      = TypeHeader arrSy TypeOrd (Byte | Number | <empty>) endAr.
-//	-- nullable phrase is array length for fixed length arrays
+//    -- nullable phrase is array length for fixed length arrays
 // Vector     = TypeHeader arrSy basSy TypeOrd endAr.
 // Pointer    = TypeHeader ptrSy TypeOrd.
 // Event      = TypeHeader evtSy FormalType.
 // ProcType   = TypeHeader pTpSy FormalType.
 // Record     = TypeHeader recSy recAtt [truSy | falSy] 
-//		[basSy TypeOrd] [iFcSy {basSy TypeOrd}]
-//		{Name TypeOrd} {Method} {Statics} endRc.
-//	-- truSy ==> is an extension of external interface
-//	-- falSy ==> is an extension of external class
-// 	-- basSy option defines base type, if not ANY / j.l.Object
+//        [basSy TypeOrd] [iFcSy {basSy TypeOrd}]
+//        {Name TypeOrd} {Method} {Statics} endRc.
+//    -- truSy ==> is an extension of external interface
+//    -- falSy ==> is an extension of external class
+//    -- basSy option defines base type, if not ANY / j.l.Object
 // NamedType  = TypeHeader.
 // Statics    = ( Constant | Variable | Procedure ).
 // Enum       = TypeHeader eTpSy { Constant } endRc.
-// Name	      = namSy byte UTFstring.
+// Name       = namSy byte UTFstring.
 // Literal    = Number | String | Set | Char | Real | falSy | truSy.
 // Byte       = bytSy byte.
 // String     = strSy UTFstring.
@@ -86,26 +96,26 @@ MODULE Browse;
 // ======================================================================== *)
 
   CONST
-	modSy = ORD('H'); namSy = ORD('$'); bytSy = ORD('\');
-	numSy = ORD('#'); chrSy = ORD('c'); strSy = ORD('s');
-	fltSy = ORD('r'); falSy = ORD('0'); truSy = ORD('1');
-	impSy = ORD('I'); setSy = ORD('S'); keySy = ORD('K');
-	conSy = ORD('C'); typSy = ORD('T'); tDefS = ORD('t');
-	prcSy = ORD('P'); retSy = ORD('R'); mthSy = ORD('M');
-	varSy = ORD('V'); parSy = ORD('p'); start = ORD('&');
-	close = ORD('!'); recSy = ORD('{'); endRc = ORD('}');
-	frmSy = ORD('('); fromS = ORD('@'); endFm = ORD(')');
-	arrSy = ORD('['); endAr = ORD(']'); pTpSy = ORD('%');
-	ptrSy = ORD('^'); basSy = ORD('+'); eTpSy = ORD('e');
-	iFcSy = ORD('~'); evtSy = ORD('v'); vecSy = ORD('*');
+    modSy = ORD('H'); namSy = ORD('$'); bytSy = ORD('\');
+    numSy = ORD('#'); chrSy = ORD('c'); strSy = ORD('s');
+    fltSy = ORD('r'); falSy = ORD('0'); truSy = ORD('1');
+    impSy = ORD('I'); setSy = ORD('S'); keySy = ORD('K');
+    conSy = ORD('C'); typSy = ORD('T'); tDefS = ORD('t');
+    prcSy = ORD('P'); retSy = ORD('R'); mthSy = ORD('M');
+    varSy = ORD('V'); parSy = ORD('p'); start = ORD('&');
+    close = ORD('!'); recSy = ORD('{'); endRc = ORD('}');
+    frmSy = ORD('('); fromS = ORD('@'); endFm = ORD(')');
+    arrSy = ORD('['); endAr = ORD(']'); pTpSy = ORD('%');
+    ptrSy = ORD('^'); basSy = ORD('+'); eTpSy = ORD('e');
+    iFcSy = ORD('~'); evtSy = ORD('v'); vecSy = ORD('*');
 
   CONST
-	magic   = 0DEADD0D0H;
-	syMag   = 0D0D0DEADH;
-	dumped* = -1;
-        symExt  = ".cps";
-        broExt  = ".bro";
-        htmlExt = ".html";
+    magic   = 0DEADD0D0H;
+    syMag   = 0D0D0DEADH;
+    dumped* = -1;
+    symExt  = ".cps";
+    broExt  = ".bro";
+    htmlExt = ".html";
 
 
 (* ============================================================ *)
@@ -116,9 +126,9 @@ MODULE Browse;
 (* ============================================================ *)
 
   TYPE
-    Desc = POINTER TO ABSTRACT RECORD
-             name   : CharOpen;
-             access : INTEGER;
+    Desc = POINTER TO ABSTRACT RECORD (BrowseLookup.DescBase)
+           (* name   : CharOpen; -- Inherited field *)
+              access : INTEGER;
            END;
 
     DescList = RECORD
@@ -188,6 +198,7 @@ MODULE Browse;
                fields    : DescList; 
                methods   : DescList; 
                statics   : DescList;
+               xAttr     : SET;
              END;
     
     Array = POINTER TO EXTENSIBLE RECORD (Type)
@@ -240,15 +251,15 @@ MODULE Browse;
                   val : AbsValue;
                 END;
 
-    TypeDesc = POINTER TO EXTENSIBLE RECORD (Desc)
+    TypedDesc = POINTER TO EXTENSIBLE RECORD (Desc)
                 type : Type;
                 typeNum : INTEGER;
               END;
 
-    UserTypeDesc = POINTER TO RECORD (TypeDesc)
+    UserTypeDesc = POINTER TO RECORD (TypedDesc)
                    END;
 
-    VarDesc = POINTER TO RECORD (TypeDesc)
+    VarDesc = POINTER TO RECORD (TypedDesc)
               END;
 
     ProcDesc = POINTER TO RECORD (Desc)
@@ -274,6 +285,9 @@ MODULE Browse;
                progArg   : BOOLEAN;
                print     : BOOLEAN;
                strongNm  : POINTER TO ARRAY 6 OF INTEGER;
+               symTable  : BrowseLookup.SymbolTable;
+               comment1  : CharOpen;
+               comment2  : CharOpen;
              END;
     
 (* ============================================================ *)
@@ -298,6 +312,7 @@ MODULE Browse;
     args, argNo  : INTEGER;
     fileName, modName  : CharOpen;
     printFNames, doAll, verbatim, verbose, unwind, hexCon, alpha : BOOLEAN;
+    doJS  : BOOLEAN;
     file  : GPBinFiles.FILE;
     sSym  : INTEGER;
     cAtt  : CHAR;
@@ -339,7 +354,7 @@ MODULE Browse;
   PROCEDURE QuickSortDescs(lo, hi : INTEGER; dLst : DescList);
     VAR i,j : INTEGER;
         dsc : Desc;
-	tmp : Desc;
+        tmp : Desc;
  (* ---------------------------------------------------- *)
   BEGIN
     i := lo; j := hi;
@@ -365,7 +380,7 @@ MODULE Browse;
   PROCEDURE QuickSortMods(lo, hi : INTEGER; dLst : ModList);
     VAR i,j : INTEGER;
         dsc : Module;
-	tmp : Module;
+        tmp : Module;
  (* ---------------------------------------------------- *)
   BEGIN
     i := lo; j := hi;
@@ -394,7 +409,7 @@ MODULE Browse;
     i : INTEGER;
     tmp : POINTER TO ARRAY OF Module;
     mod : Module;
-	mlst : ModList;
+    mlst : ModList;
   BEGIN
     mlst := modList;
     ASSERT(modList.list # NIL);
@@ -494,7 +509,7 @@ MODULE Browse;
   END AddType;
 
 (* ============================================================ *)
-(* ========	Various reading utility procedures	======= *)
+(* ========     Various reading utility procedures      ======= *)
 (* ============================================================ *)
 
   PROCEDURE read() : INTEGER;
@@ -526,9 +541,9 @@ MODULE Browse;
     idx := 0;
     WHILE idx < len DO
       chr := read(); INC(idx);
-      IF chr <= 07FH THEN		(* [0xxxxxxx] *)
+      IF chr <= 07FH THEN        (* [0xxxxxxx] *)
         buff[num] := CHR(chr); INC(num);
-      ELSIF chr DIV 32 = 06H THEN	(* [110xxxxx,10xxxxxx] *)
+      ELSIF chr DIV 32 = 06H THEN    (* [110xxxxx,10xxxxxx] *)
         bNm := chr MOD 32 * 64;
         chr := read(); INC(idx);
         IF chr DIV 64 = 02H THEN
@@ -536,7 +551,7 @@ MODULE Browse;
         ELSE
           RTS.Throw(bad);
         END;
-      ELSIF chr DIV 16 = 0EH THEN	(* [1110xxxx,10xxxxxx,10xxxxxxx] *)
+      ELSIF chr DIV 16 = 0EH THEN    (* [1110xxxx,10xxxxxx,10xxxxxxx] *)
         bNm := chr MOD 16 * 64;
         chr := read(); INC(idx);
         IF chr DIV 64 = 02H THEN
@@ -577,7 +592,7 @@ MODULE Browse;
 
   PROCEDURE readLong() : LONGINT;
     VAR result : LONGINT;
-	index  : INTEGER;
+        index  : INTEGER;
   BEGIN [UNCHECKED_ARITHMETIC]
     (* overflow checking off here *)
     result := read();
@@ -657,10 +672,10 @@ MODULE Browse;
     | ORD('t') : Console.WriteString("TypeDef t#"); Console.WriteInt(iAtt,1);
     | ORD('+') : Console.WriteString("BaseType t#"); Console.WriteInt(iAtt,1);
     | ORD('R') : Console.WriteString("RETURN t#"); Console.WriteInt(iAtt,1);
-    | ORD('#') :
-	    RTS.LongToStr(lAtt, arg); 
-	    Console.WriteString("Number "); 
-		Console.WriteString(arg$);
+    | ORD('#') : 
+        RTS.LongToStr(lAtt, arg); 
+        Console.WriteString("Number "); 
+        Console.WriteString(arg$);
     | ORD('$') : 
         Console.WriteString("NameSymbol #");
         Console.WriteInt(iAtt,1); 
@@ -675,9 +690,9 @@ MODULE Browse;
         Console.WriteString("Real "); 
         Console.WriteString(arg$);
     ELSE 
-	    Console.WriteString("Bad Symbol ");
-		Console.WriteInt(sSym, 1);
-	    Console.WriteString(" in File");
+        Console.WriteString("Bad Symbol ");
+        Console.WriteInt(sSym, 1);
+        Console.WriteString(" in File");
     END;
     Console.WriteLn;
   END DiagnoseSymbol;
@@ -745,7 +760,7 @@ MODULE Browse;
     | setSy : NEW(s); s.setVal := BITS(iAtt); lit := s;
     | strSy : NEW(st); st.strVal := sAtt; lit := st;
     END;
-    GetSym();						(* read past value  *)
+    GetSym(); (* read past value  *)
   END GetLiteral;
 
 (* ============================================ *)
@@ -885,6 +900,7 @@ MODULE Browse;
 
 (* ============================================ *)
 
+  PROCEDURE^ GetMeth() : ProcDesc;
   PROCEDURE^ GetProc() : ProcDesc;
   PROCEDURE^ GetVar() : VarDesc;
 
@@ -896,16 +912,32 @@ MODULE Browse;
     VAR 
         rec  : Record;
         f : VarDesc;
-        t : TypeDesc;
+        t : TypedDesc;
         m : ProcDesc;
         mth : Meth;
   BEGIN
     NEW(rec);
     rec.recAtt := read();
     rec.isAnonRec := FALSE;
-    GetSym();				(* Get past recSy rAtt	*)
-    IF (sSym = falSy) OR (sSym = truSy) THEN
+    GetSym();				(* Get past recSy rAtt	 *)
+    IF (sSym = falSy) THEN
+      INCL(rec.xAttr, Symbols.isFn);
+      INCL(rec.xAttr, Symbols.noNew);   (* remvove if ctor found *)
       GetSym();
+    ELSIF (sSym = truSy) THEN
+      INCL(rec.xAttr, Symbols.fnInf);   (* This is an interface  *)
+      INCL(rec.xAttr, Symbols.noNew);
+      GetSym();
+    END;
+    IF rec.recAtt >= TypeDesc.clsRc THEN
+      INCL(rec.xAttr, Symbols.clsTp); 
+      IF Symbols.isFn IN rec.xAttr THEN
+        INCL(rec.xAttr, Symbols.noNew); 
+        INCL(rec.xAttr, Symbols.noCpy); 
+      END;
+    ELSIF rec.recAtt >= TypeDesc.valRc THEN
+      INCL(rec.xAttr, Symbols.valTp);
+      EXCL(rec.xAttr, Symbols.noNew);
     END;
     IF sSym = basSy THEN
       rec.baseOrd := iAtt;
@@ -916,11 +948,6 @@ MODULE Browse;
     IF sSym = iFcSy THEN
       GetSym();
       WHILE sSym = basSy DO
-(* *
- * *	Console.WriteString("got interface $T");
- * *	Console.WriteInt(iAtt,1);
- * *	Console.WriteLn;
- * *)
         NEW(t);
         t.typeNum := iAtt;
 	GetSym();
@@ -935,45 +962,29 @@ MODULE Browse;
       GetSym();
       AddDesc(rec.fields,f);
     END;
-   (* Method     = mthSy Name byte byte TypeOrd [String] FormalType. *)
-    WHILE sSym = mthSy DO
-      NEW(m);
-      NEW(mth);
-      mth.importedFrom := NIL;
-      mth.isConstructor := FALSE;
-      m.pType := mth;
-      GetSym();
-      IF (sSym # namSy) THEN RTS.Throw("Bad symbol file format"); END;
-      m.name := sAtt;
-      m.access := iAtt;
-      mth.declarer := m;
-     (* byte1 is the method attributes  *)
-      mth.attr := read();
-     (* byte2 is param form of receiver *)
-      mth.recMode := read();
-     (* next 1 or 2 bytes are rcv-type  *)
-      mth.recTypeNum := readOrd();
-      GetSym();
-      IF sSym = strSy THEN 
-        mth.fName := sAtt;
-        GetSym(); 
-      ELSE
-        mth.fName := NIL;
-      END;
-      IF sSym = namSy THEN 
-        mth.recName := sAtt;
-        GetSym(); 
-      END;
-      GetFormalType(mth);
+   (* Method    = mthSy Name byte byte TypeOrd [String] FormalType. *)
+    WHILE (sSym = mthSy) OR (sSym = conSy) OR (sSym = prcSy) OR (sSym = varSy) DO
+      IF sSym = mthSy THEN
+       (* Instance Method *)
+        m := GetMeth();
       AddDesc(rec.methods,m);
-    END;
-    WHILE (sSym = conSy) OR (sSym = prcSy) OR (sSym = varSy) DO
-      IF sSym = conSy THEN
+      ELSIF sSym = conSy THEN
+       (* Static Constants *)
         AddDesc(rec.statics,GetConstant());
       ELSIF sSym = prcSy THEN
-        AddDesc(rec.statics,GetProc());
-      ELSE
-        AddDesc(rec.statics,GetVar());
+       (* Static Procedures *)
+        m := GetProc();        
+        AddDesc(rec.statics, m);
+        IF m.pType.isConstructor THEN
+          IF m.pType.pars.tide = 0 THEN 
+            EXCL(rec.xAttr, Symbols.noNew);
+          ELSE 
+            INCL(rec.xAttr, Symbols.xCtor);
+          END;
+        END;
+      ELSE 
+       (* Static Fields *)
+        AddDesc(rec.statics, GetVar());
       END;
     END;
     ReadPast(endRc); 
@@ -1003,7 +1014,7 @@ MODULE Browse;
   (*		| ProcType | NamedType | Enum } close.  *)
   (* TypeHeader = tDefS Ord [fromS Ord Name].		*)
     VAR modOrd : INTEGER;
-	typOrd : INTEGER;
+        typOrd : INTEGER;
         typ    : Type;
         namedType : Named;
         f : VarDesc;
@@ -1040,7 +1051,7 @@ MODULE Browse;
       | eTpSy : typ := enumType();
       ELSE 
         NEW(namedType);
-	    typ := namedType;
+        typ := namedType;
       END;
       IF typ # NIL THEN
         AddType(typeList,typ,typOrd);
@@ -1102,8 +1113,8 @@ MODULE Browse;
       IF typ IS Record THEN 
         r := typ(Record);
         FOR j := 0 TO r.intrFaces.tide - 1 DO
-          k := r.intrFaces.list[j](TypeDesc).typeNum;
-          r.intrFaces.list[j](TypeDesc).type := typeList[k];
+          k := r.intrFaces.list[j](TypedDesc).typeNum;
+          r.intrFaces.list[j](TypedDesc).type := typeList[k];
         END;
         IF typ.declarer = NIL THEN (* anon record *)
           typ(Record).isAnonRec := TRUE;
@@ -1226,6 +1237,43 @@ MODULE Browse;
     RETURN procDesc;
   END GetProc;
 
+ (* ============================================ *)
+
+  PROCEDURE GetMeth() : ProcDesc;
+    VAR m   : ProcDesc;
+        mth : Meth;
+  BEGIN 
+    NEW(m);
+    NEW(mth);
+    mth.importedFrom := NIL;
+    mth.isConstructor := FALSE;
+    m.pType := mth;
+    GetSym();
+    IF (sSym # namSy) THEN RTS.Throw("Bad symbol file format"); END;
+    m.name := sAtt;
+    m.access := iAtt;
+    mth.declarer := m;
+   (* byte1 is the method attributes  *)
+    mth.attr := read();
+   (* byte2 is param form of receiver *)
+    mth.recMode := read();
+   (* next 1 or 2 bytes are rcv-type  *)
+    mth.recTypeNum := readOrd();
+    GetSym();
+    IF sSym = strSy THEN 
+      mth.fName := sAtt;
+      GetSym(); 
+    ELSE
+      mth.fName := NIL;
+    END;
+    IF sSym = namSy THEN 
+      mth.recName := sAtt;
+      GetSym(); 
+    END;
+    GetFormalType(mth);
+    RETURN m;
+  END GetMeth;
+
 (* ============================================ *)
 
   PROCEDURE SymFile(mod : Module);
@@ -1243,7 +1291,19 @@ MODULE Browse;
     varDesc  : VarDesc;
     procDesc : ProcDesc;
     thisType : Type;
+   (* ----------------------------- *)
+    PROCEDURE AddType(mod : Module);
+      VAR type : UserTypeDesc;
+    BEGIN
+      type := GetType();
+      AddDesc(mod.types, type);
+      IF ~mod.symTable.enter(type.name, type) THEN
+        THROW("Type name " + type.name^ + " rejected in symbol table");
+      END;
+    END AddType;
+   (* ----------------------------- *)
   BEGIN
+    doJS := FALSE;
     AddMod(mod.imports,mod);
     ReadPast(modSy);
     IF sSym = namSy THEN (* do something with f.sAtt *)
@@ -1286,7 +1346,7 @@ MODULE Browse;
     LOOP
       CASE sSym OF
       | start : EXIT;
-      | typSy : AddDesc(mod.types,GetType());
+      | typSy : AddType(mod);
       | impSy : AddMod(mod.imports,GetImport());
       | conSy : AddDesc(mod.consts,GetConstant());
       | varSy : AddDesc(mod.vars,GetVar());
@@ -1298,6 +1358,18 @@ MODULE Browse;
     IF sSym # keySy THEN
       RTS.Throw("Missing keySy");
     END; 
+
+    GetSym();
+    IF sSym = strSy THEN
+      doJS := TRUE;
+      mod.comment1 := sAtt;
+      GetSym();
+      IF sSym = strSy THEN mod.comment2 := sAtt END;
+    ELSE
+      mod.comment1 := NIL;
+      mod.comment2 := NIL;
+    END;
+
     FOR i := 0 TO mod.types.tide-1 DO
       typeDesc := mod.types.list[i](UserTypeDesc);
       thisType := typeList[typeDesc.typeNum];
@@ -1357,12 +1429,12 @@ MODULE Browse;
         i := 0;
         WHILE (i < LEN(mod.pathName)) & (mod.pathName[i] # ".") DO INC(i); END;
         mod.pathName[i] := 0X;
-	  ELSE
-	    mod.pathName := mod.symName;
-	  END;
-	  IF verbose THEN
-	    Console.WriteString("Opened " + mod.pathName^); Console.WriteLn;
-	  END;
+      ELSE
+        mod.pathName := mod.symName;
+      END;
+      IF verbose THEN
+        Console.WriteString("Opened " + mod.pathName^); Console.WriteLn;
+      END;
       marker := readInt();
       IF marker = RTS.loInt(magic) THEN
       (* normal case, nothing to do *)
@@ -1406,6 +1478,11 @@ PROCEDURE (o : Output) WriteIdent(str : ARRAY OF CHAR),NEW,EXTENSIBLE;
 BEGIN
   Console.WriteString(str);
 END WriteIdent;
+
+PROCEDURE (o : Output) WriteComment(str : ARRAY OF CHAR),NEW,EXTENSIBLE;
+BEGIN
+  Console.WriteString(str);
+END WriteComment;
 
 PROCEDURE (o : Output) WriteImport(impMod : Module),NEW,EXTENSIBLE;
 BEGIN
@@ -1468,11 +1545,14 @@ BEGIN
   Console.WriteString(tName);
 END WriteTypeDecl;
 
-(* FIXME *)
 PROCEDURE (o : Output) MethRef(IN nam : ARRAY OF CHAR),NEW,EMPTY;
 PROCEDURE (o : Output) MethAnchor(IN nam : ARRAY OF CHAR),NEW,EMPTY;
-PROCEDURE (o : Output) WriteLinefold(indent : INTEGER),NEW,EMPTY;
-(* FIXME *)
+
+PROCEDURE (o : Output) WriteLinefold(indent : INTEGER),NEW,EXTENSIBLE;
+BEGIN
+  o.WriteLn;
+  o.Indent(indent);
+END WriteLinefold;
 
 (* ------------------------------------------------------------------- *)
 
@@ -1485,6 +1565,11 @@ PROCEDURE (f : FileOutput) WriteIdent(str : ARRAY OF CHAR),EXTENSIBLE;
 BEGIN
   GPText.WriteString(f.file,str);
 END WriteIdent;
+
+PROCEDURE (f : FileOutput) WriteComment(str : ARRAY OF CHAR),EXTENSIBLE;
+BEGIN
+  GPText.WriteString(f.file,str);
+END WriteComment;
 
 PROCEDURE (f : FileOutput) WriteImport(impMod : Module),EXTENSIBLE;
 BEGIN
@@ -1546,8 +1631,13 @@ PROCEDURE (h : HtmlOutput) WriteStart(mod : Module);
 BEGIN
   GPText.WriteString(h.file,"<html><head><title>");
   GPText.WriteString(h.file,mod.name);
-  GPText.WriteString(h.file,"</title></head>");
+  GPText.WriteString(h.file,"</title>");
   GPText.WriteLn(h.file);
+  IF doJS THEN
+    GPText.WriteString(h.file, BrowsePopups.stylePrefix);
+    GPText.WriteLn(h.file);
+  END;
+  GPText.WriteString(h.file,"</head>");
   GPText.WriteString(h.file,'<body bgcolor="white">');
   GPText.WriteLn(h.file);
   GPText.WriteString(h.file,"<hr><pre>");
@@ -1556,7 +1646,13 @@ END WriteStart;
 
 PROCEDURE (h : HtmlOutput) WriteEnd();
 BEGIN
-  GPText.WriteString(h.file,"</font></pre></hr></body></html>");
+  GPText.WriteString(h.file,"</font></pre></hr>");
+  GPText.WriteLn(h.file);
+  IF doJS THEN
+    GPText.WriteString(h.file, BrowsePopups.ecmaScript);
+    GPText.WriteLn(h.file);
+  END;
+  GPText.WriteString(h.file, "</body></html>");
   GPText.WriteLn(h.file);
 END WriteEnd;
 
@@ -1584,6 +1680,13 @@ BEGIN
   GPText.WriteString(h.file,str);
   GPText.WriteString(h.file,"</font>");
 END WriteIdent;
+
+PROCEDURE (h : HtmlOutput) WriteComment(str : ARRAY OF CHAR);
+BEGIN
+  GPText.WriteString(h.file,'<font color="green">');
+  GPText.WriteString(h.file,str);
+  GPText.WriteString(h.file,"</font>");
+END WriteComment;
 
 PROCEDURE (h : HtmlOutput) WriteString(str : ARRAY OF CHAR);
 BEGIN
@@ -1653,21 +1756,17 @@ BEGIN
   GPText.WriteString(h.file,"</font>");
 END WriteTypeDecl;
 
-(* FIXME *)
 PROCEDURE (h : HtmlOutput) MethRef(IN nam : ARRAY OF CHAR);
 BEGIN
+  GPText.WriteString(h.file,'<font color="green">');
   GPText.WriteString(h.file,"<b> (* </b>");
   GPText.WriteString(h.file, '<a href="#meths-');;
   GPText.WriteString(h.file, nam);
   GPText.WriteString(h.file, '">');
   GPText.WriteString(h.file, "Typebound Procedures");
-(*
-  GPText.WriteString(h.file, '<font color="#cc0033">');
-  GPText.WriteString(h.file, "Typebound Procedures");
-  GPText.WriteString(h.file, "</font>");
- *)
   GPText.WriteString(h.file, '</a>');
   GPText.WriteString(h.file,"<b> *)</b>");
+  GPText.WriteString(h.file,"</font>");
 END MethRef;
 
 PROCEDURE (h : HtmlOutput) MethAnchor(IN nam : ARRAY OF CHAR);
@@ -1682,7 +1781,6 @@ BEGIN
   o.WriteLn;
   o.Indent(indent);
 END WriteLinefold;
-(* FIXME *)
 
 (* ==================================================================== *)
 (*				Format Helpers				*)
@@ -1690,8 +1788,8 @@ END WriteLinefold;
 
   PROCEDURE qStrOf(str : CharOpen) : CharOpen;
     VAR len : INTEGER;
-	idx : INTEGER;
-	ord : INTEGER;
+        idx : INTEGER;
+        ord : INTEGER;
         rslt : LitValue.CharVector;
     (* -------------------------------------- *)
     PROCEDURE hexDigit(d : INTEGER) : CHAR;
@@ -1754,8 +1852,8 @@ END WriteLinefold;
 
   PROCEDURE hexOf(ch : CHAR) : CharOpen;
     VAR res : CharOpen;
-	idx : INTEGER;
-	ord : INTEGER;
+        idx : INTEGER;
+        ord : INTEGER;
     (* -------------------------------------- *)
     PROCEDURE hexDigit(d : INTEGER) : CHAR;
     BEGIN
@@ -1788,6 +1886,15 @@ END WriteLinefold;
     END;
     RETURN res;
   END hexOf;
+
+(* ==================================================================== *)
+
+  PROCEDURE LongToComment(n : LONGINT) : CharOpen;
+    VAR arr : ARRAY 40 OF CHAR;
+  BEGIN
+    RTS.LongToStr(n, arr);
+    RETURN BOX(" (* " + arr$ + " *)");
+  END LongToComment;
 
 (* ==================================================================== *)
 
@@ -1841,6 +1948,7 @@ END WriteLinefold;
   BEGIN
     IF hexCon & (n.numVal >= 0) THEN
       output.WriteString(LongToHex(n.numVal));
+      output.WriteComment(LongToComment(n.numVal));
     ELSE
       output.WriteLong(n.numVal);
     END;
@@ -1867,7 +1975,7 @@ END WriteLinefold;
       CASE k-j OF
       | 0 : (* skip *)
       | 1 : output.Write(','); 
-	    output.WriteInt(k);
+            output.WriteInt(k);
       ELSE  output.WriteString('..');
             output.WriteInt(k);
       END;
@@ -1878,11 +1986,11 @@ END WriteLinefold;
     first := TRUE;  inSet := FALSE; j := 0; k := 0;
     FOR i := 0 TO MAX(SET) DO
       IF inSet THEN
-	IF i IN s.setVal THEN k := i;
-	ELSE inSet := FALSE; WriteRange(j,k,first);
-	END;
+        IF i IN s.setVal THEN k := i;
+        ELSE inSet := FALSE; WriteRange(j,k,first);
+        END;
       ELSE
-	IF i IN s.setVal THEN inSet := TRUE; j := i; k := i END;
+        IF i IN s.setVal THEN inSet := TRUE; j := i; k := i END;
       END;
     END;
     IF k = MAX(SET) THEN WriteRange(j,k,first) END;
@@ -1917,10 +2025,24 @@ END WriteLinefold;
   PROCEDURE (t : Type) PrintType(indent : INTEGER),NEW,EMPTY;
 
   PROCEDURE (t : Type) Print(indent : INTEGER;details : BOOLEAN),NEW,EXTENSIBLE;
+    VAR res : BrowseLookup.DescBase;
   BEGIN
     IF t.importedFrom # NIL THEN
       IF t.importedFrom = output.thisMod THEN
-        output.WriteKeyword(t.importedName);
+       (*
+        *  This code catches formal parameters that 
+        *  have not been resolved to a type defined
+        *  in this module. Occasionally this still 
+        *  fails - for example some java.lang distros
+        *  list AbstractStringBuilder as the base 
+        *  type of StringBuilder, rather than JL.Object.
+        *)
+        res := output.thisMod.symTable.lookup(t.importedName);
+        IF res # NIL THEN
+           res(TypedDesc).type.Print(indent, details);
+        ELSE
+          output.WriteKeyword(t.importedName);
+        END;
       ELSE
         output.WriteImportedTypeName(t.importedFrom, t.importedName);
       END;
@@ -1977,8 +2099,13 @@ END WriteLinefold;
     aStr = "ABSTRACT ";
     lStr = "LIMITED ";
     iStr = "INTERFACE ";
-    vStr = "(* vlCls *) ";
-    nStr = "(* noNew *) ";
+    prFx = '<span class="popup"><span class="popuptext" onclick="toggle(this)"></span></span>';
+    cStr = ' <span onclick="cls(this)">class</span>';
+    vStr = ' <span onclick="valueclass(this)">valueclass</span>';
+    nNew = ' <span onclick="noNew(this)">no noArg-ctor</span>';
+    hNew = ' <span onclick="newOk(this)">has noArg-ctor</span>';
+    nCpy = ' <span onclick="noCpy(this)">no value-assign</span>';
+    init = ' <span onclick="argCtor(this)">has arg-ctor</span>';
   VAR
     rStr : ARRAY 12 OF CHAR; 
     iTyp : Type;
@@ -2008,6 +2135,49 @@ END WriteLinefold;
       RETURN lst.tide;
     END fieldNumber;
 
+    PROCEDURE MkComment(xAttr : SET) : CharOpen;
+      VAR str : CharOpen;
+          num : INTEGER;
+    BEGIN
+      str := BOX(" (*");
+      num := 0;
+      IF Symbols.valTp IN xAttr THEN
+        IF num = 0 THEN str := BOX(str^ + vStr);
+        ELSE str := BOX(str^ + " |" + vStr);
+        END;
+        INC(num);
+      ELSIF Symbols.clsTp IN xAttr THEN
+        IF num = 0 THEN str := BOX(str^ + cStr);
+        ELSE str := BOX(str^ + " |" + cStr);
+        END;
+        INC(num);
+      END;
+      IF Symbols.noNew IN xAttr THEN
+        IF num = 0 THEN str := BOX(str^ + nNew);
+        ELSE str := BOX(str^ + " |" + nNew);
+        END;
+      ELSIF ~(Symbols.valTp IN xAttr) THEN
+        IF num = 0 THEN str := BOX(str^ + hNew);
+        ELSE str := BOX(str^ + " |" + hNew);
+        END;
+      END;
+      INC(num);
+      IF Symbols.xCtor IN xAttr THEN
+        IF num = 0 THEN str := BOX(str^ + init);
+        ELSE str := BOX(str^ + " |" + init);
+        END;
+        INC(num);
+      END;
+      IF Symbols.noCpy IN xAttr THEN
+        IF num = 0 THEN str := BOX(str^ + nCpy);
+        ELSE str := BOX(str^ + " |" + nCpy);
+        END;
+        INC(num);
+      END;
+      str := BOX(str^ + " *)");
+      RETURN str;
+    END MkComment;
+
   BEGIN
     CASE r.recAtt MOD 8 OF
     | 1 : rStr := aStr;
@@ -2016,11 +2186,7 @@ END WriteLinefold;
     | 4 : rStr := iStr;
     ELSE  rStr := "";
     END;
-    IF printFNames THEN
-      IF r.recAtt DIV 8 = 1 THEN output.WriteString(nStr);
-      ELSIF r.recAtt DIV 16 = 1 THEN output.WriteString(vStr);
-      END;
-    END;
+
     output.WriteKeyword(rStr + "RECORD"); 
     IF printBaseType(r) THEN
       output.WriteString(" (");
@@ -2034,7 +2200,7 @@ END WriteLinefold;
      (* ##### *)
       FOR i := 0 TO r.intrFaces.tide-1 DO
         output.WriteString(" + ");
-        iTyp := r.intrFaces.list[i](TypeDesc).type;
+        iTyp := r.intrFaces.list[i](TypedDesc).type;
         IF (iTyp IS Record) & (iTyp(Record).ptrType # NIL) THEN
           iTyp(Record).ptrType.Print(0,FALSE);
         ELSE
@@ -2044,19 +2210,21 @@ END WriteLinefold;
      (* ##### *)
       output.WriteString(")"); 
     END;
-
-(* FIXME *)
-    IF r.methods.tide > 0 THEN (* If interfaces, then newline + indent? *)
-      IF r.intrFaces.tide > 1 THEN
-        output.WriteLinefold(indent);
-      END;
+   (* should only apply for html output? *)
+    IF Symbols.isFn IN r.xAttr THEN
+      output.WriteLinefold(indent);
+      output.WriteString(prFx);
+      output.WriteComment(MkComment(r.xAttr));
+    END;
+    
+    IF r.methods.list # NIL THEN
+      output.WriteLinefold(indent);
       IF r.declarer # NIL THEN 
         output.MethRef(r.declarer.name);
       ELSIF (r.ptrType # NIL) & (r.ptrType.declarer # NIL) THEN
         output.MethRef(r.ptrType.declarer.name);
       END;
     END;
-(* FIXME *)
 
     output.WriteLn;
     fLen := maxFldLen(r);
@@ -2165,7 +2333,7 @@ END WriteLinefold;
     END;
   END PrintFormals;
 
- (* -----------------------------------------------------------	*)
+ (* ----------------------------------------------------------- *)
 
   PROCEDURE (p : Proc) PrintType(indent : INTEGER),EXTENSIBLE;
   BEGIN
@@ -2173,7 +2341,7 @@ END WriteLinefold;
     PrintFormals(p, indent+9);
   END PrintType;
 
- (* -----------------------------------------------------------	*)
+ (* ----------------------------------------------------------- *)
 
   PROCEDURE (p : Proc) PrintProc(indent : INTEGER),NEW;
   BEGIN
@@ -2190,7 +2358,7 @@ END WriteLinefold;
     output.WriteString(";"); output.WriteLn;
   END PrintProc;
 
- (* -----------------------------------------------------------	*)
+ (* ----------------------------------------------------------- *)
 
   PROCEDURE (m : Meth) PrintType(indent : INTEGER),EXTENSIBLE;
   BEGIN
@@ -2283,7 +2451,7 @@ END WriteLinefold;
         IF xLine THEN output.WriteLn; END;
       ELSE
         output.Indent(indent);
-        IF d IS TypeDesc THEN 
+        IF d IS TypedDesc THEN 
           output.WriteTypeDecl(d.name); 
         ELSE
           output.WriteIdent(d.name);
@@ -2297,7 +2465,7 @@ END WriteLinefold;
         WITH d : ConstDesc DO
             output.WriteString(" = ");
             d.val.Print();
-        | d : TypeDesc DO
+        | d : TypedDesc DO
           IF d IS VarDesc THEN
             output.WriteString(" : ");
           ELSE
@@ -2384,6 +2552,15 @@ END WriteLinefold;
     END;
 
     output.WriteStart(mod);
+    IF mod.comment1 # NIL THEN
+      output.WriteComment("(*"); output.WriteLn;
+      output.WriteComment(" *  " + mod.comment1^); output.WriteLn;
+      IF mod.comment2 # NIL THEN 
+        output.WriteComment(" *  " + mod.comment2^); output.WriteLn;
+      END;
+      output.WriteComment(" *)"); output.WriteLn;
+    END;
+
     IF mod.systemMod THEN
       heading := "SYSTEM ";
     ELSIF mod.fName # NIL THEN
@@ -2403,13 +2580,13 @@ END WriteLinefold;
     *)
     IF mod.strongNm # NIL THEN
       output.WriteLn; 
-      output.WriteString("    (* version ");
+      output.WriteComment("    (* version ");
       output.WriteInt(mod.strongNm[0]); output.Write(":");
       output.WriteInt(mod.strongNm[1]); output.Write(":");
       output.WriteInt(mod.strongNm[2]); output.Write(":");
       output.WriteInt(mod.strongNm[3]); 
       PrintDigest(mod.strongNm[4], mod.strongNm[5]);
-      output.WriteString(" *)");
+      output.WriteComment(" *)");
     END;
    (*  end optional strong name.  *)
     output.WriteLn; output.WriteLn;
@@ -2553,7 +2730,7 @@ BEGIN
     Console.WriteLn;
     Console.WriteString(" /verbatim ==> display anonymous public type names");
     Console.WriteLn;
-  ELSE			(* RTS.defaultTarget = "jvm" *)
+  ELSE (* RTS.defaultTarget = "jvm" *)
     Console.WriteString("Usage: browse [options] <ModuleNames>");
     Console.WriteLn;
     Console.WriteString("Browse Options ... ");
@@ -2733,7 +2910,7 @@ END ParseOptions;
             Console.WriteLn;
           END;
         END;
-        PrintModule(modList.list[i]); 
+        PrintModule(modList.list[i]);
         IF output IS FileOutput THEN
           GPTextFiles.CloseFile(output(FileOutput).file);
         END;
@@ -2762,6 +2939,7 @@ END ParseOptions;
 (* ============================================================ *)
 
 BEGIN
+  NameHash.InitNameHash(32000);
   NEW(fileName, 256);
   NEW(modName, 256);
   InitTypes();

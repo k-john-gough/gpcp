@@ -539,7 +539,7 @@ MODULE StatDesc;
           ELSIF (rTp # lTp) & ~s.rhsX.isProcLit() THEN s.StmtError(191);
           END;
         END;
-      ELSE (* sort out which error to report *)
+      ELSE (* Not assign compatible: which error to report? *)
         IF    rTp.isOpenArrType() THEN eNm := 142;
         ELSIF rTp.isExtnRecType() THEN eNm := 143;
         ELSIF (rTp.kind = T.prcTp) &
@@ -578,8 +578,8 @@ MODULE StatDesc;
         ELSE
           rExp := s.retX.exprAttr();
           s.retX := rExp;
-          xTyp := rExp.type;
           IF rExp # NIL THEN (* fixed 28 July 2001 *)
+            xTyp := rExp.type;
             IF ~rTyp.assignCompat(rExp) THEN
               D.RepTypesErrTok(76, rTyp, xTyp, s.token);
             ELSIF rTyp # xTyp THEN

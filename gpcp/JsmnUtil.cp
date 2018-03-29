@@ -824,6 +824,7 @@ MODULE JsmnUtil;
     os.Prefix(code);
     os.RefLab(i2);
     os.Suffix(code);
+	INCL(i2.attr, J.jumpSeen);
   END CodeLb;
 
 (* -------------------------------------------- *)

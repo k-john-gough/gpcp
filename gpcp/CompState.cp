@@ -98,7 +98,7 @@ MODULE CompState;
     doDWC-,       (* Legacy class file emitter in v1.3.19 *)
     doJsmn-,
     forceIlasm,
-    forcePerwapi,
+    forceRflEmt,
     doIlasm-,
     doAsm-,
     doCode-,
@@ -237,6 +237,14 @@ MODULE CompState;
       Console.WriteLn;
     END TimeMsg;
 
+	(* Filename to NativeString *)
+	PROCEDURE fn2ns*(IN fn : FileNames.NameString) : RTS.NativeString;
+	BEGIN
+	  IF fn = "" THEN RETURN NIL
+	  ELSE RETURN MKSTR(fn$)
+	  END
+	END fn2ns;
+
 (* ==================================================================== *)
 
     PROCEDURE Usage;
@@ -276,6 +284,7 @@ PrintLn("       /quiet       ==> Compile silently if possible");
 PrintLn("       /symdir=XXX  ==> Place symbol files in directory XXX");
 PrintLn("  Code Generation Options ---");
 PrintLn("       /ilasm       ==> (default) Force compilation via ILASM emitter");
+PrintLn("       /rflemit     ==> Use prototype System.Reflection.Emit emitter");
 PrintLn("       /target=XXX  ==> Emit (jvm|net) assembly");
 PrintLn("       /unsafe      ==> Allow unsafe code generation");
 PrintLn("       /vserror     ==> Print error messages in Visual Studio format");
@@ -539,20 +548,17 @@ PrintLn("       -DCPSYM=%CPSYM%   pass value of CPSYM environment variable to JR
           ELSE 
             Unknown(opt);
           END;
-      | "p" :
-          IF copy = "perwapi" THEN
-           (*
-            * forcePerwapi := TRUE;
-            * expectedNet := TRUE;
-            *)
-            Message("PERWAPI is not supported for this build");
-          ELSE
-            Unknown(opt);
-          END;
       | "q" :
           IF copy = "quiet" THEN
             quiet := TRUE;
             warning := FALSE;
+          ELSE
+            Unknown(opt);
+          END;
+      | "r" :
+          IF copy = "rflemit" THEN
+            forceRflEmt := TRUE;
+            expectedNet := TRUE;
           ELSE
             Unknown(opt);
           END;
@@ -684,13 +690,11 @@ PrintLn("       -DCPSYM=%CPSYM%   pass value of CPSYM environment variable to JR
       END;
      (* 
       *  If debug is set, for this version, ILASM is used unless /perwapi is explicit
-      *  If debug is clar, for this versin, PERWAPI is used unless /ilasm is explicit
+      *  If debug is clear, for this versin, PERWAPI is used unless /ilasm is explicit
       *)
-      IF forceIlasm THEN      doIlasm := TRUE;
-      ELSIF forcePerwapi THEN doIlasm := FALSE;
-      ELSE                    
-        (* In version 1.4.0* doIlasm is always true, even with /nodebug *)
-                              doIlasm := TRUE; (* debug; *)
+      IF forceIlasm THEN     doIlasm := TRUE;
+      ELSIF forceRflEmt THEN doIlasm := FALSE;
+      ELSE                   doIlasm := TRUE; (* debug; *)
       END;
     END CheckOptionsOK;
 
@@ -768,7 +772,7 @@ PrintLn("       -DCPSYM=%CPSYM%   pass value of CPSYM environment variable to JR
     doJsmn      := FALSE;
     doIlasm     := TRUE;   (* doIlasm is the default currently *)
     forceIlasm  := FALSE;
-    forcePerwapi := FALSE; (* and stays false in 1.4.04 *)
+    forceRflEmt := FALSE; (* and stays false in 1.4.04 *)
     doCode      := TRUE;
     doAsm       := TRUE;
     doAsm5      := (RTS.defaultTarget = "jvm");

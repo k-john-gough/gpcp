@@ -75,7 +75,6 @@ MODULE NameHash;
 	idx : INTEGER;
 	len : INTEGER;
   BEGIN [UNCHECKED_ARITHMETIC]
-
     (* need to turn off overflow checking *)
     len := LEN(str$);
     tot := 0;
@@ -146,6 +145,7 @@ MODULE NameHash;
     val  := name[key];
 
     WHILE (val # NIL) & ~equalStr(val,str) DO
+	 (* hash table collision, find new slot *)
       INC(key, step);
       INC(step,2); 
       IF step >= size THEN HashtableOverflow() END;

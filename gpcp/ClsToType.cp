@@ -58,6 +58,26 @@ MODULE ClsToType;
         (* method attribute enumeration bits *)
         stMth = 4; fnMth = 5; vrMth = 6; nwMth = 8; abMth = 10;
 
+ CONST  (* Binding Flags *)
+        staticBF = 
+		  Rfl.BindingFlags.Static + 
+		  Rfl.BindingFlags.DeclaredOnly +
+		  Rfl.BindingFlags.NonPublic +
+		  Rfl.BindingFlags.Public;
+
+        instanceBF = 
+		  Rfl.BindingFlags.Instance + 
+		  Rfl.BindingFlags.DeclaredOnly +
+		  Rfl.BindingFlags.NonPublic +
+		  Rfl.BindingFlags.Public;
+
+		bothBF =
+		  Rfl.BindingFlags.Instance + 
+		  Rfl.BindingFlags.Static + 
+		  Rfl.BindingFlags.DeclaredOnly +
+		  Rfl.BindingFlags.NonPublic +
+		  Rfl.BindingFlags.Public;
+
  (* ------------------------------------------------------------ *)
 
   TYPE  Namespace*    = POINTER TO ABSTRACT RECORD
@@ -596,9 +616,10 @@ MODULE ClsToType;
 
   PROCEDURE modeFromMbrAtt(att : SET) : INTEGER;
   BEGIN
-    CASE ORD(att * {0,1,2}) OF
+    CASE ORD(att * {0,1,2,5}) OF
     | 4, 5 : RETURN Sy.protect;
     | 6    : RETURN Sy.pubMode;
+	| 26H  : RETURN Sy.rdoMode; (* Actually InitOnly for static fields *)
     ELSE     RETURN Sy.prvMode;
     END;
   END modeFromMbrAtt;
@@ -1084,18 +1105,16 @@ MODULE ClsToType;
     *  First we must add resolved base and interface types.
     *)
     FixBaseAndInterfaces(spc, cls, rec);
+	IF cls.get_IsValueType() THEN INCL(rec.xAttr, Sy.valTp);
+	ELSIF cls.get_IsClass() THEN INCL(rec.xAttr, Sy.clsTp);
+	END;
    (*
     *  Now fill in record fields ...
     *)
-    flds := cls.GetFields();
+	flds := cls.GetFields(bothBF);
     FOR indx := 0 TO LEN(flds) - 1 DO
       fldI := flds[indx];
-     (*
-      *  Don't emit inherited fields.
-      *)
-      IF fldI.get_DeclaringType() = cls THEN 
-        spc.AddRecFld(rec, fldI);
-      END;
+      spc.AddRecFld(rec, fldI);
     END;
    (*
     *  Now fill in record events ...
@@ -1107,18 +1126,16 @@ MODULE ClsToType;
    (*
     *  Now fill in record methods ...
     *)
-    mths := cls.GetMethods();
+    mths := cls.GetMethods(bothBF);
     FOR indx := 0 TO LEN(mths) - 1 DO
       mthI := mths[indx];
-      IF cls = mthI.get_DeclaringType() THEN (* ONLY IF NOT GENERIC ARGUMENTS *)
-        spc.AddRecMth(rec, mths[indx]);
-      END;
+      spc.AddRecMth(rec, mths[indx]);
     END;
    (*
     *  Now fill in constructors ...
     *  even if there are no instance members.
     *)
-    cons := cls.GetConstructors();
+    cons := cls.GetConstructors(instanceBF);
     FOR indx := 0 TO LEN(cons) - 1 DO 
       spc.AddRecMth(rec, cons[indx]);
     END;

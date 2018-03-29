@@ -132,7 +132,12 @@ public class GPBinFiles {
   }
 
   public static int readByte(GPBinFiles_FILE cpf) throws IOException {
-    return cpf.rf.readUnsignedByte();
+    try {
+      return cpf.rf.readUnsignedByte();
+    }
+    catch (EOFException x) {
+      return -1; // Compatibility with .NET version.
+    }
   } 
 
   public static int readNBytes(GPBinFiles_FILE cpf, byte[] buff, 

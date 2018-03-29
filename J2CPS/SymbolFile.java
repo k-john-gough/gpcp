@@ -395,6 +395,10 @@ class SymbolFile {
     out.writeByte(close);
     out.writeByte(keySy);
     out.writeInt(0);
+    // We need to emit the optional comments to 
+    // trigger special behaviour from Browse.
+    writeString(out, "Creator PeToCps " + j2cps.versionStr);
+    writeString(out, "Compiled from " + j2cps.pkgOrJar);
     thisPack.ResetImports();
   }
 
