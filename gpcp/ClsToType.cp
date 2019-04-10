@@ -152,11 +152,22 @@ MODULE ClsToType;
   END isGenericClass;
 
  (* ------------------------------------------------ *)
-
+ (* This method detects generic types that appear as *)
+ (* byRef values that point to generic types. These  *)
+ (* types have isGenericType false!                  *)
+ (* ------------------------------------------------ *)
   PROCEDURE isGenericType(typ : Sys.Type) : BOOLEAN;
+   (* --------------------------------- *)
+    PROCEDURE hasBackTick(n : RTS.NativeString) : BOOLEAN;
+	BEGIN
+	  RETURN n.Contains(MKSTR("`"));
+	END hasBackTick;
+   (* --------------------------------- *)
   BEGIN 
     IF typ.get_IsArray() THEN 
       RETURN isGenericType(typ.GetElementType());
+    ELSIF typ.get_HasElementType() & hasBackTick(typ.get_Name()) THEN
+	  RETURN TRUE;
     ELSE
       RETURN typ.get_IsGenericType();
     END;
@@ -237,6 +248,7 @@ MODULE ClsToType;
 
   PROCEDURE gpName(typ : Sys.Type) : RTS.NativeString;
     VAR name : RTS.NativeString;
+   (* --------------------------------- *)
    (* ----- Trim the trailing '&' ----- *)
     PROCEDURE trimAmp(n : RTS.NativeString) : RTS.NativeString;
     BEGIN
@@ -290,6 +302,16 @@ MODULE ClsToType;
     END;
     Glb.Message(str^ + gpSpce(cls) + "." + gpName(cls));
   END SayWhy;
+
+ (* ------------------------------------------------ *)
+
+  PROCEDURE SayWhyBase(bas : Sys.Type; cls : Sys.Type);
+    VAR str : Glb.CharOpen;
+  BEGIN
+    str := BOX(" Hiding class with generic base type -- ");
+    Glb.Message(str^ + gpSpce(cls) + "." + gpName(cls));
+	Glb.Message(" ... Base type is == " + gpSpce(bas) + "." + gpName(bas));
+  END SayWhyBase;
 
  (* ------------------------------------------------ *)
 
@@ -616,13 +638,24 @@ MODULE ClsToType;
 
   PROCEDURE modeFromMbrAtt(att : SET) : INTEGER;
   BEGIN
-    CASE ORD(att * {0,1,2,5}) OF
+    CASE ORD(att * {0,1,2}) OF
     | 4, 5 : RETURN Sy.protect;
     | 6    : RETURN Sy.pubMode;
-	| 26H  : RETURN Sy.rdoMode; (* Actually InitOnly for static fields *)
     ELSE     RETURN Sy.prvMode;
     END;
   END modeFromMbrAtt;
+
+ (* ------------------------------------------------ *)
+
+  PROCEDURE modeFromFldAtt(att : SET) : INTEGER;
+  BEGIN
+    CASE ORD(att * {0,1,2,5}) OF
+    | 4, 5 : RETURN Sy.protect;
+    | 6    : RETURN Sy.pubMode;
+	| 26H  : RETURN Sy.rdoMode; (* Actually InitOnly for fields *)
+    ELSE     RETURN Sy.prvMode;
+    END;
+  END modeFromFldAtt;
 
  (* ------------------------------------------------ *)
 
@@ -695,7 +728,7 @@ MODULE ClsToType;
    (* ------------------------------------ *)
   BEGIN
     bts := BITS(fld.get_Attributes());
-    mod := modeFromMbrAtt(bts);
+    mod := modeFromFldAtt(bts);
     typ := fld.get_FieldType();
     IF isGenericType(typ) THEN RETURN END;
     IF mod > Sy.prvMode THEN
@@ -1086,7 +1119,19 @@ MODULE ClsToType;
     BEGIN
       super := cls.get_BaseType();
       ifArr := cls.GetInterfaces();
-      IF super # NIL THEN rec.baseTp := cpTypeFromCTS(super, spc) END;
+      IF super # NIL THEN 
+	    IF ~super.get_IsGenericType() & isPublicClass(super) THEN
+		  rec.baseTp := cpTypeFromCTS(super, spc);
+        ELSIF Glb.verbose THEN
+		 (* 
+		  * We exclude non-generic types that are 
+		  * instantiated from a generic base type.
+		  * In principal this could be allowed, but
+		  * requires many code changes. (kjg 2019)
+		  *)
+          SayWhyBase(super, cls);
+        END;
+      END;
       IF ifArr # NIL THEN
         FOR index := 0 TO LEN(ifArr) - 1 DO
           ifElm := ifArr[index];
@@ -1103,7 +1148,8 @@ MODULE ClsToType;
   BEGIN
    (*
     *  First we must add resolved base and interface types.
-    *)
+ 	* name := cls.get_Name();
+   *)
     FixBaseAndInterfaces(spc, cls, rec);
 	IF cls.get_IsValueType() THEN INCL(rec.xAttr, Sy.valTp);
 	ELSIF cls.get_IsClass() THEN INCL(rec.xAttr, Sy.clsTp);
@@ -1283,7 +1329,7 @@ MODULE ClsToType;
     name := Nh.charOpenOfHash(spc.hash);
     spc.bloc.SetNameFromHash(spc.hash);
     Glb.BlkIdInit(spc.bloc, aNm, name);
-    IF Glb.superVb THEN Glb.Message("Creating blk - " + name^) END;
+    IF Glb.superVb & (name # NIL) THEN Glb.Message("Creating blk - " + name^) END;
   END MakeBlkId;
 
  (* ------------------------------------------------ *)

@@ -655,7 +655,7 @@ MODULE CPascalErrors;
     | 311: msg := LitValue.strToCharOpen('Access to variable <' 
 		       + s1 + '> will be inefficient');
     | 220,
-      312: msg := LitValue.strToCharOpen("Matches with - " + s1);
+      312: msg := LitValue.strToCharOpen("Also matches with - " + s1);
     | 313: msg := LitValue.strToCharOpen("Bound to - " + s1);
     END;
     IF ~nowarn OR                        (* If warnings are on OR  *)

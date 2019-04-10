@@ -1,7 +1,7 @@
 
 
 (* ============================================================ *)
-(*  Return the PE-file target emitter. .JVM version             *)
+(*  Return the PE-file target emitter. .NET version             *)
 (*  Copyright (c) John Gough 2018.                              *)
 (* ============================================================ *)
 (* ============================================================ *)
@@ -11,7 +11,8 @@ MODULE PeTarget;
   IMPORT 
         RTS,
         GPCPcopyright,
-        MsilUtil;
+        MsilUtil,
+        RefEmitUtil;
 
 (* ============================================================ *)
 (*                       Factory Method                         *)
@@ -20,11 +21,10 @@ MODULE PeTarget;
   PROCEDURE newPeFile*(
      IN nam : ARRAY OF CHAR; isDll : BOOLEAN) : MsilUtil.MsilFile;
   BEGIN
-    IF RTS.defaultTarget = "net" THEN
+    IF RTS.defaultTarget # "net" THEN
       THROW("Wrong version of PeTarget compiled");
-    ELSE
-      THROW("Reflection Emit emitter not available on JVM"); 
     END;
+    RETURN RefEmitUtil.newPeFile(nam, isDll);
   END newPeFile;
 
 (* ============================================================ *)
