@@ -874,7 +874,11 @@ MODULE TypeDesc;
     ELSIF (i.recAtt = limit) & i.isImportedType() THEN
       S.SemError.Report(71, tok.lin, tok.col);
     ELSIF (Sy.clsTp IN i.xAttr) & (Sy.noNew IN i.xAttr) THEN
-      S.SemError.Report(155, tok.lin, tok.col);
+	  IF i.isExtnRecType() THEN 
+        S.SemError.Report(241, tok.lin, tok.col);
+	  ELSE
+        S.SemError.Report(155, tok.lin, tok.col);
+	  END;
     END;
   END InstantiateCheck;
 
@@ -1734,7 +1738,16 @@ MODULE TypeDesc;
             i.TypeError(102); (* abstract record must have abstract base *)
           ELSIF baseT.isExtnRecType() THEN
             i.CopyFieldsOf(baseT);
-            IF Sy.noNew IN baseT.xAttr THEN INCL(i.xAttr, Sy.noNew) END;
+		   (*
+		    * There is a subtlety here: if i is a CP type and baseT is an 
+			* external record type with no no-arg constructor then i must 
+			* have the noNew attribute. However this does not apply if i 
+			* is also an external type, since the i might have a ctor 
+			* that performs a base call to a with-args ctor of baseT.
+			*)
+            IF (Sy.noNew IN baseT.xAttr) & ~i.isExtnRecType() THEN 
+			  INCL(i.xAttr, Sy.noNew) 
+			END;
 (* ----- Code for extensible limited records ----- *)
           ELSIF baseT.isLimRecType() THEN
             IF ~i.isLimRecType() THEN

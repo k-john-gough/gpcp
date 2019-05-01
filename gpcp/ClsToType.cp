@@ -423,7 +423,7 @@ MODULE ClsToType;
     ELSIF name = "SByte"   THEN RETURN Bi.byteTp;
     ELSIF name = "UInt8"   THEN RETURN Bi.uBytTp;
     ELSIF name = "Byte"   THEN RETURN Bi.uBytTp;
-    ELSIF name = "Single"  THEN RETURN Bi.intTp;
+    ELSIF name = "Single"  THEN RETURN Bi.sReaTp;
     ELSIF name = "Double"  THEN RETURN Bi.realTp;
     ELSIF name = "Boolean" THEN RETURN Bi.boolTp;
 
