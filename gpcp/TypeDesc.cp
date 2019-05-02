@@ -874,7 +874,7 @@ MODULE TypeDesc;
     ELSIF (i.recAtt = limit) & i.isImportedType() THEN
       S.SemError.Report(71, tok.lin, tok.col);
     ELSIF (Sy.clsTp IN i.xAttr) & (Sy.noNew IN i.xAttr) THEN
-	  IF i.isExtnRecType() THEN 
+	  IF i.isForeign() THEN 
         S.SemError.Report(241, tok.lin, tok.col);
 	  ELSE
         S.SemError.Report(155, tok.lin, tok.col);
@@ -1658,6 +1658,7 @@ MODULE TypeDesc;
         recId : Sy.Idnt;
         dBlk  : Id.BlkId;
 		ntvNm : RTS.NativeString;
+		nbtNm : RTS.NativeString;
         e137,e145 : BOOLEAN;
    (* ----------------------------------------- *)
     PROCEDURE refInNET(t : Sy.Type) : BOOLEAN;
@@ -1684,6 +1685,7 @@ MODULE TypeDesc;
    (* ----------------------------------------- *)
   BEGIN (* resolve *)
     IF i.depth = initialMark THEN
+	 (* ----- some debugging diagnostics here -----*)
 	  IF CSt.verbose THEN
   	    IF i.idnt # NIL THEN
 	      ntvNm := Sy.getName.NtStr(i.idnt);
@@ -1691,6 +1693,7 @@ MODULE TypeDesc;
 	      ntvNm := Sy.getName.NtStr(i.bindTp.idnt);
         END;
       END;
+	 (* ------------------------------------------ *)
       i.depth := d;
       e145 := FALSE;
       e137 := FALSE;
@@ -1729,6 +1732,15 @@ MODULE TypeDesc;
           END;
         END;
         IF baseT # NIL THEN
+		 (* ----- some debugging diagnostics here -----*)
+	      IF CSt.verbose THEN
+  	        IF baseT.idnt # NIL THEN
+	          nbtNm := Sy.getName.NtStr(baseT.idnt);
+            ELSIF (baseT.bindTp # NIL) & (baseT.bindTp.idnt # NIL) THEN
+	          nbtNm := Sy.getName.NtStr(baseT.bindTp.idnt);
+            END;
+          END;
+		 (* ----------------------------------------- *)
          (*
           *  Base is resolved, now check some semantic constraints.
           *)
@@ -1740,12 +1752,12 @@ MODULE TypeDesc;
             i.CopyFieldsOf(baseT);
 		   (*
 		    * There is a subtlety here: if i is a CP type and baseT is an 
-			* external record type with no no-arg constructor then i must 
+			* foreign record type with no no-arg constructor then i must 
 			* have the noNew attribute. However this does not apply if i 
-			* is also an external type, since the i might have a ctor 
+			* is also an foreign type, since the i might have a ctor 
 			* that performs a base call to a with-args ctor of baseT.
 			*)
-            IF (Sy.noNew IN baseT.xAttr) & ~i.isExtnRecType() THEN 
+            IF (Sy.noNew IN baseT.xAttr) & ~i.isForeign() THEN 
 			  INCL(i.xAttr, Sy.noNew) 
 			END;
 (* ----- Code for extensible limited records ----- *)

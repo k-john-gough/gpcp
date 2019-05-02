@@ -2036,7 +2036,9 @@ MODULE NewSymFileRW;
         Console.WriteInt(f.impS.verNm[2],1); Console.Write(".");
         Console.WriteInt(f.impS.verNm[3],1); 
         Console.WriteHex(f.impS.verNm[4],9);
-        Console.WriteHex(f.impS.verNm[5],9); Console.WriteLn;
+        Console.WriteHex(f.impS.verNm[5],9); 
+        Console.WriteString(" (" + nm + ")"); 
+		Console.WriteLn;
       END;
       (*
       //  The CPS format only provides for version information if
