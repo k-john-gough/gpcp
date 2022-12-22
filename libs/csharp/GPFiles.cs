@@ -9,9 +9,10 @@
 namespace GPFiles {
 public abstract class GPFiles {
 
-  public static char pathSep = ';';
-  public static char fileSep = '\\';
-  public static char optChar = '/';
+  private static bool unix = (System.Environment.NewLine == "\n");
+  public static char pathSep = unix ? ':' : ';';
+  public static char fileSep = unix ? '/' : '\\';
+  public static char optChar = unix ? '-' : '/';
 
   /* ----------------------------------	*/
 

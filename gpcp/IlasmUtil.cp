@@ -1857,12 +1857,16 @@ MODULE IlasmUtil;
     IF s = NIL THEN RETURN END;
     os.CatStr(Asm.dirStr[Asm.dot_line]); 
     os.Tint(s.sLin);
-    os.CatChar(",");
-    os.CatInt(s.eLin);
+    IF RTS.eol[0] # 0AX THEN
+      os.CatChar(",");
+      os.CatInt(s.eLin)
+    END;
     os.CatChar(":");
     os.CatInt(s.sCol);
-    os.CatChar(",");
-    os.CatInt(s.eCol);
+    IF RTS.eol[0] # 0AX THEN
+      os.CatChar(",");
+      os.CatInt(s.eCol)
+    END;
     os.Bstring(os.srcS);
     os.CatEOL();
   END LineSpan;
