@@ -31,6 +31,8 @@ public class ConstantPool {
   public final static int CONSTANT_MethodHandle       = 15;
   public final static int CONSTANT_MethodType         = 16;
   public final static int CONSTANT_InvokeDynamic      = 18;
+  public final static int CONSTANT_Module             = 19;
+  public final static int CONSTANT_Package            = 20;
 
   /* access flags */
   public static final int ACC_PUBLIC       = 0x0001;
@@ -109,6 +111,10 @@ public class ConstantPool {
     case CONSTANT_InvokeDynamic:
         return SkipInfo(this,tag,stream.readUnsignedShort(),
                     stream.readUnsignedShort());
+    case CONSTANT_Module:
+	return SkipInfo(this,tag,stream.readUnsignedShort(),0);
+    case CONSTANT_Package:
+	return SkipInfo(this,tag,stream.readUnsignedShort(),0);
     default:
       System.out.println("Unrecognized constant type: "+String.valueOf(tag));
 	throw new IOException("Unrecognized constant in constant pool");
