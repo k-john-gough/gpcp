@@ -148,12 +148,24 @@ public class PackageDesc {
       */
       desc.set(Util.ONTODO);
     }
+
+    private String removeCLSU(String pName) {
+        if (pName.startsWith("classes_"))
+            return pName.substring(8);
+        return pName;
+    }
+
+    private String removeCLSDOT(String pName) {
+        if (pName.startsWith("classes."))
+            return pName.substring(8);
+        return pName;
+    }
   
     private PackageDesc(String pName, boolean anon) {
         if (anon) {
           this.name = pName;
-          this.cpName = pName;
-          this.javaName = pName;
+          this.cpName = removeCLSU(pName);
+          this.javaName = removeCLSDOT(pName);
           this.anonPackage = true;
         } else {
           MakeName(pName); 
@@ -164,8 +176,8 @@ public class PackageDesc {
     private void MakeName(String pName) {
         this.name = pName.replace(Util.JAVADOT,Util.FWDSLSH);
         this.name = this.name.replace(Util.FILESEP,Util.FWDSLSH);  /* name is now .../... */
-        this.cpName = this.name.replace(Util.FWDSLSH,Util.LOWLINE);
-        this.javaName = this.name.replace(Util.FWDSLSH,Util.JAVADOT);
+        this.cpName = removeCLSU(this.name.replace(Util.FWDSLSH,Util.LOWLINE));
+        this.javaName = removeCLSDOT(this.name.replace(Util.FWDSLSH,Util.JAVADOT));
         if (Util.FWDSLSH != Util.FILESEP) {
             this.dirName = this.name.replace(Util.FWDSLSH,Util.FILESEP);
         } else {

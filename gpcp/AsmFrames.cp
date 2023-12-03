@@ -987,6 +987,17 @@ MODULE AsmFrames;
   END AddRefParam;
 
  (* ================================================ *)
+  PROCEDURE remSigS( obj : RTS.NativeObject ): RTS.NativeObject;
+  VAR sig : RTS.NativeString;
+  BEGIN
+    IF obj IS RTS.NativeString THEN
+      sig := obj(RTS.NativeString);
+      IF sig.startsWith("L") & sig.endsWith(";") THEN
+        RETURN sig.substring( 1, sig.length()-1 );
+      END;
+    END; 
+    RETURN obj
+  END remSigS;
 
   PROCEDURE ( mFrm : MethodFrame )GetLocalArr*() : Def.JloArr,NEW;
     VAR indx, count : INTEGER;
@@ -999,7 +1010,7 @@ MODULE AsmFrames;
       FOR indx := 0 TO mFrm.LcHi() DO
         IF mFrm.isDummyElem( indx ) THEN (* skip *)
         ELSE
-          rslt[count] := mFrm.localStack[indx].state;
+          rslt[count] := remSigS( mFrm.localStack[indx].state ); (* XXX *)
           INC(count);
         END;
       END;
@@ -1020,7 +1031,7 @@ MODULE AsmFrames;
       FOR indx := 0 TO mFrm.LcHi() DO
         IF mFrm.isDummyElem( indx ) THEN (* skip *)
         ELSE
-          rslt[count] := mFrm.localStack[indx].dclTp;
+          rslt[count] := remSigS( mFrm.localStack[indx].dclTp ); (* XXX *)
           INC(count);
         END;
       END;
@@ -1048,7 +1059,7 @@ MODULE AsmFrames;
 (*
  Hlp.Msg2("  elem " + Ju.i2CO(index)^, Hlp.objToStr(elem) );
  *)
-        rslt[count] := elem; INC(index); INC(count);
+        rslt[count] := remSigS( elem ); INC(index); INC(count); (* XXX *)
         IF (elem = ASM.Opcodes.DOUBLE) OR
            (elem = ASM.Opcodes.LONG) THEN INC(index) ;
 (*

@@ -188,8 +188,11 @@ mkdir %TRGT%\sources\libs\cpascal
 REM ===================================
 echo Copying GPCP sources
 REM ===================================
+copy sources\gpcp\env.bat %TRGT%
+copy sources\gpcp\env.sh %TRGT%
 copy sources\gpcp\*.cp %TRGT%\sources\gpcp
 copy sources\gpcp\MkNetDistro.bat %TRGT%\sources\gpcp
+copy sources\gpcp\MkNetDistro.sh %TRGT%\sources\gpcp
 copy sources\gpcp\MakeIndex\*.cp %TRGT%\sources\gpcp\MakeIndex
 copy sources\gpcp\libs\java\MsilAsm.java %TRGT%\sources\gpcp\libs\java
 copy sources\gpcp\libs\csharp\MsilAsm.cs %TRGT%\sources\gpcp\libs\csharp

@@ -1420,7 +1420,7 @@ MODULE Browse;
       file := GPBinFiles.findLocal(mod.symName);
       IF file = NIL THEN
         file := GPBinFiles.findOnPath("CPSYM", mod.symName);
-        IF (file = NIL) OR (mod.progArg) THEN
+        IF (file = NIL) (* OR (mod.progArg)) *) THEN
           Error.WriteString("File <" + mod.symName^ + "> not found"); 
           Error.WriteLn;
           HALT(1);

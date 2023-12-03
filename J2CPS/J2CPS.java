@@ -132,8 +132,8 @@ public class j2cps {
     }
     try {
         if (ClassDesc.useJar) {
-            if (ClassDesc.useJar && !argStr.toLowerCase().endsWith(".jar")) {
-                System.err.println("After -jar, filename must end \".jar\"");
+            if (ClassDesc.useJar && !argStr.toLowerCase().endsWith(".jar") & !argStr.toLowerCase().endsWith(".jmod")) {
+                System.err.println("After -jar, filename must end in \".jar\" or \".jmod\"");
                 System.exit(1);
             }
             pkgOrJar = "jar-file " + argStr;
