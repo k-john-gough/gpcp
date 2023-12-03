@@ -22,10 +22,13 @@ SYSTEM MODULE RTS;
   TYPE  CharOpen*       = POINTER TO ARRAY OF CHAR;
         CharVector*     = VECTOR OF CHAR;
 
-  TYPE  NativeType*     = POINTER TO ABSTRACT RECORD END;
-        NativeObject*   = POINTER TO EXTENSIBLE RECORD END;  
-        NativeString*   = POINTER TO RECORD END;
-        NativeException*= POINTER TO EXTENSIBLE RECORD END;
+  TYPE  NativeType*     = POINTER TO ABSTRACT RECORD
+                            STATIC PROCEDURE init*() : NativeType, CONSTRUCTOR; END;  
+        NativeObject*   = POINTER TO EXTENSIBLE RECORD 
+                            STATIC PROCEDURE init*() : NativeObject, CONSTRUCTOR; END;  
+        NativeException*= POINTER TO EXTENSIBLE RECORD;
+                            STATIC PROCEDURE init*() : NativeException, CONSTRUCTOR; END;  
+        NativeString*   = POINTER TO RECORD (* No noArg constructor *) END;
 
   VAR   eol- : POINTER TO ARRAY OF CHAR; (* OS-specific end of line string *)
 

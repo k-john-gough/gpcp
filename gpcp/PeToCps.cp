@@ -121,7 +121,7 @@ MODULE PeToCps;
       Glb.AbortMsg("Cannot load mscorlib, use the /mscorlib option instead")
     END;
     Glb.GlobInit(nam, basS);
-    RETURN SysRfl.Assembly.(*ReflectionOnly*)LoadFrom(MKSTR(nam));
+    RETURN SysRfl.Assembly.(* ReflectionOnly *)LoadFrom(MKSTR(nam));
   END GetAssembly;
 
   PROCEDURE GetMscorlib() : SysRfl.Assembly;

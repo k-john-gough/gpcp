@@ -419,7 +419,7 @@ MODULE CPascalErrors;
     | 152: str := "Bound type of foreign reference type cannot be assigned";
     | 153: str := "Bound type of foreign reference type cannot be value param";
     | 154: str := "It is not possible to extend an interface type";
-    | 155: str := "NEW illegal unless foreign supertype has no-arg constructor";
+    | 155: str := "NEW is illegal because foreign basetype has no no-arg constructor";
     | 156: str := "Interfaces can only extend ANYREC or the target Object type";
     | 157: str := "Only extensions of Foreign classes can implement interfaces";
     | 158: str := "Additional base types must be interface types";
@@ -513,6 +513,8 @@ MODULE CPascalErrors;
     | 238: str := "STA is illegal unless target is NET";
     | 239: str := "This module can only be accessed via an alias";
     | 240: str := "This module already has an alias";
+	| 241: str := "Variable has a foreign type without a no-arg constructor";
+
 
     | 298: str := "ILASM failed to assemble IL file";
     | 299: str := "Compiler raised an internal exception";
@@ -655,7 +657,7 @@ MODULE CPascalErrors;
     | 311: msg := LitValue.strToCharOpen('Access to variable <' 
 		       + s1 + '> will be inefficient');
     | 220,
-      312: msg := LitValue.strToCharOpen("Matches with - " + s1);
+      312: msg := LitValue.strToCharOpen("Also matches with - " + s1);
     | 313: msg := LitValue.strToCharOpen("Bound to - " + s1);
     END;
     IF ~nowarn OR                        (* If warnings are on OR  *)

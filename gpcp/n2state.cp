@@ -254,7 +254,7 @@ MODULE N2State;
     Console.WriteString(prefix);
     Console.WriteString(sumPre);
     IF flNm = 0 THEN
-      Console.WriteString(" No input files specified");
+      Console.WriteString(" No explicit input files specified");
     ELSE
       Console.WriteInt(flNm,1); 
       Console.WriteString(" input files");

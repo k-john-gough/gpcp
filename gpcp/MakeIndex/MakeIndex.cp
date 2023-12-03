@@ -69,7 +69,7 @@ BEGIN (* Static code of Module *)
   NEW(appState);
   IF ProgArgs.ArgNumber() = 0 THEN
     Console.WriteString("Usage: MakeIndex [-verb] -dst:dir"); Console.WriteLn;
-    Console.WriteString("     -dst:dir    - find symfiles in directory 'dir'"); Console.WriteLn;
+    Console.WriteString("     -dst:dir    - find Browse Files in directory 'dir'"); Console.WriteLn;
     Console.WriteString("     -verb[ose]  - emit progress information."); Console.WriteLn;
     Console.WriteString("Output file is 'dir\index.html'"); Console.WriteLn;
     HALT(0);
