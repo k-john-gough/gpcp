@@ -1,16 +1,14 @@
-
 (* ============================================================ *)
-(*  Target is the module which selects the target ClassMaker.   *)
-(*  Copyright (c) John Gough 1999, 2017.                        *)
+(*  Target is the module which selects the target ClassMaker.	*)
+(*  Copyright (c) John Gough 1999, 2017.			*)
 (* ============================================================ *)
 
-MODULE JavaTarget; (* JavaTargetForJVM.cp *)
+MODULE JavaTarget; (* JavaTargetForCLR.cp *)
 
   IMPORT 
         RTS,
-        GPCPcopyright,
-        CompState,
-        AsmUtil,
+	GPCPcopyright,
+	CompState,
         JavaUtil,
         ClassUtil;
 
@@ -18,11 +16,7 @@ MODULE JavaTarget; (* JavaTargetForJVM.cp *)
 
   PROCEDURE NewJavaEmitter*(IN fileName : ARRAY OF CHAR) : JavaUtil.JavaFile;
   BEGIN
-    IF CompState.doAsm5 THEN 
-      IF CompState.verbose THEN CompState.Message("Using ASM emitter") END;
-      RETURN AsmUtil.newAsmEmitter(fileName);
-    ELSIF CompState.doDWC THEN 
-      IF CompState.verbose THEN CompState.Message("Using DWC emitter") END;
+    IF CompState.doDWC THEN 
       RETURN ClassUtil.newClassFile(fileName);
     ELSE 
       THROW( "no jvm emitter chosen" );
@@ -31,8 +25,8 @@ MODULE JavaTarget; (* JavaTargetForJVM.cp *)
 
 (* ============================================================ *)
 BEGIN
-  IF RTS.defaultTarget # "jvm" THEN
-    CompState.Abort("Wrong JavaTarget implementation: Use JavaTargetForCLR.cp");
+  IF RTS.defaultTarget = "jvm" THEN
+    CompState.Abort("Wrong JavaTarget implementation: Use JavaTargetForJVM.cp");
   END;
 END JavaTarget.
 (* ============================================================ *)

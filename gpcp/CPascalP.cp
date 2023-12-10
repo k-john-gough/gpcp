@@ -2637,6 +2637,24 @@ VAR
                         defScp : Sy.Scope;
                         vMod   : INTEGER);  (* vMod ??? *)
    (* ----------------------------------------- *)
+    PROCEDURE CheckIsConstructor(rec : Ty.Record; prcD : Id.Procs);
+	 (* --------------------- *)
+	  PROCEDURE isConstB() : BOOLEAN;
+      BEGIN
+	    IF ~(nextT.sym = T.identSym) THEN RETURN FALSE END;
+		RETURN NameHash.enterSubStr(nextT.pos, nextT.len) = Bi.constB;
+	  END isConstB;
+	 (* --------------------- *)
+	BEGIN
+	  Get;
+	  IF isConstB() THEN 
+	    Get; (* read past "CONSTRUCTOR" *)
+		prcD.SetKind(Id.ctorP);
+	  ELSE 
+	    prcD.IdError(6);
+	  END;
+	END CheckIsConstructor;
+   (* ----------------------------------------- *)
     PROCEDURE StaticProc(rec : Ty.Record; scp : Sy.Scope);
       VAR prcD : Id.Procs;
           prcT : Ty.Procedure;
@@ -2662,6 +2680,7 @@ VAR
       IF prcD.vMod # Sy.prvMode THEN INCL(prcD.pAttr, Id.public) END;
       IF nextT.sym = T.lparenSym THEN
         FormalParameters(prcT, prcD, scp);
+		IF nextT.sym = T.commaSym THEN CheckIsConstructor(rec, prcD) END;
       END;
       prcD.type := prcT;
       Ty.InsertInRec(prcD,rec,FALSE,oId,ok);

@@ -210,8 +210,12 @@ public class ClassDesc extends TypeDesc  {
       // End experimental code
 
       String clName = ((ClassRef) cp.Get(stream.readUnsignedShort())).GetName();
+      String extClName = "classes/" + clName;
       if (!qualName.equals(clName)) {
-        if (clName.startsWith(parentPkg.name)) {
+        if (clName.startsWith(parentPkg.name) ||
+            extClName.startsWith(parentPkg.name)
+           )
+        {
           if (verbose) { System.out.println(clName + " IS PART OF PACKAGE " + 
                                             parentPkg.name + " but name is not "
                                             + qualName); }

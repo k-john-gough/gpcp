@@ -528,10 +528,10 @@ public class RTS
 /* ------------------------------------------------------------ */
 //  PROCEDURE SRealToStrInvar*(r : SHORTREAL; OUT s : ARRAY OF CHAR);
 //  (** Decode a CP REAL into an array *)
-//  BEGIN END SRealToStr;
+//  BEGIN END SRealToStrInvar;
 //
-	// Known in ILASM as [RTS]RTS::SRealToStr
-	public static void SRealToStr(float num,
+	// Known in ILASM as [RTS]RTS::SRealToStrInvar
+	public static void SRealToStrInvar(float num,
 				     char[] str)
 	{
 	 // System.String lls = System.Convert.ToString(num);
@@ -544,10 +544,10 @@ public class RTS
 /* ------------------------------------------------------------ */
 //  PROCEDURE SRealToStrLocal*(r : SHORTREAL; OUT s : ARRAY OF CHAR);
 //  (** Decode a CP REAL into an array *)
-//  BEGIN END SRealToStr;
+//  BEGIN END SRealToStrLocal;
 //
-	// Known in ILASM as [RTS]RTS::SRealToStr
-	public static void SRealToStr(float num,
+	// Known in ILASM as [RTS]RTS::SRealToStrLocal
+	public static void SRealToStrLocal(float num,
 				     char[] str)
 	{
 	 // System.String lls = System.Convert.ToString(num);

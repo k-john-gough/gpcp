@@ -311,7 +311,7 @@ MODULE Browse;
     multiMods : BOOLEAN;
     args, argNo  : INTEGER;
     fileName, modName  : CharOpen;
-    printFNames, doAll, verbatim, verbose, unwind, hexCon, alpha : BOOLEAN;
+    printFNames, doAll, verbatim, verbose, unwind, hexCon, alpha, isHtml : BOOLEAN;
     doJS  : BOOLEAN;
     file  : GPBinFiles.FILE;
     sSym  : INTEGER;
@@ -922,7 +922,7 @@ MODULE Browse;
     GetSym();				(* Get past recSy rAtt	 *)
     IF (sSym = falSy) THEN
       INCL(rec.xAttr, Symbols.isFn);
-      INCL(rec.xAttr, Symbols.noNew);   (* remvove if ctor found *)
+      INCL(rec.xAttr, Symbols.noNew);   (* remove if ctor found  *)
       GetSym();
     ELSIF (sSym = truSy) THEN
       INCL(rec.xAttr, Symbols.fnInf);   (* This is an interface  *)
@@ -1205,7 +1205,7 @@ MODULE Browse;
 (* ============================================ *)
 
   PROCEDURE GetProc() : ProcDesc;
-  (* Procedure  = prcSy Name [String] [trySy] FormalType.  *)
+  (* Procedure  = prcSy Name [String] [truSy] FormalType.  *)
   VAR
     procDesc : ProcDesc;
   BEGIN
@@ -1420,7 +1420,7 @@ MODULE Browse;
       file := GPBinFiles.findLocal(mod.symName);
       IF file = NIL THEN
         file := GPBinFiles.findOnPath("CPSYM", mod.symName);
-        IF (file = NIL) OR (mod.progArg) THEN
+        IF (file = NIL) (* OR (mod.progArg)) *) THEN
           Error.WriteString("File <" + mod.symName^ + "> not found"); 
           Error.WriteLn;
           HALT(1);
@@ -2210,18 +2210,20 @@ END WriteLinefold;
      (* ##### *)
       output.WriteString(")"); 
     END;
-   (* should only apply for html output? *)
-    IF Symbols.isFn IN r.xAttr THEN
+
+   (* should only apply for html output *)
+    IF (Symbols.isFn IN r.xAttr) & isHtml THEN
       output.WriteLinefold(indent);
       output.WriteString(prFx);
       output.WriteComment(MkComment(r.xAttr));
     END;
     
     IF r.methods.list # NIL THEN
-      output.WriteLinefold(indent);
-      IF r.declarer # NIL THEN 
+      IF r.declarer # NIL THEN
+	    output.WriteLinefold(indent);
         output.MethRef(r.declarer.name);
       ELSIF (r.ptrType # NIL) & (r.ptrType.declarer # NIL) THEN
+	    output.WriteLinefold(indent);
         output.MethRef(r.ptrType.declarer.name);
       END;
     END;
@@ -2867,6 +2869,7 @@ BEGIN
     END;
     IF argNo < args THEN ProgArgs.GetArg(argNo,option) ELSE RETURN argNo END;
   END;
+  IF htmlOutput THEN isHtml := TRUE END;
   RETURN argNo;
 END ParseOptions;
 
@@ -2902,7 +2905,7 @@ END ParseOptions;
               GPTextFiles.createFile(fNamePtr^);
           ELSE
             fNamePtr := mkPathName(fNamePtr^);
-          output(FileOutput).file := 
+            output(FileOutput).file := 
               GPTextFiles.createPath(fNamePtr);
           END;
           IF verbose THEN
