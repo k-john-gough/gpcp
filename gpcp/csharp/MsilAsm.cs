@@ -45,7 +45,10 @@ public class MsilAsm {
                 asm = new Process();
                 System.String frameworkDir = GetDotNetRuntimeInstallDirectory();
                 //System.String frameworkDir = Environment.GetEnvironmentVariable("NET40", EnvironmentVariableTarget.User);
-                asm.StartInfo.FileName = frameworkDir + "\\" + "ilasm";
+                asm.StartInfo.FileName = frameworkDir
+                  + (frameworkDir[0] == '/' ?
+                        "/../../../Commands/" : "\\") + "ilasm";
+
                 asm.StartInfo.CreateNoWindow = true;
                 asm.StartInfo.UseShellExecute = false;
             }

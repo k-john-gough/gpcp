@@ -9,12 +9,15 @@ import java.io.*;
 
 public class StdIn
 {
+        private static boolean eof = false;
+
         private static BufferedReader rdr = 
                new BufferedReader(new InputStreamReader(System.in));
 
 	public static void ReadLn(char[] arr) throws IOException {
             String str = rdr.readLine();
             if (str == null) {
+                eof = true;
                 arr[0] = '\0'; return;
             }
             int len = arr.length;
@@ -31,8 +34,9 @@ public class StdIn
 
         public static boolean More() throws IOException
 	{
-	    return true;         // temporary fix until we figure out
-	 // return rdr.ready();  // how to get the same semantics for
+         // return !eof;
+	 // return true;         // temporary fix until we figure out
+	    return rdr.ready();  // how to get the same semantics for
 	}                        // .NET and the JVM (kjg Sep. 2004)
 
 	public static void SkipLn() throws IOException
